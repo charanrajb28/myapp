@@ -1,0 +1,1 @@
+This directory will contain the authentication service, which will handle all the communication with Firebase Auth.
