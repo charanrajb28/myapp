@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'student_detail_screen.dart';
+import 'add_student_screen.dart';
 
 class StudentsListScreen extends StatelessWidget {
   const StudentsListScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,7 +51,7 @@ class StudentsListScreen extends StatelessWidget {
                             children: [
                               Expanded(child: _buildExportButton()),
                               const SizedBox(width: 12),
-                              Expanded(child: _buildAddButton()),
+                              Expanded(child: _buildAddButton(context)),
                             ],
                           ),
                         ],
@@ -67,7 +68,7 @@ class StudentsListScreen extends StatelessWidget {
                           const SizedBox(width: 12),
                           _buildExportButton(),
                           const SizedBox(width: 12),
-                          _buildAddButton(),
+                          _buildAddButton(context),
                         ],
                       ),
               ),
@@ -113,6 +114,19 @@ class StudentsListScreen extends StatelessWidget {
                                 department: index % 3 == 0 ? 'Computer Science' : 'Information Tech',
                                 status: status,
                                 company: company,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => StudentDetailScreen(
+                                        studentName: 'Student Name ${index + 1}',
+                                        collegeId: 'ID-2026-00${index + 1}',
+                                        status: status,
+                                        department: index % 3 == 0 ? 'Computer Science' : 'Information Tech',
+                                        company: company,
+                                      ),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),
@@ -223,11 +237,16 @@ class StudentsListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAddButton() {
+  Widget _buildAddButton(BuildContext context) {
     return SizedBox(
       height: 48,
       child: ElevatedButton.icon(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddStudentScreen()),
+          );
+        },
         icon: const Icon(Icons.add_rounded, size: 18),
         label: const Text('Student', style: TextStyle(fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
@@ -260,6 +279,7 @@ class StudentsListScreen extends StatelessWidget {
     required String department,
     required String status,
     required String company,
+    required VoidCallback onTap,
   }) {
     final isAlert = status == 'Red Alert';
     final isUnassigned = status == 'Unassigned';
@@ -274,7 +294,7 @@ class StudentsListScreen extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {},
+          onTap: onTap,
           hoverColor: const Color(0xFFF8FAFC),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
