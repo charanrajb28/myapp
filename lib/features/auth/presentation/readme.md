@@ -1,1 +1,0 @@
-This directory will contain all the presentation-layer components for the authentication feature.

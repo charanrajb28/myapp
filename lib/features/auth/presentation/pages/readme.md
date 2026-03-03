@@ -1,1 +1,0 @@
-This directory will contain all the pages for the authentication feature.

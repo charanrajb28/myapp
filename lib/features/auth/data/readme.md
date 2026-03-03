@@ -1,1 +1,0 @@
-This directory will contain all the data-layer components for the authentication feature.
