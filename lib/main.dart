@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
+import 'screens/student/student_shell.dart';
 
 void main() {
   runApp(const MyApp());
@@ -308,6 +310,18 @@ class _LoginPageState extends State<LoginPage>
                                     builder: (context) => const AdminShell(
                                       child: AdminDashboardScreen(),
                                     ),
+                                  ),
+                                );
+                              } else if (_devRole == 'Student') {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                    builder: (context) => const StudentShell(),
+                                  ),
+                                );
+                              } else if (_devRole == 'Company') {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                    builder: (context) => const CompanyShell(),
                                   ),
                                 );
                               } else {

@@ -1,0 +1,10 @@
+﻿Analyzing student...
+
+  error - internship\my_internship_screen.dart:200:27 - Undefined name '_kInternships'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+warning - internship\my_internship_screen.dart:121:31 - The declaration '_past' isn't referenced. Try removing the declaration of '_past'. - unused_element
+   info - checkins\checkins_screen.dart:459:35 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - dashboard\student_dashboard_screen.dart:717:35 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - internship\my_internship_screen.dart:234:29 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - student_shell.dart:12:10 - Invalid use of a private type in a public API. Try making the private type public, or making the API that uses the private type also be private. - library_private_types_in_public_api
+
+6 issues found.

@@ -1,0 +1,8 @@
+﻿Analyzing student...
+
+warning - internship\my_internship_screen.dart:121:31 - The declaration '_past' isn't referenced. Try removing the declaration of '_past'. - unused_element
+   info - checkins\checkins_screen.dart:459:35 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - dashboard\student_dashboard_screen.dart:717:35 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - internship\my_internship_screen.dart:233:29 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+
+4 issues found.
