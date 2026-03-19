@@ -489,9 +489,9 @@ class _StatCard extends StatelessWidget {
       width: cardWidth,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color.withValues(alpha: 0.03), // Subtle shade
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 12)),
           BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2)),
@@ -634,9 +634,9 @@ class _ActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color.withValues(alpha: 0.03), // Subtle shade
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),

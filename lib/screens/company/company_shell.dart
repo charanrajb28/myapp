@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 import 'dashboard/company_dashboard_screen.dart';
+import 'postings/manage_postings_screen.dart';
+import 'candidates/manage_candidates_screen.dart';
+import 'profile/company_profile_screen.dart';
 
 class CompanyShell extends StatefulWidget {
   const CompanyShell({super.key});
 
   @override
   State<CompanyShell> createState() => _CompanyShellState();
+
+  static _CompanyShellState? of(BuildContext context) =>
+      context.findAncestorStateOfType<_CompanyShellState>();
 }
 
 class _CompanyShellState extends State<CompanyShell> {
   int _currentIndex = 0;
 
+  void setIndex(int index) {
+    setState(() => _currentIndex = index);
+  }
+
   final List<Widget> _screens = [
     const CompanyDashboardScreen(),
-    const Scaffold(body: Center(child: Text('My Postings'))),
-    const Scaffold(body: Center(child: Text('Candidate Management'))),
-    const Scaffold(body: Center(child: Text('Settings'))),
+    const ManagePostingsScreen(),
+    const ManageCandidatesScreen(),
+    const CompanyProfileScreen(),
   ];
 
   @override
@@ -47,9 +57,9 @@ class _CompanyShellState extends State<CompanyShell> {
             label: 'Candidates',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings_rounded),
-            label: 'Settings',
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Profile',
           ),
         ],
       ),
