@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../models/internship.dart';
 import '../internship/my_internship_screen.dart';
+import '../internship/student_internship_detail_screen.dart';
+import '../internship/student_internship_alerts_screen.dart';
 import '../student_shell.dart';
 
 class StudentDashboardScreen extends StatelessWidget {
@@ -17,21 +20,10 @@ class StudentDashboardScreen extends StatelessWidget {
                 // ── App bar with greeting ──
                 SliverToBoxAdapter(child: _Header()),
 
-                // ── Status banner ──
+                // ── Internship Carousel ──
                 const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                const SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  sliver: SliverToBoxAdapter(child: _InternshipStatusBanner()),
-                ),
+                const SliverToBoxAdapter(child: _InternshipCarousel()),
 
-                // ── Stat cards ──
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverToBoxAdapter(
-                    child: _StatCardGrid(constraints: constraints),
-                  ),
-                ),
 
                 // ── Quick actions ──
                 const SliverToBoxAdapter(child: SizedBox(height: 28)),
@@ -40,15 +32,9 @@ class StudentDashboardScreen extends StatelessWidget {
                   sliver: SliverToBoxAdapter(child: _QuickActions()),
                 ),
 
-                // ── Recent Activity ──
-                const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                const SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverToBoxAdapter(child: _RecentActivity()),
-                ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                const SliverToBoxAdapter(child: SizedBox(height: 48)),
               ],
+
             );
           },
         ),
@@ -159,388 +145,296 @@ class _Header extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-class _InternshipStatusBanner extends StatelessWidget {
-  const _InternshipStatusBanner();
+class _InternshipCarousel extends StatefulWidget {
+  const _InternshipCarousel();
+
+  @override
+  State<_InternshipCarousel> createState() => _InternshipCarouselState();
+}
+
+class _InternshipCarouselState extends State<_InternshipCarousel> {
+  final PageController _pageController = PageController(viewportFraction: 0.92);
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Pull the single active internship from shared data
     final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    
     if (active.isEmpty) {
-      return _noActiveInternshipCard(context);
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _noActiveInternshipCard(context),
+      );
     }
-    final intern = active.first;
 
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => InternshipDetailScreen(internship: intern),
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF020617), Color(0xFF1E293B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    final currentIntern = active[_currentPage];
+
+    return Column(
+      children: [
+        // Top Carousel: Company Header
+        SizedBox(
+          height: 160, // Increased height to prevent vertical overflow with more details
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemCount: active.length,
+            itemBuilder: (context, index) {
+              final intern = active[index];
+              return AnimatedBuilder(
+                animation: _pageController,
+                builder: (context, child) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => StudentInternshipDetailScreen(internship: intern),
+                          ),
+                        );
+                      },
+                      child: _CompanyHeaderCard(internship: intern),
+                    ),
+                  );
+                },
+              );
+            },
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F172A).withValues(alpha: 0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
+        if (active.length > 1) ...[
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              active.length,
+              (index) => Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _currentPage == index
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        // Bottom Section: 3 Stat Cards (Linked to Selection)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
             children: [
-              // Subtle light leak effects
-              Positioned(
-                top: -30,
-                right: -30,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: intern.brandColor.withValues(alpha: 0.15),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SmallStatCard(
+                      title: 'Check-ins',
+                      value: '42',
+                      icon: Icons.qr_code_scanner_rounded,
+                      color: const Color(0xFF10B981),
+                      onTap: () => StudentShell.of(context)?.setIndex(2),
+                    ),
                   ),
-                ),
-              ),
-              Positioned(
-                bottom: -50,
-                left: -20,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.03),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _SmallStatCard(
+                      title: 'Alerts',
+                      value: '2',
+                      icon: Icons.error_outline_rounded,
+                      color: const Color(0xFFEF4444),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => StudentInternshipAlertsScreen(internship: currentIntern),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+
+
+                ],
               ),
-              // Main Content
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        // Company logo avatar
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                          ),
-                          child: Center(
-                            child: Text(
-                              intern.logoInitial,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white.withValues(alpha: 0.9),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                intern.company,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                intern.role,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF94A3B8),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        _activeBadge(),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Overall Completion',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          '${(intern.progress * 100).round()}% ',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Stack(
-                      children: [
-                        Container(
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: intern.progress,
-                          child: Container(
-                            height: 10,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [intern.brandColor, intern.brandColor.withValues(alpha: 0.8)],
-                              ),
-                              borderRadius: BorderRadius.circular(5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: intern.brandColor.withValues(alpha: 0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        _statusChip(Icons.calendar_today_rounded, '${intern.startDate} – ${intern.endDate}'),
-                        const SizedBox(width: 12),
-                        _statusChip(Icons.timer_outlined, '${intern.daysLeft}d left'),
-                      ],
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 14),
+              _LargeStatCard(
+                title: 'Days Remaining',
+                value: '${currentIntern.daysLeft}',
+                icon: Icons.hourglass_bottom_rounded,
+                color: const Color(0xFFF59E0B),
+                onAction: null, // Disabled
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-  
-  Widget _activeBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFF10B981).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          const Text(
-            'ACTIVE',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF10B981), letterSpacing: 0.5),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusChip(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: const Color(0xFF94A3B8)),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE2E8F0))),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _noActiveInternshipCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: const Row(children: [
-        Icon(Icons.work_off_rounded, size: 32, color: Color(0xFF94A3B8)),
-        SizedBox(width: 14),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('No Active Internship',
-              style: TextStyle(
-                  fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-          Text('Check Internships tab for upcoming offers.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-        ]),
-      ]),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-class _StatCardGrid extends StatelessWidget {
-  final BoxConstraints constraints;
-  const _StatCardGrid({required this.constraints});
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        _StatCard(
-          title: 'Check-ins Done',
-          value: '42',
-          icon: Icons.check_circle_rounded,
-          color: const Color(0xFF10B981),
-          constraints: constraints,
-        ),
-        _StatCard(
-          title: 'Reports Filed',
-          value: '8',
-          icon: Icons.article_rounded,
-          color: const Color(0xFF3B82F6),
-          constraints: constraints,
-        ),
-        _StatCard(
-          title: 'Days Remaining',
-          value: '42',
-          icon: Icons.hourglass_bottom_rounded,
-          color: const Color(0xFFF59E0B),
-          constraints: constraints,
-        ),
-        _StatCard(
-          title: 'Alerts',
-          value: '0',
-          icon: Icons.notifications_none_rounded,
-          color: const Color(0xFF64748B),
-          constraints: constraints,
-        ),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final BoxConstraints constraints;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.constraints,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cardWidth = (constraints.maxWidth - 40 - 12) / 2;
-
-    return Container(
-      width: cardWidth,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.03), // Subtle shade
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.1)),
-        boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 12)),
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2)),
+      child: Column(
+        children: [
+          const Icon(Icons.work_off_rounded, size: 48, color: Color(0xFF94A3B8)),
+          const SizedBox(height: 16),
+          const Text(
+            'No Active Internship',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Check Internships tab for upcoming offers.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _CompanyHeaderCard extends StatelessWidget {
+  final StudentInternship internship;
+  const _CompanyHeaderCard({required this.internship});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+      ),
+
       child: Stack(
         children: [
+          // Subtle background decorative circles
           Positioned(
-            right: -15, top: -15,
+            right: -30,
+            top: -30,
             child: Container(
-              width: 70, height: 70,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.04),
                 shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.03),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            padding: const EdgeInsets.all(24),
+            child: Row(
               children: [
+                // Logo Container with glassmorphism style
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const SizedBox(height: 24),
-                FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    value,
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), height: 1.0, letterSpacing: -1),
-                    maxLines: 1,
+                  child: Center(
+                    child: Text(
+                      internship.logoInitial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 28,
+                        letterSpacing: -1,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    title.toUpperCase(),
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w800, letterSpacing: 0.8),
-                    maxLines: 1,
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          _activeBadge(),
+                          const SizedBox(width: 8),
+                          Text(
+                            internship.id,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        internship.company,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        internship.role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // New details row
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on_rounded, size: 12, color: Colors.white.withValues(alpha: 0.4)),
+                            const SizedBox(width: 4),
+                            Text(
+                              internship.location,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                            ),
+                            const SizedBox(width: 12),
+                            Icon(Icons.payments_rounded, size: 12, color: Colors.white.withValues(alpha: 0.4)),
+                            const SizedBox(width: 4),
+                            Text(
+                              internship.stipend,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    ],
                   ),
                 ),
               ],
@@ -550,7 +444,186 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _activeBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        'ACTIVE',
+        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF10B981)),
+      ),
+    );
+  }
 }
+
+class _SmallStatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _SmallStatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.1)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                ),
+                Text(
+                  title.toUpperCase(),
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 0.5),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LargeStatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onAction;
+
+  const _LargeStatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF94A3B8),
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: onAction,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF1F5F9),
+                elevation: 0,
+                disabledBackgroundColor: const Color(0xFFF1F5F9),
+                disabledForegroundColor: const Color(0xFF94A3B8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.lock_outline_rounded, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'SUBMIT FINAL REPORT',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                      color: const Color(0xFF94A3B8).withValues(alpha: 0.8),
+                    ),
+                  ),
+
+
+                ],
+              ),
+            ),
+          ),
+
+        ],
+      ),
+    );
+  }
+}
+
 
 // ─────────────────────────────────────────────────────────────────
 class _QuickActions extends StatelessWidget {
@@ -581,12 +654,12 @@ class _QuickActions extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         _ActionTile(
-          title: 'Submit Weekly Report',
-          subtitle: 'Week 8 report due in 2 days',
-          icon: Icons.article_rounded,
+          title: 'View Notifications',
+          subtitle: 'You have 2 unread alerts',
+          icon: Icons.notifications_active_rounded,
           color: const Color(0xFF3B82F6),
-          badge: 'WEEK 8',
-          badgeColor: const Color(0xFF3B82F6),
+          badge: 'NEW',
+          badgeColor: const Color(0xFFEF4444),
           onTap: () => StudentShell.of(context)?.setIndex(3),
         ),
         const SizedBox(height: 10),
@@ -734,10 +807,10 @@ class _RecentActivity extends StatelessWidget {
       subtitle: 'Today at 9:14 AM',
     ),
     _Activity(
-      icon: Icons.article_rounded,
+      icon: Icons.notifications_active_rounded,
       color: Color(0xFF3B82F6),
-      title: 'Week 7 report reviewed',
-      subtitle: 'Mar 10 • Reviewed by Admin',
+      title: 'New Grade Published',
+      subtitle: '2 hours ago • Industrial Training Phase 1',
     ),
     _Activity(
       icon: Icons.workspace_premium_rounded,
@@ -748,8 +821,8 @@ class _RecentActivity extends StatelessWidget {
     _Activity(
       icon: Icons.notifications_rounded,
       color: Color(0xFF8B5CF6),
-      title: 'Reminder: Week 8 report due',
-      subtitle: 'Due Mar 16',
+      title: 'Company Visit Scheduled',
+      subtitle: 'Upcoming on Mar 25',
     ),
   ];
 

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dashboard/student_dashboard_screen.dart';
 import 'internship/my_internship_screen.dart';
 import 'checkins/checkins_screen.dart';
-import 'reports/student_reports_screen.dart';
+import 'notifications/student_notifications_screen.dart';
 import 'profile/student_profile_screen.dart';
 
 
@@ -29,7 +29,7 @@ class StudentShellState extends State<StudentShell> {
     StudentDashboardScreen(),
     MyInternshipScreen(),
     CheckinsScreen(),
-    StudentReportsScreen(),
+    const StudentNotificationsScreen(),
     StudentProfileScreen(),
   ];
 
@@ -66,9 +66,9 @@ class StudentShellState extends State<StudentShell> {
             label: 'Check-In',
           ),
           NavigationDestination(
-            icon: Icon(Icons.article_outlined),
-            selectedIcon: Icon(Icons.article_rounded),
-            label: 'Reports',
+            icon: Icon(Icons.notifications_outlined),
+            selectedIcon: Icon(Icons.notifications_rounded),
+            label: 'Notifications',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),

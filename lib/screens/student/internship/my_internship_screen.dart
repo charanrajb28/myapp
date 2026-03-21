@@ -25,25 +25,26 @@ const List<StudentInternship> kStudentInternships = [
   ),
   StudentInternship(
     id: 'INT-2023-007',
-    company: 'DataDynamics',
-    role: 'Data Engineering Intern',
-    department: 'Data Analytics',
-    location: 'Austin, TX',
-    startDate: 'Jun 1, 2023',
-    endDate: 'Aug 31, 2023',
-    progress: 1.0,
-    daysLeft: 0,
-    status: 'Completed',
-    brandColor: const Color(0xFF8B5CF6),
-    logoInitial: 'D',
-    stipend: '₹12,000 / month',
-    mentorName: 'Ananya Shah',
-    mentorEmail: 'a.shah@datadynamics.io',
-    offerLetterId: 'DD-2023-INT-0044',
+    company: 'Nexus Robotics',
+    role: 'Robotics Engineering Intern',
+    department: 'Hardware Systems',
+    location: 'Boston, MA',
+    startDate: 'Jan 1, 2025',
+    endDate: 'Jun 30, 2025',
+    progress: 0.15,
+    daysLeft: 124,
+    status: 'Active',
+    brandColor: const Color(0xFFF59E0B),
+    logoInitial: 'N',
+    stipend: '₹18,000 / month',
+    mentorName: 'Sarah Jenkins',
+    mentorEmail: 's.jenkins@nexus.io',
+    offerLetterId: 'NX-2025-INT-0012',
     about:
-        'Specialises in real-time data pipelines and predictive analytics for Fortune 500 clients.',
+        'Design and build the future of automated logistics and industrial bots.',
   ),
 ];
+
 
 const List<InternshipOpportunity> kAvailableInternships = [
   InternshipOpportunity(
