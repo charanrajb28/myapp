@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../models/internship.dart';
+import '../internship/my_internship_screen.dart'; // To access kStudentInternships
 
 class CheckinsScreen extends StatefulWidget {
   const CheckinsScreen({super.key});
@@ -9,7 +11,10 @@ class CheckinsScreen extends StatefulWidget {
 
 class _CheckinsScreenState extends State<CheckinsScreen>
     with SingleTickerProviderStateMixin {
-  bool _checkedInToday = false;
+  int _selectedInternshipIndex = 0;
+  final Map<String, bool> _checkedInStatus = {};
+  final Map<String, bool> _checkedOutStatus = {};
+  
   bool _submitting = false;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
@@ -56,26 +61,63 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   }
 
   Future<void> _processCheckIn() async {
+    final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    if (active.isEmpty) return;
+    final companyId = active[_selectedInternshipIndex].id;
+
     setState(() => _submitting = true);
     await Future.delayed(const Duration(seconds: 1));
     setState(() {
       _submitting = false;
-      _checkedInToday = true;
+      _checkedInStatus[companyId] = true;
     });
+    _showSnackBar('Check-in recorded for ${active[_selectedInternshipIndex].company}!', const Color(0xFF10B981));
+  }
+
+  Future<void> _submitCheckOut() async {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return _QRScannerOverlay(
+          onScanComplete: () {
+            Navigator.pop(context);
+            _processCheckOut();
+          },
+          onCancel: () => Navigator.pop(context),
+        );
+      },
+    );
+  }
+
+  Future<void> _processCheckOut() async {
+    final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    if (active.isEmpty) return;
+    final companyId = active[_selectedInternshipIndex].id;
+
+    setState(() => _submitting = true);
+    await Future.delayed(const Duration(seconds: 1));
+    setState(() {
+      _submitting = false;
+      _checkedOutStatus[companyId] = true;
+    });
+    _showSnackBar('Check-out recorded for ${active[_selectedInternshipIndex].company}!', const Color(0xFF3B82F6));
+  }
+
+  void _showSnackBar(String msg, Color color) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 10),
-              Text(
-                'Attendance recorded successfully!',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),
-          backgroundColor: const Color(0xFF10B981),
+          backgroundColor: color,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -86,6 +128,19 @@ class _CheckinsScreenState extends State<CheckinsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    if (active.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(title: const Text('Daily Check-In')),
+        body: const Center(child: Text('No active internships to check in.')),
+      );
+    }
+    final int safeIndex = _selectedInternshipIndex.clamp(0, active.length - 1);
+    final currentInternship = active[safeIndex];
+    final bool checkedIn = _checkedInStatus[currentInternship.id] ?? false;
+    final bool checkedOut = _checkedOutStatus[currentInternship.id] ?? false;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -108,27 +163,80 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
+          // ── Company Selector ──
+          if (active.length > 1) ...[
+            const Text(
+              'Select Company',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF1E293B)),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: active.length,
+                itemBuilder: (context, index) {
+                  final intern = active[index];
+                  final isSelected = _selectedInternshipIndex == index;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedInternshipIndex = index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 140,
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isSelected ? Colors.transparent : const Color(0xFFE2E8F0)),
+                        boxShadow: isSelected ? [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))] : null,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(color: isSelected ? Colors.white12 : intern.brandColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+                            child: Text(intern.logoInitial, style: TextStyle(color: isSelected ? Colors.white : intern.brandColor, fontWeight: FontWeight.w900, fontSize: 14)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            intern.company,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+
           // ── Today's status card ──
-          _todayCard(),
+          _todayCard(currentInternship, checkedIn, checkedOut),
           const SizedBox(height: 24),
 
           // ── Check-in button ──
-          _checkInButton(),
+          _checkInButton(checkedIn, checkedOut),
           const SizedBox(height: 28),
 
           // ── This week calendar strip ──
-          _weekStrip(),
+          _weekStrip(checkedIn),
           const SizedBox(height: 28),
 
           // ── History section ──
-          _historySection(),
+          _historySection(currentInternship.company),
           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _todayCard() {
+  Widget _todayCard(StudentInternship internship, bool checkedIn, bool checkedOut) {
     final now = DateTime.now();
     final dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][now.weekday - 1];
     final monthName = [
@@ -141,7 +249,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (_checkedInToday
+            color: (checkedIn
                     ? const Color(0xFF10B981)
                     : const Color(0xFF0F172A))
                 .withValues(alpha: 0.25),
@@ -159,7 +267,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: _checkedInToday
+                  colors: checkedIn
                       ? [const Color(0xFF059669), const Color(0xFF10B981)]
                       : [const Color(0xFF0F172A), const Color(0xFF1E293B)],
                   begin: Alignment.topLeft,
@@ -196,9 +304,9 @@ class _CheckinsScreenState extends State<CheckinsScreen>
                             color: Colors.white.withValues(alpha: 0.5),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                      const SizedBox(height: 8),
                         Text(
-                          '$dayName, ${now.day} $monthName',
+                          internship.company,
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
@@ -206,39 +314,37 @@ class _CheckinsScreenState extends State<CheckinsScreen>
                             letterSpacing: -0.5,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$dayName, ${now.day} $monthName',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
                         const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(30),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _checkedInToday ? Icons.verified_rounded : Icons.info_outline_rounded,
-                                size: 14,
-                                color: _checkedInToday ? const Color(0xFF4ADE80) : Colors.white70,
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _statusBadge(
+                              checkedIn ? 'CHECKED IN' : 'PENDING IN',
+                              checkedIn ? const Color(0xFF4ADE80) : Colors.white,
+                              checkedIn ? Icons.login_rounded : Icons.info_outline_rounded,
+                            ),
+                            if (checkedIn)
+                              _statusBadge(
+                                checkedOut ? 'CHECKED OUT' : 'PENDING OUT',
+                                checkedOut ? const Color(0xFF60A5FA) : Colors.white70,
+                                checkedOut ? Icons.logout_rounded : Icons.timer_outlined,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _checkedInToday ? 'SECURED FOR TODAY' : 'PENDING CHECK-IN',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: _checkedInToday ? const Color(0xFF4ADE80) : Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  _indicatorIcon(),
+                  _indicatorIcon(checkedIn, checkedOut),
                 ],
               ),
             ),
@@ -248,8 +354,20 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     );
   }
 
-  Widget _indicatorIcon() {
-    if (_checkedInToday) {
+  Widget _indicatorIcon(bool checkedIn, bool checkedOut) {
+    if (checkedIn && checkedOut) {
+      return Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          color: const Color(0xFF10B981).withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.2)),
+        ),
+        child: const Icon(Icons.verified_user_rounded, size: 36, color: Colors.white),
+      );
+    }
+    if (checkedIn) {
       return Container(
         width: 64,
         height: 64,
@@ -258,7 +376,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
-        child: const Icon(Icons.check_circle_rounded, size: 36, color: Colors.white),
+        child: const Icon(Icons.timer_rounded, size: 36, color: Colors.white),
       );
     }
     return ScaleTransition(
@@ -281,8 +399,35 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     );
   }
 
-  Widget _checkInButton() {
-    if (_checkedInToday) {
+  Widget _statusBadge(String text, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              color: color,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _checkInButton(bool checkedIn, bool checkedOut) {
+    if (checkedIn && checkedOut) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 18),
@@ -295,11 +440,11 @@ class _CheckinsScreenState extends State<CheckinsScreen>
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_rounded,
+            Icon(Icons.task_alt_rounded,
                 color: Color(0xFF10B981), size: 22),
             SizedBox(width: 10),
             Text(
-              'Attendance Recorded for Today',
+              'Daily Attendance Completed',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -311,26 +456,30 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       );
     }
 
+    final bool isCheckout = checkedIn;
+
     return Container(
       width: double.infinity,
       height: 60,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         gradient: LinearGradient(
-          colors: [const Color(0xFF0F172A), const Color(0xFF334155)],
+          colors: isCheckout 
+            ? [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)]
+            : [const Color(0xFF0F172A), const Color(0xFF334155)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.2),
+            color: (isCheckout ? const Color(0xFF3B82F6) : const Color(0xFF0F172A)).withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
       ),
       child: ElevatedButton(
-        onPressed: _submitting ? null : _submitCheckIn,
+        onPressed: _submitting ? null : (isCheckout ? _submitCheckOut : _submitCheckIn),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
@@ -343,14 +492,14 @@ class _CheckinsScreenState extends State<CheckinsScreen>
                 height: 24,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.qr_code_scanner_rounded, size: 22),
-                  SizedBox(width: 12),
+                  Icon(isCheckout ? Icons.logout_rounded : Icons.qr_code_scanner_rounded, size: 22),
+                  const SizedBox(width: 12),
                   Text(
-                    'START QR SCANNER',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1),
+                    isCheckout ? 'CHECK OUT NOW' : 'START QR SCANNER',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1),
                   ),
                 ],
               ),
@@ -358,7 +507,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     );
   }
 
-  Widget _weekStrip() {
+  Widget _weekStrip(bool checkedIn) {
     final today = DateTime.now().weekday; // 1=Mon ... 7=Sun
     const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     // Mock: Mon–today checked in, rest missing/upcoming
@@ -401,7 +550,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
 
               if (isWeekend) {
                 accentColor = const Color(0xFFE2E8F0);
-              } else if ((isToday && _checkedInToday) || isChecked) {
+              } else if ((isToday && checkedIn) || isChecked) {
                 accentColor = const Color(0xFF10B981);
                 showCheck = true;
               } else if (isToday) {
@@ -460,7 +609,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     );
   }
 
-  Widget _historySection() {
+  Widget _historySection(String companyName) {
     const history = [
       _CheckInRecord('Mar 14', 'Friday', '9:08 AM', true),
       _CheckInRecord('Mar 13', 'Thursday', '9:21 AM', true),

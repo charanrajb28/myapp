@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
 import '../internship/my_internship_screen.dart';
-import '../internship/student_internship_detail_screen.dart';
 import '../internship/student_internship_alerts_screen.dart';
 import '../student_shell.dart';
 
@@ -27,8 +26,8 @@ class StudentDashboardScreen extends StatelessWidget {
 
                 // ── Quick actions ──
                 const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                const SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   sliver: SliverToBoxAdapter(child: _QuickActions()),
                 ),
 
@@ -196,7 +195,7 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => StudentInternshipDetailScreen(internship: intern),
+                            builder: (context) => InternshipDetailScreen(internship: intern),
                           ),
                         );
                       },
@@ -229,50 +228,54 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
           ),
         ],
         const SizedBox(height: 20),
-        // Bottom Section: 3 Stat Cards (Linked to Selection)
+        // Bottom Section: Internship Stats Grid
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             children: [
-              Row(
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 2.0,
                 children: [
-                  Expanded(
-                    child: _SmallStatCard(
-                      title: 'Check-ins',
-                      value: '42',
-                      icon: Icons.qr_code_scanner_rounded,
-                      color: const Color(0xFF10B981),
-                      onTap: () => StudentShell.of(context)?.setIndex(2),
-                    ),
+                  _StatGridCard(
+                    title: 'Check-ins',
+                    value: '42',
+                    icon: Icons.qr_code_scanner_rounded,
+                    color: const Color(0xFF10B981),
+                    onTap: () => StudentShell.of(context)?.setIndex(2),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _SmallStatCard(
-                      title: 'Alerts',
-                      value: '2',
-                      icon: Icons.error_outline_rounded,
-                      color: const Color(0xFFEF4444),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => StudentInternshipAlertsScreen(internship: currentIntern),
-                          ),
-                        );
-                      },
-                    ),
+                  _StatGridCard(
+                    title: 'Alerts',
+                    value: '2',
+                    icon: Icons.error_outline_rounded,
+                    color: const Color(0xFFEF4444),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => StudentInternshipAlertsScreen(internship: currentIntern),
+                        ),
+                      );
+                    },
                   ),
-
-
+                  _StatGridCard(
+                    title: 'Remaining',
+                    value: '${currentIntern.daysLeft}D',
+                    icon: Icons.hourglass_bottom_rounded,
+                    color: const Color(0xFFF59E0B),
+                  ),
+                  _StatGridCard(
+                    title: 'Feedback',
+                    value: 'ADMIN',
+                    icon: Icons.feedback_outlined,
+                    color: const Color(0xFFEC4899),
+                    onTap: () => _showFeedbackSheet(context, currentIntern),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 14),
-              _LargeStatCard(
-                title: 'Days Remaining',
-                value: '${currentIntern.daysLeft}',
-                icon: Icons.hourglass_bottom_rounded,
-                color: const Color(0xFFF59E0B),
-                onAction: null, // Disabled
               ),
             ],
           ),
@@ -304,6 +307,97 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
             style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+void _showFeedbackSheet(BuildContext context, StudentInternship internship) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _FeedbackSheet(internship: internship),
+  );
+}
+
+class _StatGridCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _StatGridCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.w900, 
+                          color: Color(0xFF0F172A), 
+                        ),
+                      ),
+                      Text(
+                        title.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 8.5, 
+                          fontWeight: FontWeight.w800, 
+                          color: Color(0xFF94A3B8), 
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -460,172 +554,6 @@ class _CompanyHeaderCard extends StatelessWidget {
   }
 }
 
-class _SmallStatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _SmallStatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.1)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 16),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                ),
-                Text(
-                  title.toUpperCase(),
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 0.5),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LargeStatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final VoidCallback? onAction;
-
-  const _LargeStatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.onAction,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF94A3B8),
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    Text(
-                      value,
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -1.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: onAction,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF1F5F9),
-                elevation: 0,
-                disabledBackgroundColor: const Color(0xFFF1F5F9),
-                disabledForegroundColor: const Color(0xFF94A3B8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.lock_outline_rounded, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    'SUBMIT FINAL REPORT',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                      letterSpacing: 0.5,
-                      color: const Color(0xFF94A3B8).withValues(alpha: 0.8),
-                    ),
-                  ),
-
-
-                ],
-              ),
-            ),
-          ),
-
-        ],
-      ),
-    );
-  }
-}
-
-
-// ─────────────────────────────────────────────────────────────────
 class _QuickActions extends StatelessWidget {
   const _QuickActions();
 
@@ -676,9 +604,8 @@ class _QuickActions extends StatelessWidget {
           subtitle: 'Download your authorization document',
           icon: Icons.document_scanner_rounded,
           color: const Color(0xFF8B5CF6),
-          onTap: () => StudentShell.of(context)?.setIndex(1), // Links to internship/documents
+          onTap: () => StudentShell.of(context)?.setIndex(1),
         ),
-
       ],
     );
   }
@@ -944,3 +871,194 @@ class _ActivityTile extends StatelessWidget {
     );
   }
 }
+
+
+class _FeedbackSheet extends StatefulWidget {
+  final StudentInternship internship;
+  const _FeedbackSheet({required this.internship});
+
+  @override
+  State<_FeedbackSheet> createState() => _FeedbackSheetState();
+}
+
+class _FeedbackSheetState extends State<_FeedbackSheet> {
+  int _feedbackType = 0; // 0: Compliment, 1: Complaint
+  final _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEC4899).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.feedback_rounded, color: Color(0xFFEC4899), size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Feedback for ${widget.internship.company}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                      ),
+                      const Text(
+                        'This message will be sent to the College Admin.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'NATURE OF FEEDBACK',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _typeOption(0, 'Compliment', Icons.favorite_rounded, const Color(0xFF10B981)),
+                const SizedBox(width: 12),
+                _typeOption(1, 'Complaint', Icons.warning_rounded, const Color(0xFFEF4444)),
+              ],
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'YOUR COMMENTS',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _commentController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: _feedbackType == 0 
+                  ? 'What did you like about the company?' 
+                  : 'Describe the issue or concern...',
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Color(0xFFEC4899), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showSuccessSnack(context, 'Feedback sent to Admin successfully');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                ),
+                child: const Text('SUBMIT TO ADMIN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _typeOption(int index, String label, IconData icon, Color color) {
+    bool isSelected = _feedbackType == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _feedbackType = index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? color : const Color(0xFFE2E8F0),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: isSelected ? color : const Color(0xFF64748B)),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? color : const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSuccessSnack(BuildContext context, String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+        const SizedBox(width: 12),
+        Expanded(child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600))),
+      ]),
+      backgroundColor: const Color(0xFF10B981),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.all(20),
+    ));
+  }
+}
+

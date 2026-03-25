@@ -839,24 +839,27 @@ class InternshipDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
+                    const SizedBox(height: 36),
                     _CompanyProfileCard(internship: internship),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 36),
                     _TimelineSectionCard(internship: internship),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 36),
+                    _AttendanceCalendarCard(internship: internship),
+                    const SizedBox(height: 36),
                     _DetailSectionCard(
                       title: 'Role & Department',
                       icon: Icons.badge_rounded,
                       color: internship.brandColor,
                       child: _RoleSection(internship: internship),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 36),
                     _DetailSectionCard(
                       title: 'Industry Mentor',
                       icon: Icons.person_pin_rounded,
                       color: const Color(0xFF8B5CF6),
                       child: _MentorSection(internship: internship),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 36),
                     _DetailSectionCard(
                       title: 'Documents',
                       icon: Icons.folder_rounded,
@@ -1232,6 +1235,8 @@ class _DocumentsSection extends StatelessWidget {
         Color(0xFF10B981)),
     _Doc('NDA Agreement', 'PDF  ·  0.5 MB', Icons.gavel_rounded,
         Color(0xFF8B5CF6)),
+    _Doc('Internship Certificate', 'PDF  ·  2.1 MB', Icons.workspace_premium_rounded,
+        Color(0xFFF59E0B)),
   ];
 
   @override
@@ -1467,4 +1472,136 @@ class _OpportunityListItem extends StatelessWidget {
   }
 }
 
+class _AttendanceCalendarCard extends StatelessWidget {
+  final StudentInternship internship;
+  const _AttendanceCalendarCard({required this.internship});
 
+  @override
+  Widget build(BuildContext context) {
+    // Mock attendance data: true = present, false = absent, null = upcoming
+    final List<bool?> attendance = List.generate(31, (i) {
+      if (i > 25) return null; // Upcoming days
+      if (i == 12 || i == 13 || i == 20) return false; // Mock absences/weekends
+      return true; // Present
+    });
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF3B82F6)),
+              SizedBox(width: 8),
+              Text(
+                'Attendance History',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'March 2024',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '92% RATE',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF10B981), letterSpacing: 0.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemCount: 31,
+            itemBuilder: (context, index) {
+              final status = attendance[index];
+              Color bgColor = const Color(0xFFF1F5F9);
+              Color textColor = const Color(0xFF64748B);
+              IconData? icon;
+
+              if (status == true) {
+                bgColor = const Color(0xFF10B981).withValues(alpha: 0.12);
+                textColor = const Color(0xFF059669);
+                icon = Icons.check_circle_rounded;
+              } else if (status == false) {
+                bgColor = const Color(0xFFEF4444).withValues(alpha: 0.1);
+                textColor = const Color(0xFFDC2626);
+                icon = Icons.close_rounded;
+              }
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: status == null
+                      ? Text(
+                          '${index + 1}',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textColor.withValues(alpha: 0.5)),
+                        )
+                      : Icon(icon, size: 16, color: textColor),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _legendItem('Present', const Color(0xFF10B981)),
+              _legendItem('Absent', const Color(0xFFEF4444)),
+              _legendItem('Holiday', const Color(0xFF94A3B8)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+      ],
+    );
+  }
+}

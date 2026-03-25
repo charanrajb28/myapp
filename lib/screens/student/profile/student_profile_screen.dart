@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'edit_profile_screen.dart';
+import 'student_documents_screen.dart';
+import 'security_password_screen.dart';
 
 class StudentProfileScreen extends StatefulWidget {
   const StudentProfileScreen({super.key});
@@ -44,8 +47,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildQuickStats(),
-                  const SizedBox(height: 32),
+                  // Quick stats removed as per user request
+                  const SizedBox(height: 12),
 
                   _buildSectionTitle('Academic Details', Icons.school_rounded, const Color(0xFF3B82F6)),
                   const SizedBox(height: 16),
@@ -100,8 +103,20 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
       pinned: true,
       elevation: 0,
       backgroundColor: _primaryColor,
-      stretch: true,
       surfaceTintColor: Colors.transparent,
+      actions: [
+        IconButton(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+          ),
+          icon: const Icon(Icons.edit_rounded, color: Colors.white70, size: 20),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.1),
+            padding: const EdgeInsets.all(10),
+          ),
+        ),
+        const SizedBox(width: 12),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         stretchModes: const [StretchMode.zoomBackground, StretchMode.blurBackground],
         background: Stack(
@@ -339,28 +354,23 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     ];
 
     return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 8,
+      runSpacing: 8,
       children: skills.map((s) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: (s['color'] as Color).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: (s['color'] as Color).withValues(alpha: 0.2)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 6, height: 6,
-              decoration: BoxDecoration(color: s['color'] as Color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              s['label'] as String,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: (s['color'] as Color)),
-            ),
-          ],
+        child: Text(
+          (s['label'] as String).toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10, 
+            fontWeight: FontWeight.w900, 
+            color: Color(0xFF64748B),
+            letterSpacing: 0.5,
+          ),
         ),
       )).toList(),
     );
@@ -440,11 +450,23 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
       ),
       child: Column(
         children: [
-          _actionTile('Edit Personal Details', Icons.edit_note_rounded, const Color(0xFF64748B), () {}),
+          _actionTile('Edit Personal Details', Icons.edit_note_rounded, const Color(0xFF64748B), () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+            );
+          }),
           _divider(),
-          _actionTile('Security & Password', Icons.lock_outline_rounded, const Color(0xFF64748B), () {}),
+          _actionTile('Security & Password', Icons.lock_outline_rounded, const Color(0xFF64748B), () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const SecurityPasswordScreen()),
+            );
+          }),
           _divider(),
-          _actionTile('Documents Box', Icons.folder_open_rounded, const Color(0xFF64748B), () {}),
+          _actionTile('Documents Box', Icons.folder_open_rounded, const Color(0xFF64748B), () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const StudentDocumentsScreen()),
+            );
+          }),
           _divider(),
           _actionTile('Privacy Policy', Icons.policy_rounded, const Color(0xFF64748B), () {}),
         ],
@@ -468,7 +490,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
   Widget _buildLogoutButton() {
     return InkWell(
-      onTap: () => Navigator.of(context).pushReplacementNamed('/'),
+      onTap: () => Navigator.of(context).pushNamed('/logout'),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),

@@ -141,6 +141,8 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
                       _ledgerRow('ESTABLISHED', 'OCT 2018', () => _showLedgerDetail(context, 'FOUNDING_DATE')),
                       _ledgerRow('EMPLOYEE_VAL', '850+ MEMBERS', () => _showLedgerDetail(context, 'ORGANIZATIONAL_SCALE')),
                       _ledgerRow('HQ_NODE', 'BANGALORE, KA', () => _showLedgerDetail(context, 'PRIMARY_LOCATION')),
+                      const SizedBox(height: 24),
+                      _logoutBtn(context),
                       const SizedBox(height: 100),
                     ]),
                   ),
@@ -260,6 +262,28 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
 
   void _showLedgerDetail(BuildContext context, String key) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('READING_LEDGER_${key}... ACCESS_GRANTED')));
+  }
+
+  Widget _logoutBtn(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pushNamed('/logout'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 18),
+            SizedBox(width: 12),
+            Text('TERMINATE_SESSION', style: TextStyle(color: Color(0xFFDC2626), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          ],
+        ),
+      ),
+    );
   }
 }
 

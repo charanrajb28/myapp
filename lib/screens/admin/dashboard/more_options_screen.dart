@@ -208,7 +208,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
                   style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
               trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFFEF4444)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              onTap: () => Navigator.of(context).pushReplacementNamed('/'),
+              onTap: () => Navigator.of(context).pushNamed('/logout'),
             ),
           ),
 
