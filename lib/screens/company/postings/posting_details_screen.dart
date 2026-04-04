@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'edit_posting_screen.dart';
+import '../candidates/candidate_portfolio_screen.dart';
 
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
@@ -12,12 +13,15 @@ class PostingDetailsScreen extends StatefulWidget {
 class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
   late String roleName;
   late String status;
+  late List<Map<String, dynamic>> _candidates;
+  final Set<String> _selectedCandidates = {};
 
   @override
   void initState() {
     super.initState();
     roleName = widget.posting['role'];
     status = widget.posting['status'];
+    _candidates = List.from(_dummyCandidates);
   }
 
   @override
@@ -109,6 +113,46 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 48)),
 
               // ── APPLICANT_REGISTRY ──
+              if (status == 'ACTIVE') ...[
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverToBoxAdapter(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('> BATCH_SELECTION_HUB', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              if (_selectedCandidates.length == _candidates.length) {
+                                _selectedCandidates.clear();
+                              } else {
+                                _selectedCandidates.addAll(_candidates.map((c) => c['name'] as String));
+                              }
+                            });
+                          },
+                          child: Text(_selectedCandidates.length == _candidates.length ? 'DESELECT_ALL' : 'SELECT_ALL', style: const TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverToBoxAdapter(
+                    child: _industrialBtnSmall('SEND_ALERT_TO_SELECTED (${_selectedCandidates.length})', onTap: () {
+                      if (_selectedCandidates.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('NO_NODES_SELECTED_FOR_BROADCAST.'), backgroundColor: Color(0xFF64748B)));
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ALERT_BROADCASTED_TO ${_selectedCandidates.length} CANDIDATES.'), backgroundColor: const Color(0xFF0F172A)));
+                      }
+                    }),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              ],
+
               const SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverToBoxAdapter(
@@ -121,11 +165,25 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _CandidateIndustrialTile(
-                      candidate: _dummyCandidates[index],
-                      onTap: () => _showCandidateDetail(context, _dummyCandidates[index]),
-                    ),
-                    childCount: _dummyCandidates.length,
+                    (context, index) {
+                      final candidate = _candidates[index];
+                      return _CandidateIndustrialTile(
+                        candidate: candidate,
+                        isSelected: _selectedCandidates.contains(candidate['name']),
+                        showSelection: status == 'ACTIVE',
+                        onSelect: (val) {
+                           setState(() {
+                             if (val == true) {
+                               _selectedCandidates.add(candidate['name']);
+                             } else {
+                               _selectedCandidates.remove(candidate['name']);
+                             }
+                           });
+                        },
+                        onTap: () => _showCandidateDetail(context, candidate),
+                      );
+                    },
+                    childCount: _candidates.length,
                   ),
                 ),
               ),
@@ -139,8 +197,12 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                   child: Row(
                     children: [
                       Expanded(child: _actionBtn('EDIT_CONSOLE', true, color, () => Navigator.push(context, MaterialPageRoute(builder: (context) => EditPostingScreen(posting: widget.posting))))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _actionBtn('CLOSE_SLOT', false, color, () {})),
+                      if (status == 'ACTIVE' || status == 'INTERVIEWING') ...[
+                        const SizedBox(width: 12),
+                        Expanded(child: _actionBtn('CLOSE_SLOT', false, color, () {
+                          // TODO: Implement close logic
+                        })),
+                      ],
                     ],
                   ),
                 ),
@@ -252,32 +314,64 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
         padding: const EdgeInsets.all(28),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
         decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(radius: 28, backgroundImage: NetworkImage(candidate['avatar'])),
-                const SizedBox(width: 20),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(candidate['name'], style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.w900)),
-                  Text(candidate['college'], style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                ]),
-              ],
-            ),
-            const SizedBox(height: 32),
-            const Text('> APPLICATION_INSIGHTS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
-            const SizedBox(height: 16),
-            _insightRow('MATCH_SCORE', '84%', const Color(0xFF10B981)),
-            _insightRow('PROFILE_STATE', 'SCREENING_NODE_ACTIVE', const Color(0xFF6366F1)),
-            const SizedBox(height: 32),
-            _industrialBtnSmall('VIEW_FULL_PORTFOLIO'),
-            const SizedBox(height: 40),
-          ],
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(radius: 28, backgroundImage: NetworkImage(candidate['avatar'])),
+                  const SizedBox(width: 20),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(candidate['name'], style: const TextStyle(color: Color(0xFF0F172A), fontSize: 18, fontWeight: FontWeight.w900)),
+                    Text('${candidate['college']} • SCH_NODE_ID', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                  ]),
+                ],
+              ),
+              const Text('> CREDENTIAL_OVERVIEW', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              const SizedBox(height: 16),
+              _insightRow('RESUME_DOC', 'DOWNLOAD_STUB_PDF', const Color(0xFF3B82F6)),
+              
+              const SizedBox(height: 32),
+              const Text('> TECHNICAL_SKILL_BREAKDOWN', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8, runSpacing: 8,
+                children: [
+                   _skillPulse('Flutter', 0.95),
+                   _skillPulse('Node.js', 0.8),
+                   _skillPulse('UI/UX', 0.7),
+                ],
+              ),
+              
+              const SizedBox(height: 48),
+              _actionBtnModal('ACCEPT_CANDIDATE', const Color(0xFF10B981), () {
+                setState(() {
+                  final idx = _candidates.indexWhere((c) => c['name'] == candidate['name']);
+                  if (idx != -1) _candidates[idx]['status'] = 'ACCEPTED';
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${candidate['name']} accepted.'), backgroundColor: const Color(0xFF10B981)));
+              }),
+              const SizedBox(height: 12),
+              _actionBtnModal('REJECT_PHASE', const Color(0xFFEF4444), () {
+                setState(() {
+                  final idx = _candidates.indexWhere((c) => c['name'] == candidate['name']);
+                  if (idx != -1) _candidates[idx]['status'] = 'REJECTED';
+                });
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${candidate['name']} rejected.'), backgroundColor: const Color(0xFFEF4444)));
+              }),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
@@ -287,30 +381,161 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)), Text(value, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold))]));
   }
 
-  Widget _industrialBtnSmall(String label) {
-    return Container(width: double.infinity, height: 44, decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)), child: Center(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5))));
+  Widget _industrialBtnSmall(String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(width: double.infinity, height: 44, decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)), child: Center(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)))),
+    );
+  }
+
+  Widget _actionBtnModal(String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: 44,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: color)),
+        child: Center(child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5))),
+      ),
+    );
+  }
+
+  Widget _deepMetric(String label, String status, double value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+              Text(status, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: value,
+              backgroundColor: const Color(0xFFF1F5F9),
+              color: color,
+              minHeight: 4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _skillPulse(String label, double strength) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6, height: 6,
+            decoration: BoxDecoration(
+              color: strength > 0.7 ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
   }
 }
 
 class _CandidateIndustrialTile extends StatelessWidget {
   final Map<String, dynamic> candidate;
+  final bool isSelected;
+  final bool showSelection;
+  final ValueChanged<bool?> onSelect;
   final VoidCallback onTap;
-  const _CandidateIndustrialTile({required this.candidate, required this.onTap});
+  const _CandidateIndustrialTile({required this.candidate, required this.onTap, required this.isSelected, required this.showSelection, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
+    final status = candidate['status'] as String? ?? 'PENDING';
+    final isAccepted = status == 'ACCEPTED';
+    final isRejected = status == 'REJECTED';
+    
+    Color statusColor = const Color(0xFF64748B);
+    Color bgColor = Colors.white;
+    if (isAccepted) {
+      statusColor = const Color(0xFF10B981);
+      bgColor = const Color(0xFF10B981).withValues(alpha: 0.05); // Green-whiter
+    }
+    if (isRejected) {
+      statusColor = const Color(0xFFEF4444);
+      bgColor = const Color(0xFFEF4444).withValues(alpha: 0.05); // Red-whiter
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: statusColor.withValues(alpha: 0.2), width: 1.5),
+          boxShadow: [
+             if (isAccepted || isRejected)
+               BoxShadow(color: statusColor.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
         child: Row(
           children: [
-            CircleAvatar(radius: 18, backgroundImage: NetworkImage(candidate['avatar'])),
+            if (showSelection) ...[
+               Checkbox(
+                 value: isSelected,
+                 onChanged: onSelect,
+                 activeColor: const Color(0xFF6366F1),
+                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+               ),
+               const SizedBox(width: 8),
+            ],
+            Stack(
+              children: [
+                CircleAvatar(radius: 20, backgroundImage: NetworkImage(candidate['avatar'])),
+                if (isAccepted || isRejected)
+                  Positioned(
+                    right: -2, bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                      child: Icon(isAccepted ? Icons.check : Icons.close, color: Colors.white, size: 8),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(candidate['name'], style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold)), Text(candidate['college'].toUpperCase(), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.w800))])),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFCBD5E1), size: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(candidate['name'], style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold)),
+                  Text(candidate['college'].toUpperCase(), style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+            if (isAccepted || isRejected)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                child: Text(status, style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              )
+            else
+              const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFCBD5E1), size: 12),
           ],
         ),
       ),
@@ -340,7 +565,7 @@ class _DotPainter extends CustomPainter {
 }
 
 final _dummyCandidates = [
-  {'name': 'Arjun Mehta', 'college': 'IIT Bombay', 'avatar': 'https://i.pravatar.cc/150?u=1'},
-  {'name': 'Sara Khan', 'college': 'BITS Pilani', 'avatar': 'https://i.pravatar.cc/150?u=2'},
-  {'name': 'Vikram Singh', 'college': 'NIT Trichy', 'avatar': 'https://i.pravatar.cc/150?u=3'},
+  {'name': 'Arjun Mehta', 'college': 'IIT Bombay', 'avatar': 'https://i.pravatar.cc/150?u=1', 'status': 'ACCEPTED'},
+  {'name': 'Sara Khan', 'college': 'BITS Pilani', 'avatar': 'https://i.pravatar.cc/150?u=2', 'status': 'REJECTED'},
+  {'name': 'Vikram Singh', 'college': 'NIT Trichy', 'avatar': 'https://i.pravatar.cc/150?u=3', 'status': 'PENDING'},
 ];

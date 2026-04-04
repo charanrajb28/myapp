@@ -87,6 +87,23 @@ class AdminDashboardScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 48),
+
+                    // ── Student Feedback Section ──
+                    Row(
+                      children: [
+                        const Text('Recent Student Feedback',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () {},
+                          style: TextButton.styleFrom(foregroundColor: const Color(0xFF3B82F6)),
+                          child: const Text('View All', style: TextStyle(fontWeight: FontWeight.w700)),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _FeedbackList(),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -287,6 +304,148 @@ class _ActionTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FeedbackList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _FeedbackTile(
+          student: 'Arjun Mehta',
+          company: 'TechFlow Inc.',
+          type: 'Compliment',
+          comment: 'The mentorship program is excellent. I am learning a lot about cloud architecture and enterprise software practices.',
+          date: '2 hours ago',
+        ),
+        const SizedBox(height: 12),
+        _FeedbackTile(
+          student: 'Sanya Sharma',
+          company: 'DataDynamics',
+          type: 'Complaint',
+          comment: 'There was a slight delay in the onboarding process, but the technical team eventually resolved it. Would appreciate faster communication.',
+          date: 'Yesterday',
+        ),
+        const SizedBox(height: 12),
+        _FeedbackTile(
+          student: 'Vikram Singh',
+          company: 'Stark Industries',
+          type: 'Compliment',
+          comment: 'Incredible work environment. The facilities and the R&D projects are state-of-the-art. Very grateful for this opportunity.',
+          date: 'Mar 31',
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedbackTile extends StatelessWidget {
+  final String student;
+  final String company;
+  final String type;
+  final String comment;
+  final String date;
+
+  const _FeedbackTile({
+    required this.student,
+    required this.company,
+    required this.type,
+    required this.comment,
+    required this.date,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isCompliment = type == 'Compliment';
+    final Color color = isCompliment ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final IconData icon = isCompliment ? Icons.favorite_rounded : Icons.warning_rounded;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(student,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    Text('at $company',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              Text(date,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            comment,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF334155),
+              height: 1.5,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  type.toUpperCase(),
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.5),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {},
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF64748B),
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Row(
+                  children: [
+                    Text('Mark as Read', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    SizedBox(width: 4),
+                    Icon(Icons.check_rounded, size: 14),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

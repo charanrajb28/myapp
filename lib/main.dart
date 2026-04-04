@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // TODO: Replace with your actual Supabase URL and Anon Key
+  // Once you start your local Supabase instance (using 'supabase start')
+  await Supabase.initialize(
+    url: 'https://nfurwspybtiaycqntzev.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+  );
+
   runApp(const MyApp());
 }
 
@@ -196,6 +206,10 @@ class _LoginPageState extends State<LoginPage>
 
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  bool _isLoading = false;
+
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   late final AnimationController _devAnimController;
   late final Animation<double> _devPanelAnim;
@@ -215,6 +229,8 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
     _devAnimController.dispose();
     super.dispose();
   }
@@ -312,6 +328,7 @@ class _LoginPageState extends State<LoginPage>
                         ),
                         const SizedBox(height: 10),
                         TextField(
+                          controller: _emailController,
                           decoration: InputDecoration(
                             hintText: 'Enter your official credentials',
                             hintStyle: TextStyle(
@@ -354,6 +371,7 @@ class _LoginPageState extends State<LoginPage>
                         ),
                         const SizedBox(height: 10),
                         TextField(
+                          controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: '••••••••',
@@ -454,31 +472,52 @@ class _LoginPageState extends State<LoginPage>
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: () {
-                              if (_devRole == 'Admin') {
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(
-                                    builder: (context) => const AdminShell(
-                                      child: AdminDashboardScreen(),
-                                    ),
-                                  ),
+                            onPressed: _isLoading ? null : () async {
+                              setState(() => _isLoading = true);
+                              try {
+                                final res = await Supabase.instance.client.auth.signInWithPassword(
+                                  email: _emailController.text.trim(),
+                                  password: _passwordController.text,
                                 );
-                              } else if (_devRole == 'Student') {
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(
-                                    builder: (context) => const StudentShell(),
-                                  ),
-                                );
-                              } else if (_devRole == 'Company') {
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(
-                                    builder: (context) => const CompanyShell(),
-                                  ),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('$_devRole portal not implemented yet')),
-                                );
+                                
+                                final user = res.user;
+                                if (user != null) {
+                                  // Fetch role from public.users table
+                                  final userData = await Supabase.instance.client
+                                      .from('users')
+                                      .select('role')
+                                      .eq('id', user.id)
+                                      .single();
+                                      
+                                  final role = userData['role'];
+                                  
+                                  if (!mounted) return;
+                                  
+                                  if (role == 'admin') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
+                                    );
+                                  } else if (role == 'student') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const StudentShell()),
+                                    );
+                                  } else if (role == 'company') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const CompanyShell()),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(e.toString()),
+                                      backgroundColor: Colors.red,
+                                    )
+                                  );
+                                }
+                              } finally {
+                                if (mounted) setState(() => _isLoading = false);
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -489,7 +528,9 @@ class _LoginPageState extends State<LoginPage>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Row(
+                            child: _isLoading 
+                                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
@@ -626,17 +667,34 @@ class _LoginPageState extends State<LoginPage>
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                _devRoleChip(
-                                    'Student', Icons.person, textPrimary),
-                                const SizedBox(width: 8),
-                                _devRoleChip(
-                                    'Company', Icons.domain, textPrimary),
-                                const SizedBox(width: 8),
-                                _devRoleChip(
-                                    'Admin', Icons.shield_outlined, textPrimary),
-                              ],
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final client = Supabase.instance.client;
+                                try {
+                                  await client.auth.signUp(
+                                    email: 'admin@scholarbridge.com',
+                                    password: 'adminpassword123',
+                                    data: {'role': 'admin', 'name': 'System Admin'},
+                                  );
+                                  await client.auth.signUp(
+                                    email: 'student@college.edu',
+                                    password: 'studentpassword123',
+                                    data: {'role': 'student', 'name': 'Alex Demo'},
+                                  );
+                                  await client.auth.signUp(
+                                    email: 'hr@techcorp.com',
+                                    password: 'companypassword123',
+                                    data: {'role': 'company', 'name': 'TechCorp HR'},
+                                  );
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo users created! You can now log in.')));
+                                  }
+                                } catch(e) {
+                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                }
+                              },
+                              icon: const Icon(Icons.bolt),
+                              label: const Text('Generate Demo Users via Auth API'),
                             ),
                           ],
                         ),

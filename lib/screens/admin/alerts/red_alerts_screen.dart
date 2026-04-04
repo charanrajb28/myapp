@@ -131,15 +131,32 @@ class RedAlertsScreen extends StatelessWidget {
                         style: TextStyle(color: const Color(0xFF0F172A).withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.event_busy_rounded, size: 14, color: Color(0xFFDC2626)),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Missed check-ins: Oct 12, Oct 13, Oct 14',
-                            style: TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
-                          ),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2.0),
+                                child: Icon(Icons.event_busy_rounded, size: 14, color: Color(0xFFDC2626)),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Missed check-ins: Oct 12, Oct 13, Oct 14',
+                                  style: const TextStyle(
+                                    fontSize: 12, 
+                                    color: Color(0xFFDC2626), 
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  softWrap: true,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
                       ),
                     ],
                   ),
@@ -149,24 +166,31 @@ class RedAlertsScreen extends StatelessWidget {
           ),
           const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 TextButton(
                   onPressed: () {},
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
                   child: const Text('View Profile', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                 ),
-                const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F172A), // Slate 900
                     foregroundColor: Colors.white,
                     elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    minimumSize: const Size(0, 36),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text('Resolve Status', style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: const Text('Resolve Status', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
               ],
             ),

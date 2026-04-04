@@ -156,11 +156,11 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
                     builder: (context, constraints) {
                       return GridView.builder(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: constraints.maxWidth > 900 ? 3 : constraints.maxWidth > 600 ? 2 : 1,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: constraints.maxWidth > 900 ? 0.9 : constraints.maxWidth > 600 ? 1.0 : 1.3,
+                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 450,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          mainAxisExtent: 200, // Fixed height for consistency
                         ),
                         itemCount: companies.length,
                         itemBuilder: (_, i) => _CompanyCard(company: companies[i]),

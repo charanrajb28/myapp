@@ -24,15 +24,16 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFFF1F5F9),
+        floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
             await Navigator.push(context, MaterialPageRoute(builder: (context) => const CreatePostingScreen()));
             setState(() {});
           },
           backgroundColor: const Color(0xFF0F172A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          child: const Icon(Icons.add_rounded, color: Colors.white),
+          elevation: 10,
+          label: const Text('DEPLOY_NEW_NODE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
         ),
         body: Stack(
           children: [
@@ -55,11 +56,11 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                         isScrollable: true,
                         tabAlignment: TabAlignment.start,
                         indicatorColor: const Color(0xFF6366F1),
-                        indicatorWeight: 3,
+                        indicatorWeight: 4,
                         labelColor: const Color(0xFF0F172A),
                         labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.5),
                         unselectedLabelColor: const Color(0xFF94A3B8),
-                        dividerColor: const Color(0xFFE2E8F0),
+                        dividerColor: Colors.transparent,
                         onTap: (index) => setState(() {}),
                         tabs: const [
                           Tab(text: 'ACTIVE_PUBS'),
@@ -72,7 +73,6 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
 
                   const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-                  // ── RECRUITMENT_REGISTRY_FEED ──
                   Builder(
                     builder: (context) {
                       final tabIndex = DefaultTabController.of(context).index;
@@ -83,8 +83,14 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                         return const SliverToBoxAdapter(
                           child: Center(
                             child: Padding(
-                              padding: EdgeInsets.only(top: 40),
-                              child: Text('NO_RECORDS_IN_PHASE', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                              padding: EdgeInsets.only(top: 60),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.inventory_2_outlined, color: Color(0xFFCBD5E1), size: 48),
+                                  SizedBox(height: 16),
+                                  Text('NO_RECORDS_IN_PHASE', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -104,7 +110,7 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                       );
                     },
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
                 ],
               ),
             ),
@@ -123,28 +129,33 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text('> QR_SHARE_TERMINAL: ${role.toUpperCase()}', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 200, height: 200, padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: CustomPaint(painter: _QRSimPainter()),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
+              child: CustomPaint(size: const Size(200, 200), painter: _QRSimPainter()),
             ),
             const SizedBox(height: 24),
             const Text('SCAN_TO_INITIATE_APPLICATION', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
-            const SizedBox(height: 24),
-            _industrialBtnSmall('DOWNLOAD_AS_PNG'),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: const Text('DOWNLOAD_AS_PNG', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _industrialBtnSmall(String label) {
-    return Container(width: double.infinity, height: 44, decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(8)), child: Center(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5))));
   }
 }
 
@@ -161,43 +172,67 @@ class _PostingIndustrialCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 8))],
+        ),
         child: Column(
           children: [
             Row(
               children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(14)),
+                  child: Icon(Icons.hub_rounded, color: color, size: 22),
+                ),
+                const SizedBox(width: 20),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(posting['role'].toUpperCase(), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _statusChip(posting['status'], color),
-                          const SizedBox(width: 8),
-                          const Text('32 APPLICANTS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                        ],
-                      ),
+                      Text(posting['role'].toUpperCase(), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                      const SizedBox(height: 6),
+                      _statusChip(posting['status'], color),
                     ],
                   ),
                 ),
                 if (isActive)
                   IconButton(
-                    icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 24),
+                    icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF0F172A), size: 28),
                     onPressed: () {
                       final state = context.findAncestorStateOfType<_ManagePostingsScreenState>();
                       state?._showQRDialog(context, posting['role']);
                     },
                   )
                 else
-                  const Padding(padding: EdgeInsets.only(right: 12), child: Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFCBD5E1), size: 14)),
+                  const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 24),
               ],
             ),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(value: posting['completion'], backgroundColor: const Color(0xFFF1F5F9), color: color, minHeight: 4, borderRadius: BorderRadius.circular(2)),
+            const SizedBox(height: 24),
+            Stack(
+              children: [
+                Container(height: 6, decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(3))),
+                LayoutBuilder(
+                  builder: (context, constraints) => Container(
+                    height: 6,
+                    width: constraints.maxWidth * posting['completion'],
+                    decoration: BoxDecoration(gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.6)]), borderRadius: BorderRadius.circular(3)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('SYNC_COMPLETION_PHASE', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                Text('${(posting['completion'] * 100).toInt()}%', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+              ],
+            ),
           ],
         ),
       ),
@@ -206,9 +241,9 @@ class _PostingIndustrialCard extends StatelessWidget {
 
   Widget _statusChip(String status, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-      child: Text(status, style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+      child: Text(status, style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
     );
   }
 }
@@ -218,11 +253,11 @@ class _IndustrialPostingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('> MANAGEMENT_CMS_CONSOLE', style: TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+      const Text('> MANAGEMENT_CMS_CONSOLE', style: TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 3)),
+      const SizedBox(height: 12),
+      const Text('RECRUITMENT_REGISTRY', style: TextStyle(color: Color(0xFF0F172A), fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -1)),
       const SizedBox(height: 8),
-      const Text('RECRUITMENT_COMMAND', style: TextStyle(color: Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-      const SizedBox(height: 4),
-      const Text('DEPLOY_AND_MONITOR_TALENT_NODES', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+      const Text('MONITOR_AND_DEPLOY_TALENT_NODES_v2.4', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
     ]);
   }
 }
@@ -237,7 +272,7 @@ class _DotGrid extends StatelessWidget {
 class _DotPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFE2E8F0)..strokeWidth = 1;
+    final paint = Paint()..color = const Color(0xFFCBD5E1)..strokeWidth = 1;
     for (double i = 0; i < size.width; i += 30) {
       for (double j = 0; j < size.height; j += 30) {
         canvas.drawCircle(Offset(i, j), 1, paint);
