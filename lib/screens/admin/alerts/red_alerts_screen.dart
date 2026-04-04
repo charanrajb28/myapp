@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RedAlertsScreen extends StatelessWidget {
   const RedAlertsScreen({super.key});
@@ -75,12 +76,45 @@ class RedAlertsScreen extends StatelessWidget {
           ),
           
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              itemCount: 3, // Mock active red alerts
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                return _buildAlertCard();
+            child: FutureBuilder(
+              future: Supabase.instance.client
+                  .from('red_alerts')
+                  .select('*, students(name), companies(name)')
+                  .order('created_at', ascending: false),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError || !snapshot.hasData || (snapshot.data as List).isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.check_circle_outline_rounded, size: 48, color: Color(0xFF10B981)),
+                        const SizedBox(height: 16),
+                        const Text('Zero Red Alerts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        const SizedBox(height: 4),
+                        const Text('No students are currently flagged for missing check-ins.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  );
+                }
+
+                final items = snapshot.data as List;
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  itemCount: items.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final alert = items[index];
+                    return _buildAlertCard(
+                      studentName: alert['students']?['name'] ?? 'Unknown Student',
+                      companyName: alert['companies']?['name'] ?? 'Unknown Company',
+                      missedDates: alert['missed_dates'] ?? 'Recent check-ins missed',
+                    );
+                  },
+                );
               },
             ),
           ),
@@ -89,7 +123,7 @@ class RedAlertsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAlertCard() {
+  Widget _buildAlertCard({required String studentName, required String companyName, required String missedDates}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -121,13 +155,13 @@ class RedAlertsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Student Name',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 16),
+                      Text(
+                        studentName,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 16),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Interning at TechFlow Inc.',
+                        'Interning at $companyName',
                         style: TextStyle(color: const Color(0xFF0F172A).withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 8),
@@ -143,7 +177,7 @@ class RedAlertsScreen extends StatelessWidget {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Missed check-ins: Oct 12, Oct 13, Oct 14',
+                                  'Missed check-ins: $missedDates',
                                   style: const TextStyle(
                                     fontSize: 12, 
                                     color: Color(0xFFDC2626), 

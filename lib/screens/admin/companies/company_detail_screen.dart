@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'role_detail_screen.dart';
 import 'add_company_screen.dart';
 
@@ -39,32 +40,65 @@ class CompanyDetailScreen extends StatefulWidget {
 class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   int _tabIndex = 0;
   static const _tabs = ['Overview', 'Past Internships', 'Open Roles', 'Documents'];
+  
+  bool _isLoading = true;
+  CompanyDetailArgs? _dynamicCompany;
+  List<Map<String, dynamic>> _openRoles = [];
+  List<Map<String, dynamic>> _pastRoles = [];
+  List<Map<String, dynamic>> _docs = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchCompanyData();
+  }
 
-  final _pastRoles = const [
-    {'title': 'Backend Developer Intern',  'type': 'Full-time',  'period': 'Jun–Nov 2024', 'slots': '3', 'filled': '3'},
-    {'title': 'Data Analyst Intern',       'type': 'Part-time',  'period': 'Jan–Jun 2024', 'slots': '2', 'filled': '2'},
-    {'title': 'UI/UX Design Intern',       'type': 'Full-time',  'period': 'Jul–Dec 2023', 'slots': '2', 'filled': '1'},
-    {'title': 'DevOps Engineering Intern', 'type': 'Full-time',  'period': 'Jan–Jun 2023', 'slots': '1', 'filled': '1'},
-    {'title': 'ML Research Intern',        'type': 'Part-time',  'period': 'Jun–Nov 2022', 'slots': '2', 'filled': '2'},
-  ];
+  Future<void> _fetchCompanyData() async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      final companyRes = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', widget.company.id)
+          .single();
+          
+      final rolesRes = await supabase
+          .from('internships')
+          .select('*')
+          .eq('company_id', widget.company.id);
 
-  final _roles = const [
-    {'title': 'Backend Developer Intern', 'type': 'Full-time', 'deadline': 'Apr 15, 2025', 'slots': '2'},
-    {'title': 'Data Analyst Intern',      'type': 'Part-time', 'deadline': 'May 1, 2025',  'slots': '1'},
-    {'title': 'UI/UX Design Intern',      'type': 'Full-time', 'deadline': 'Mar 28, 2025', 'slots': '2'},
-  ];
-
-  final _docs = const [
-    {'title': 'MOU Agreement',         'type': 'PDF',  'date': 'Jan 10, 2024', 'status': 'Verified'},
-    {'title': 'Company Registration',  'type': 'PDF',  'date': 'Nov 5, 2023',  'status': 'Verified'},
-    {'title': 'Internship Policy',     'type': 'DOCX', 'date': 'Feb 1, 2024',  'status': 'Pending'},
-    {'title': 'Insurance Certificate', 'type': 'PDF',  'date': 'Jan 15, 2024', 'status': 'Verified'},
-  ];
+      if (mounted) {
+        setState(() {
+          _dynamicCompany = CompanyDetailArgs(
+            id: companyRes['id'].toString(),
+            name: companyRes['name'] ?? widget.company.name,
+            industry: companyRes['industry'] ?? widget.company.industry,
+            location: companyRes['location'] ?? widget.company.location,
+            activeInterns: widget.company.activeInterns, // Calculated or placeholder
+            totalPlacements: widget.company.totalPlacements,
+            openRoles: (rolesRes as List).length,
+            rating: widget.company.rating,
+            status: 'Approved',
+            logoColor: widget.company.logoColor,
+            logoInitial: widget.company.logoInitial,
+            about: companyRes['description'] ?? widget.company.about,
+          );
+          _openRoles = List<Map<String, dynamic>>.from(rolesRes);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching company: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.company;
+    // We use the Dynamic Profile if ready, otherwise fallback to the Initial passed one (Instant Load)
+    final c = _dynamicCompany ?? widget.company;
+    
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -100,12 +134,17 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _HeroCard(c: c, isMobile: isMobile),
+                _HeroCard(c: c, isMobile: isMobile, isLoading: _isLoading),
                 const SizedBox(height: 20),
                 _TabRow(tabs: _tabs, activeIndex: _tabIndex,
                     onTap: (i) => setState(() => _tabIndex = i)),
                 const SizedBox(height: 20),
-                _buildTabContent(c, isMobile),
+                _isLoading 
+                  ? const Center(child: Padding(
+                      padding: EdgeInsets.all(40),
+                      child: CircularProgressIndicator(color: Color(0xFF0F172A)),
+                    ))
+                  : _buildTabContent(c, isMobile),
                 const SizedBox(height: 48),
               ],
             ),
@@ -119,7 +158,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     switch (_tabIndex) {
       case 0: return _OverviewTab(c: c, isMobile: isMobile);
       case 1: return _PastRolesTab(pastRoles: _pastRoles);
-      case 2: return _RolesTab(roles: _roles);
+      case 2: return _RolesTab(roles: _openRoles);
       case 3: return _DocsTab(docs: _docs);
       default: return const SizedBox();
     }
@@ -131,7 +170,8 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
 class _HeroCard extends StatelessWidget {
   final CompanyDetailArgs c;
   final bool isMobile;
-  const _HeroCard({required this.c, required this.isMobile});
+  final bool isLoading;
+  const _HeroCard({required this.c, required this.isMobile, this.isLoading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +232,17 @@ class _HeroCard extends StatelessWidget {
                 Positioned(
                   top: 12,
                   right: 12,
-                  child: _StatusBadgeLight(status: c.status),
+                  child: isLoading 
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
+                        child: const Row(children: [
+                          SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                          SizedBox(width: 8),
+                          Text('Syncing...', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                        ]),
+                      )
+                    : _StatusBadgeLight(status: c.status),
                 ),
               ],
             ),
@@ -214,8 +264,8 @@ class _HeroCard extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 4,
                   children: [
-                    _metaChip(Icons.domain_rounded, c.industry),
-                    _metaChip(Icons.place_outlined, c.location),
+                    _metaChip(Icons.domain_rounded,  c.industry),
+                    _metaChip(Icons.place_outlined,   c.location),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -451,34 +501,53 @@ Widget _card({required Widget child}) => Container(
 );
 
 // ─────────────────────────────────────────────────────────────────
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends StatefulWidget {
   final CompanyDetailArgs c;
   final bool isMobile;
   const _OverviewTab({required this.c, required this.isMobile});
 
   @override
+  State<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends State<_OverviewTab> {
+  Map<String, dynamic>? _fullData;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchExtraData();
+  }
+
+  Future<void> _fetchExtraData() async {
+    final res = await Supabase.instance.client
+        .from('companies')
+        .select('*')
+        .eq('id', widget.c.id)
+        .single();
+    if (mounted) setState(() => _fullData = res);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final d = _fullData;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Company Information'),
         _card(child: _infoList([
-          _InfoRow(icon: Icons.tag_rounded,          label: 'Company ID',        value: c.id),
-          _InfoRow(icon: Icons.domain_rounded,        label: 'Industry',          value: c.industry),
-          _InfoRow(icon: Icons.place_outlined,        label: 'Headquarters',      value: c.location),
-          _InfoRow(icon: Icons.people_alt_outlined,   label: 'Active Interns',    value: '${c.activeInterns}'),
-          _InfoRow(icon: Icons.work_outline_rounded,  label: 'Open Roles',        value: '${c.openRoles}'),
-          _InfoRow(icon: Icons.check_circle_outline,  label: 'Total Placements',  value: '${c.totalPlacements}'),
-          _InfoRow(icon: Icons.star_rounded,          label: 'Avg Rating',        value: c.rating > 0 ? '${c.rating} / 5.0' : 'No ratings yet'),
+          _InfoRow(icon: Icons.tag_rounded,          label: 'System ID',        value: widget.c.id),
+          _InfoRow(icon: Icons.domain_rounded,        label: 'Industry',          value: widget.c.industry),
+          _InfoRow(icon: Icons.place_outlined,        label: 'Headquarters',      value: widget.c.location),
         ])),
         const SizedBox(height: 24),
         _sectionTitle('Contact & Partnership'),
         _card(child: _infoList([
-          _InfoRow(icon: Icons.email_outlined,      label: 'Primary Contact', value: 'hr@company.com'),
-          _InfoRow(icon: Icons.phone_outlined,      label: 'Phone',           value: '+1 (555) 000-0000'),
-          _InfoRow(icon: Icons.language_rounded,    label: 'Website',         value: 'www.company.com'),
-          _InfoRow(icon: Icons.handshake_outlined,  label: 'MOU Signed',      value: 'January 10, 2024'),
-          _InfoRow(icon: Icons.calendar_month_outlined, label: 'Partner Since', value: '2023'),
+          _InfoRow(icon: Icons.email_outlined,      label: 'Coordination Email', value: d?['contact_email'] ?? 'Not Given'),
+          _InfoRow(icon: Icons.phone_outlined,      label: 'Phone',           value: d?['phone'] ?? 'N/A'),
+          _InfoRow(icon: Icons.language_rounded,    label: 'Website',         value: d?['website'] ?? 'N/A'),
+          _InfoRow(icon: Icons.handshake_outlined,  label: 'MOU Signed',      value: d?['mou_date'] ?? 'TBD'),
+          _InfoRow(icon: Icons.calendar_month_outlined, label: 'Partner Since', value: d?['partner_since']?.toString() ?? 'N/A'),
         ])),
       ],
     );
@@ -522,7 +591,7 @@ class _InfoRow extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────
 class _PastRolesTab extends StatelessWidget {
-  final List<Map<String, String>> pastRoles;
+  final List<Map<String, dynamic>> pastRoles;
   const _PastRolesTab({required this.pastRoles});
 
   // Mock data for detail screen
@@ -648,50 +717,24 @@ class _PastRolesTab extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────
 class _RolesTab extends StatelessWidget {
-  final List<Map<String, String>> roles;
+  final List<Map<String, dynamic>> roles;
   const _RolesTab({required this.roles});
-
-  static const _applicants = [
-    [
-      {'name': 'Priya Sharma',  'id': 'STU-001', 'dept': 'Computer Science', 'status': 'Accepted'},
-      {'name': 'Arjun Mehta',   'id': 'STU-002', 'dept': 'Data Science',     'status': 'Under Review'},
-      {'name': 'Rohan Das',     'id': 'STU-004', 'dept': 'IT',               'status': 'Rejected'},
-    ],
-    [
-      {'name': 'Kavya Nair',   'id': 'STU-098', 'dept': 'Statistics',  'status': 'Accepted'},
-      {'name': 'Tanya Kapoor', 'id': 'STU-055', 'dept': 'Data Science','status': 'Applied'},
-    ],
-    [
-      {'name': 'Nisha Patel', 'id': 'STU-003', 'dept': 'Design',     'status': 'Under Review'},
-      {'name': 'Samir Joshi', 'id': 'STU-076', 'dept': 'Fine Arts',  'status': 'Applied'},
-      {'name': 'Meera Roy',   'id': 'STU-110', 'dept': 'CS',         'status': 'Applied'},
-    ],
-  ];
-
-  static const _descriptions = [
-    'Work on scalable REST APIs and microservices using Node.js and PostgreSQL. Collaborate with senior engineers on system design and code reviews.',
-    'Analyse large datasets to generate actionable business insights. Proficiency in Python and SQL required. Tableau experience is a plus.',
-    'Design intuitive interfaces for web and mobile platforms. Work closely with the product team using Figma and conduct usability testing.',
-  ];
-
-  static const _skills = [
-    ['Node.js', 'PostgreSQL', 'REST API', 'Git'],
-    ['Python', 'SQL', 'Tableau', 'Excel'],
-    ['Figma', 'UX Research', 'Prototyping', 'CSS'],
-  ];
-
-  static const _startDates = ['May 1, 2025', 'Jun 1, 2025', 'Apr 15, 2025'];
-  static const _durations  = ['6 months',   '3 months',   '4 months'];
 
   @override
   Widget build(BuildContext context) {
+    if (roles.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        child: const Center(child: Text('No open roles found for this company.')),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Open Positions (${roles.length})'),
         ...List.generate(roles.length, (i) {
           final role = roles[i];
-          final appCount = _applicants[i % _applicants.length].length;
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
@@ -705,40 +748,38 @@ class _RolesTab extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 onTap: () => Navigator.push(context, MaterialPageRoute(
                   builder: (_) => RoleDetailScreen(
-                    title: role['title']!,
-                    type: role['type']!,
-                    deadline: role['deadline']!,
-                    slots: role['slots']!,
-                    startDate: _startDates[i % _startDates.length],
-                    duration:  _durations[i % _durations.length],
-                    description: _descriptions[i % _descriptions.length],
-                    skills: _skills[i % _skills.length],
-                    applicants: _applicants[i % _applicants.length],
+                    title: role['role'] ?? 'Intern Role',
+                    type: 'Full-time',
+                    deadline: role['deadline'] ?? 'TBD',
+                    slots: role['total_slots']?.toString() ?? '0',
+                    startDate: 'May 1, 2025',
+                    duration: '6 Months',
+                    description: role['description'] ?? 'No description provided.',
+                    skills: const ['General Skillset'],
+                    applicants: const [],
                   ),
                 )),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(role['title']!,
+                      Text(role['role'] ?? 'Intern Role',
                         style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 14),
                         overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 8),
                       Row(children: [
-                        _chip(role['type']!, const Color(0xFFF1F5F9), const Color(0xFF475569)),
+                        _chip('Full-time', const Color(0xFFF1F5F9), const Color(0xFF475569)),
                         const SizedBox(width: 8),
                         const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF94A3B8)),
                         const SizedBox(width: 4),
-                        Flexible(child: Text(role['deadline']!,
+                        Flexible(child: Text(role['deadline'] ?? 'No Deadline',
                           style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                           overflow: TextOverflow.ellipsis)),
                       ]),
                     ])),
                     const SizedBox(width: 10),
                     Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      _chip('${role['slots']} slots', const Color(0xFFEFF6FF), const Color(0xFF1D4ED8)),
-                      const SizedBox(height: 6),
-                      _chip('$appCount applied', const Color(0xFFF0FDF4), const Color(0xFF15803D)),
+                      _chip('${role['total_slots']} slots', const Color(0xFFEFF6FF), const Color(0xFF1D4ED8)),
                     ]),
                     const SizedBox(width: 10),
                     const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
@@ -762,7 +803,7 @@ class _RolesTab extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────
 class _DocsTab extends StatelessWidget {
-  final List<Map<String, String>> docs;
+  final List<Map<String, dynamic>> docs;
   const _DocsTab({required this.docs});
 
   @override

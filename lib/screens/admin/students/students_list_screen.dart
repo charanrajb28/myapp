@@ -1,9 +1,82 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'student_detail_screen.dart';
 import 'add_student_screen.dart';
 
-class StudentsListScreen extends StatelessWidget {
+class StudentsListScreen extends StatefulWidget {
   const StudentsListScreen({super.key});
+
+  @override
+  State<StudentsListScreen> createState() => _StudentsListScreenState();
+}
+
+class _StudentsListScreenState extends State<StudentsListScreen> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _students = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStudents();
+  }
+
+  Future<void> _fetchStudents() async {
+    try {
+      final res = await Supabase.instance.client
+          .from('students')
+          .select('*')
+          .order('created_at');
+
+      if (mounted) {
+        setState(() {
+          _students = List<Map<String, dynamic>>.from(res);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching students: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteStudent(String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Student'),
+        content: const Text('Are you sure you want to permanently delete this student profile and their associated user account? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Find user_id from students first
+        final student = _students.firstWhere((s) => s['id'] == id);
+        final userId = student['user_id'];
+        
+        await Supabase.instance.client.from('users').delete().eq('id', userId);
+        _fetchStudents();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student deleted successfully')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _toggleBlacklist(String id, bool currentStatus) async {
+    try {
+      await Supabase.instance.client.from('students').update({'is_blacklisted': !currentStatus}).eq('id', id);
+      _fetchStudents();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(currentStatus ? 'Student whitelisted' : 'Student blacklisted')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,7 +148,11 @@ class StudentsListScreen extends StatelessWidget {
 
               // ── Interactive Horizontal Scroll Data Table ──
               Expanded(
-                child: SingleChildScrollView(
+                child: _isLoading 
+                  ? const Center(child: CircularProgressIndicator())
+                  : _students.isEmpty
+                    ? const Center(child: Text('No students found.'))
+                    : SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: SizedBox(
@@ -99,34 +176,46 @@ class StudentsListScreen extends StatelessWidget {
                         Expanded(
                           child: ListView.separated(
                             padding: const EdgeInsets.only(bottom: 24),
-                            itemCount: 8,
+                            itemCount: _students.length,
                             separatorBuilder: (context, index) => const SizedBox(height: 12),
                             itemBuilder: (context, index) {
-                              final isRedAlert = index == 2;
-                              final isUnassigned = index == 5;
-                              final status = isRedAlert ? 'Red Alert' : (isUnassigned ? 'Unassigned' : 'Active');
-                              final company = isUnassigned ? 'Looking for match' : (index % 2 == 0 ? 'TechFlow Inc.' : 'DataDynamics');
+                              final student = _students[index];
+                              final name = student['name'] ?? 'Unknown';
+                              final department = student['department'] ?? 'Dept. Not Assigned';
+                              final collegeId = student['college'] ?? 'ID-Not-Set';
+                              
+                              final email = department;
+                                
+                              // For MVP, we use dummy status since joining applications adds complexity
+                              final status = 'Active'; 
+                              final company = 'Unassigned';
                               
                               return _buildStudentDashboardTile(
-                                name: 'Student Name ${index + 1}',
-                                email: 'student${index + 1}@college.edu',
-                                collegeId: 'ID-2026-00${index + 1}',
-                                department: index % 3 == 0 ? 'Computer Science' : 'Information Tech',
+                                name: name,
+                                email: email,
+                                collegeId: collegeId,
+                                department: department,
                                 status: status,
                                 company: company,
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (context) => StudentDetailScreen(
-                                        studentName: 'Student Name ${index + 1}',
-                                        collegeId: 'ID-2026-00${index + 1}',
+                                        studentId: student['id'].toString(),
+                                        studentName: name,
+                                        collegeId: collegeId,
                                         status: status,
-                                        department: index % 3 == 0 ? 'Computer Science' : 'Information Tech',
+                                        department: department,
                                         company: company,
                                       ),
                                     ),
-                                  );
+                                  ).then((value) {
+                                    if (value == true) _fetchStudents();
+                                  });
                                 },
+                                onBlacklist: () => _toggleBlacklist(student['id'], student['is_blacklisted'] ?? false),
+                                onDelete: () => _deleteStudent(student['id']),
+                                isBlacklisted: student['is_blacklisted'] ?? false,
                               );
                             },
                           ),
@@ -241,11 +330,15 @@ class StudentsListScreen extends StatelessWidget {
     return SizedBox(
       height: 48,
       child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddStudentScreen()),
           );
+          
+          if (result == true) {
+            _fetchStudents(); // Refresh the list
+          }
         },
         icon: const Icon(Icons.add_rounded, size: 18),
         label: const Text('Student', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -280,15 +373,23 @@ class StudentsListScreen extends StatelessWidget {
     required String status,
     required String company,
     required VoidCallback onTap,
+    required VoidCallback onBlacklist,
+    required VoidCallback onDelete,
+    bool isBlacklisted = false,
   }) {
     final isAlert = status == 'Red Alert';
     final isUnassigned = status == 'Unassigned';
     
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isBlacklisted ? const Color(0xFFFEF2F2).withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isAlert ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0), width: isAlert ? 1.5 : 1.0),
+        border: Border.all(
+          color: isBlacklisted 
+              ? const Color(0xFFFCA5A5) 
+              : (isAlert ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0)), 
+          width: (isBlacklisted || isAlert) ? 1.5 : 1.0,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -302,8 +403,8 @@ class StudentsListScreen extends StatelessWidget {
               children: [
                 // Avatar
                 CircleAvatar(
-                  backgroundColor: isAlert ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
-                  foregroundColor: isAlert ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                  backgroundColor: (isBlacklisted || isAlert) ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+                  foregroundColor: (isBlacklisted || isAlert) ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
                   radius: 20,
                   child: Text(name.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
@@ -315,9 +416,27 @@ class StudentsListScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 15),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 15),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isBlacklisted) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('BLACKLISTED', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -376,9 +495,38 @@ class StudentsListScreen extends StatelessWidget {
                 ),
                 
                 // Actions
-                IconButton(
-                  icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF94A3B8), size: 20),
-                  onPressed: () {},
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert_rounded, 
+                    color: isBlacklisted ? Colors.red : const Color(0xFF94A3B8), 
+                    size: 20
+                  ),
+                  onSelected: (value) {
+                    if (value == 'blacklist') onBlacklist();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'blacklist',
+                      child: Row(
+                        children: [
+                          Icon(isBlacklisted ? Icons.check_circle_outline : Icons.block_rounded, size: 18, color: isBlacklisted ? Colors.green : Colors.orange),
+                          const SizedBox(width: 8),
+                          Text(isBlacklisted ? 'Whitelist Student' : 'Blacklist Student'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Text('Delete Permanently', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

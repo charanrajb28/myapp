@@ -1,9 +1,15 @@
--- 1. Create custom enum types
-CREATE TYPE user_role AS ENUM ('student', 'company', 'admin');
-CREATE TYPE application_status AS ENUM ('Applied', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review');
+-- 1. Create custom enum types if they don't exist
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('student', 'company', 'admin');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'application_status') THEN
+        CREATE TYPE application_status AS ENUM ('Applied', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review');
+    END IF;
+END $$;
 
 -- 2. Create users table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   -- Link exactly to auth.users to prevent stranded rows
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role user_role NOT NULL,
@@ -14,34 +20,48 @@ CREATE TABLE users (
 );
 
 -- 3. Create students table
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enrollment_id VARCHAR(100),
   name VARCHAR(255),
-  college VARCHAR(255),
+  college VARCHAR(255) DEFAULT 'Sheshadri Institute of Technology',
   department VARCHAR(255),
+  contact_email TEXT,
+  phone_number VARCHAR(20),
+  parent_contact VARCHAR(20),
+  parent_email VARCHAR(255),
   resume_url TEXT,
+  document_urls TEXT[] DEFAULT '{}',
   gpa NUMERIC(3, 2),
+  graduation_year INTEGER,
+  is_blacklisted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
 );
 
 -- 4. Create companies table
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   industry VARCHAR(255),
+  location TEXT,
+  website TEXT,
+  phone TEXT,
+  contact_email TEXT,
   description TEXT,
   logo_url TEXT,
+  mou_date DATE,
+  partner_since INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
 );
 
 -- 5. Create internships table (internship opportunities)
-CREATE TABLE internships (
+CREATE TABLE IF NOT EXISTS internships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   role VARCHAR(255) NOT NULL,
@@ -60,7 +80,7 @@ CREATE TABLE internships (
 );
 
 -- 6. Create applications table (student internships)
-CREATE TABLE applications (
+CREATE TABLE IF NOT EXISTS applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   internship_id UUID NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
@@ -84,11 +104,53 @@ ALTER TABLE internships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for basic access
-CREATE POLICY "Users can view everyone" ON users FOR SELECT USING (true);
-CREATE POLICY "Students can view everyone" ON students FOR SELECT USING (true);
-CREATE POLICY "Companies can view everyone" ON companies FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON users;
+CREATE POLICY "Public profiles are viewable by everyone" ON users FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can update all users" ON users;
+CREATE POLICY "Admins can update all users" ON users FOR UPDATE TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Users can update own profile" ON users;
+CREATE POLICY "Users can update own profile" ON users FOR UPDATE TO authenticated USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Students are viewable by everyone" ON students;
+CREATE POLICY "Students are viewable by everyone" ON students FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage students" ON students;
+CREATE POLICY "Admins can manage students" ON students FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Students can update own profile" ON students;
+CREATE POLICY "Students can update own profile" ON students FOR UPDATE TO authenticated USING (
+  user_id = auth.uid()
+);
+
+DROP POLICY IF EXISTS "Companies are viewable by everyone" ON companies;
+CREATE POLICY "Companies are viewable by everyone" ON companies FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage companies" ON companies;
+CREATE POLICY "Admins can manage companies" ON companies FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Internships are public" ON internships;
 CREATE POLICY "Internships are public" ON internships FOR SELECT USING (true);
-CREATE POLICY "Applications are visible to the student and the company" ON applications FOR SELECT USING (true); -- Requires more complex policy in production
+
+DROP POLICY IF EXISTS "Admins can manage internships" ON internships;
+CREATE POLICY "Admins can manage internships" ON internships FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Applications are visible to students and companies" ON applications;
+CREATE POLICY "Applications are visible to students and companies" ON applications FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage applications" ON applications;
+CREATE POLICY "Admins can manage applications" ON applications FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
 -- Functions to update 'updated_at' timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -99,28 +161,43 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_students_updated_at ON students;
 CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_companies_updated_at ON companies;
 CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_internships_updated_at ON internships;
 CREATE TRIGGER update_internships_updated_at BEFORE UPDATE ON internships FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_applications_updated_at ON applications;
 CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Secure Identity Sync via Trigger (The Proper Way)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
+  -- Insert into public.users if not exists
   INSERT INTO public.users (id, email, name, role)
   VALUES (
     new.id, 
     new.email, 
     COALESCE(new.raw_user_meta_data->>'name', 'Unknown User'),
     COALESCE((new.raw_user_meta_data->>'role')::user_role, 'student'::user_role)
-  );
+  ) ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = EXCLUDED.name,
+    role = EXCLUDED.role;
 
   IF (new.raw_user_meta_data->>'role') = 'student' THEN
-    INSERT INTO public.students (user_id, name) VALUES (new.id, COALESCE(new.raw_user_meta_data->>'name', 'Unknown'));
+    INSERT INTO public.students (user_id, name) VALUES (new.id, COALESCE(new.raw_user_meta_data->>'name', 'Unknown'))
+    ON CONFLICT (user_id) DO NOTHING;
   ELSIF (new.raw_user_meta_data->>'role') = 'company' THEN
-    INSERT INTO public.companies (user_id, name, industry) VALUES (new.id, COALESCE(new.raw_user_meta_data->>'name', 'Unknown'), 'Software');
+    INSERT INTO public.companies (user_id, name, industry) VALUES (new.id, COALESCE(new.raw_user_meta_data->>'name', 'Unknown'), 'Software')
+    ON CONFLICT (user_id) DO NOTHING;
   END IF;
 
   RETURN new;

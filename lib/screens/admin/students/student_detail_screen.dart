@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StudentDetailScreen extends StatefulWidget {
+  final String studentId;
   final String studentName;
   final String collegeId;
   final String status;
   final String department;
   final String company;
 
-  const StudentDetailScreen({
-    super.key,
+  StudentDetailScreen({
+    Key? key,
+    required this.studentId,
     required this.studentName,
     required this.collegeId,
     required this.status,
     required this.department,
     required this.company,
-  });
+  }) : super(key: key);
 
   @override
   State<StudentDetailScreen> createState() => _StudentDetailScreenState();
@@ -22,17 +25,130 @@ class StudentDetailScreen extends StatefulWidget {
 
 class _StudentDetailScreenState extends State<StudentDetailScreen> {
   int _activeTabIndex = 0;
+  bool _isBlacklisted = false;
+  bool _isDeleting = false;
+  bool _isBlacklisting = false;
+  bool _isLoadingData = true;
+
+  Map<String, dynamic>? _studentData;
+  List<Map<String, dynamic>> _pastInternships = [];
+  List<Map<String, dynamic>> _currentInternships = [];
+  List<Map<String, dynamic>> _appliedInternships = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStudentAdditionalData();
+  }
+
+  Future<void> _fetchStudentAdditionalData() async {
+    try {
+      // 1. Fetch Full Student Info
+      final studentRes = await Supabase.instance.client
+          .from('students')
+          .select('*')
+          .eq('id', widget.studentId)
+          .single();
+      
+      // 2. Fetch All Applications (Applied, Active, Completed)
+      final appsRes = await Supabase.instance.client
+          .from('applications')
+          .select('*, internships(*, companies(*))')
+          .eq('student_id', widget.studentId);
+      
+      final List<Map<String, dynamic>> apps = List<Map<String, dynamic>>.from(appsRes);
+
+      if (mounted) {
+        setState(() {
+          _studentData = studentRes;
+          _isBlacklisted = studentRes['is_blacklisted'] ?? false;
+          _appliedInternships = apps.where((a) => a['status'] == 'Applied' || a['status'] == 'Under Review').toList();
+          _currentInternships = apps.where((a) => a['status'] == 'Active').toList();
+          _pastInternships = apps.where((a) => a['status'] == 'Completed').toList();
+          _isLoadingData = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching student details: $e');
+      if (mounted) setState(() => _isLoadingData = false);
+    }
+  }
+
+  Future<void> _toggleBlacklist() async {
+    setState(() => _isBlacklisting = true);
+    try {
+      await Supabase.instance.client
+          .from('students')
+          .update({'is_blacklisted': !_isBlacklisted})
+          .eq('id', widget.studentId);
+      
+      if (mounted) {
+        setState(() {
+          _isBlacklisted = !_isBlacklisted;
+          _isBlacklisting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isBlacklisted ? 'Student Blacklisted' : 'Student Whitelisted'), backgroundColor: _isBlacklisted ? Colors.black : Colors.green)
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isBlacklisting = false);
+    }
+  }
+
+  Future<void> _deleteStudent() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Student?'),
+        content: const Text('This will permanently remove the student profile and the associated Auth account. This action is irreversible.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isDeleting = true);
+    try {
+      // Note: We delete from 'users' (public) which handles 'students' via CASCADE. 
+      // Auth deletion requires admin API but we assume a trigger or direct access for MVP.
+      final studentRes = await Supabase.instance.client
+          .from('students')
+          .select('user_id')
+          .eq('id', widget.studentId)
+          .single();
+      
+      await Supabase.instance.client
+          .from('users')
+          .delete()
+          .eq('id', studentRes['user_id']);
+      
+      if (mounted) {
+        Navigator.pop(context, true); // Pop with refresh signal
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Student Deleted Successfully')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
-    final studentName = widget.studentName;
-    final collegeId = widget.collegeId;
+    if (_isLoadingData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    
+    // Dynamic mapping back to database fields
+    final studentName = _studentData?['name'] ?? widget.studentName;
+    final collegeId = _studentData?['college'] ?? widget.collegeId;
+    final department = _studentData?['department'] ?? widget.department;
     final status = widget.status;
-    final department = widget.department;
     final company = widget.company;
 
     final isAlert = status == 'Red Alert';
-    final isUnassigned = status == 'Unassigned';
+    final isUnassigned = _currentInternships.isEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -49,9 +165,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {},
-            tooltip: 'Edit Profile',
+            icon: Icon(
+              _isBlacklisted ? Icons.block_flipped : Icons.block_rounded,
+              color: _isBlacklisted ? Colors.red : const Color(0xFF64748B),
+            ),
+            onPressed: _isBlacklisting ? null : _toggleBlacklist,
+            tooltip: _isBlacklisted ? 'Whitelist' : 'Blacklist',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+            onPressed: _isDeleting ? null : _deleteStudent,
+            tooltip: 'Delete Profile',
           ),
           const SizedBox(width: 8),
         ],
@@ -116,6 +240,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                   ),
                                 ),
                                 _buildStatusBadge(status),
+                                if (_isBlacklisted)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text('BLACKLISTED', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -170,11 +303,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       const SizedBox(width: 12),
                       _buildTab('Applications', 1),
                       const SizedBox(width: 12),
-                      _buildTab('Check-Ins & Reports', 2),
+                      _buildTab('Documents', 2),
                       const SizedBox(width: 12),
-                      _buildTab('Documents', 3),
-                      const SizedBox(width: 12),
-                      _buildTab('Past Internships', 4),
+                      _buildTab('Past Internships', 3),
                     ],
                   ),
                 ),
@@ -214,10 +345,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               ] else if (_activeTabIndex == 1) ...[
                 _buildApplicationsTab(isMobile),
               ] else if (_activeTabIndex == 2) ...[
-                _buildCheckInsTab(isMobile),
-              ] else if (_activeTabIndex == 3) ...[
                 _buildDocumentsTab(isMobile),
-              ] else if (_activeTabIndex == 4) ...[
+              ] else if (_activeTabIndex == 3) ...[
                 _buildPastInternshipsTab(isMobile),
               ] else ...[
                 _buildComingSoonPlaceholder(_activeTabIndex),
@@ -260,7 +389,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildComingSoonPlaceholder(int tabIndex) {
-    final tabNames = ['Overview', 'Applications', 'Check-Ins & Reports', 'Documents', 'Past Internships'];
+    final tabNames = ['Overview', 'Applications', 'Documents', 'Past Internships'];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64),
@@ -284,33 +413,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildApplicationsTab(bool isMobile) {
+    if (_isLoadingData) return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
+    if (_appliedInternships.isEmpty) return _buildComingSoonPlaceholder(1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildApplicationCard(
-          isMobile: isMobile,
-          company: 'TechFlow Inc.',
-          role: 'Software Engineering Intern',
-          status: 'Interview',
-          date: 'Applied Oct 12, 2025',
-        ),
-        const SizedBox(height: 16),
-        _buildApplicationCard(
-          isMobile: isMobile,
-          company: 'DataDynamics',
-          role: 'Data Science Intern',
-          status: 'Pending',
-          date: 'Applied Oct 15, 2025',
-        ),
-        const SizedBox(height: 16),
-        _buildApplicationCard(
-          isMobile: isMobile,
-          company: 'CloudScale Systems',
-          role: 'Backend Developer Intern',
-          status: 'Rejected',
-          date: 'Applied Sept 28, 2025',
-        ),
-      ],
+      children: _appliedInternships.map((app) {
+        final intern = app['internships'] ?? {};
+        final comp = intern['companies'] ?? {};
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildApplicationCard(
+            isMobile: isMobile,
+            company: comp['name'] ?? 'Unknown Company',
+            role: intern['role'] ?? 'Intern Role',
+            status: app['status'] ?? 'Pending',
+            date: 'Applied ${app['created_at'].substring(0, 10)}',
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -472,206 +593,29 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Widget _buildCheckInsTab(bool isMobile) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildCheckInCard(
-          isMobile: isMobile,
-          week: 'Week 12',
-          date: 'Oct 24, 2026',
-          status: 'Submitted',
-          summary: 'Completed integration of the payment gateway API. Faced some issues with webhooks but resolved them. Setting up unit tests next week.',
-          managerFeedback: 'Good progress. Ensure the test coverage is above 80%.',
-        ),
-        const SizedBox(height: 16),
-        _buildCheckInCard(
-          isMobile: isMobile,
-          week: 'Week 11',
-          date: 'Oct 17, 2026',
-          status: 'Submitted',
-          summary: 'Worked on database scheme migration for the new feature. Everything is deployed to staging.',
-          managerFeedback: 'Approved.',
-        ),
-        const SizedBox(height: 16),
-        _buildCheckInCard(
-          isMobile: isMobile,
-          week: 'Week 10',
-          date: 'Oct 10, 2026',
-          status: 'Missed',
-          summary: '',
-          managerFeedback: '',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCheckInCard({
-    required bool isMobile,
-    required String week,
-    required String date,
-    required String status,
-    required String summary,
-    required String managerFeedback,
-  }) {
-    final isMissed = status.toLowerCase() == 'missed';
-
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 20 : 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isMissed ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      week,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    date,
-                    style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isMissed ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: isMissed ? const Color(0xFFFECACA) : const Color(0xFFBBF7D0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isMissed ? Icons.cancel_rounded : Icons.check_circle_rounded,
-                      size: 14,
-                      color: isMissed ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      status.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: isMissed ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (!isMissed) ...[
-            const SizedBox(height: 16),
-            const Divider(color: Color(0xFFE2E8F0)),
-            const SizedBox(height: 16),
-            const Text(
-              'Student Summary',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8), letterSpacing: 0.5),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              summary,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF334155), height: 1.5),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.record_voice_over_outlined, size: 16, color: Color(0xFF64748B)),
-                      SizedBox(width: 6),
-                      Text(
-                        'Manager Feedback',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    managerFeedback,
-                    style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('View Full Report', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildDocumentsTab(bool isMobile) {
+    final List<dynamic> docUrls = _studentData?['document_urls'] ?? [];
+    
+    if (docUrls.isEmpty) return _buildComingSoonPlaceholder(2);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildDocumentTile(
-          title: 'Student Resume (Updated)',
-          date: 'Uploaded Oct 01, 2026',
-          type: 'PDF',
-          status: 'Verified',
-        ),
-        const SizedBox(height: 12),
-        _buildDocumentTile(
-          title: 'TechFlow Offer Letter',
-          date: 'Uploaded Sept 10, 2026',
-          type: 'PDF',
-          status: 'Verified',
-        ),
-        const SizedBox(height: 12),
-        _buildDocumentTile(
-          title: 'NDA Agreement',
-          date: 'Uploaded Sept 12, 2026',
-          type: 'PDF',
-          status: 'Pending Signature',
-        ),
-        const SizedBox(height: 12),
-        _buildDocumentTile(
-          title: 'Mid-Term Evaluation Form',
-          date: 'Uploaded Nov 15, 2026',
-          type: 'DOCX',
-          status: 'Action Required',
-        ),
+        ...List.generate(docUrls.length, (index) {
+          final url = docUrls[index].toString();
+          final String extension = url.split('.').last.toUpperCase().split('?').first;
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildDocumentTile(
+              title: 'Student Document ${index + 1}',
+              date: 'Profile Attachment',
+              type: extension.length > 4 ? 'DOC' : extension,
+              status: 'Verified',
+            ),
+          );
+        }),
       ],
     );
   }
@@ -751,29 +695,27 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildPastInternshipsTab(bool isMobile) {
+    if (_isLoadingData) return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
+    if (_pastInternships.isEmpty) return _buildComingSoonPlaceholder(3);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildPastInternshipCard(
-          isMobile: isMobile,
-          company: 'Acme Corp',
-          role: 'Frontend Developer Intern',
-          duration: 'May 2025 - Aug 2025',
-          rating: 4.8,
-          managerName: 'Jane Smith',
-          feedback: 'Outstanding performer. Mastered React quickly and delivered a critical dashboard feature ahead of schedule.',
-        ),
-        const SizedBox(height: 16),
-        _buildPastInternshipCard(
-          isMobile: isMobile,
-          company: 'Startup Incubator Labs',
-          role: 'UI/UX Design Intern',
-          duration: 'Jan 2025 - Apr 2025',
-          rating: 4.2,
-          managerName: 'Alex Johnson',
-          feedback: 'Creative and eager to learn. Needs to work slightly on communication during cross-team alignment, but excellent design skills.',
-        ),
-      ],
+      children: _pastInternships.map((app) {
+        final intern = app['internships'] ?? {};
+        final comp = intern['companies'] ?? {};
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildPastInternshipCard(
+            isMobile: isMobile,
+            company: comp['name'] ?? 'Unknown',
+            role: intern['role'] ?? 'Role',
+            duration: '${app['start_date'] ?? "?"} - ${app['end_date'] ?? "?"}',
+            rating: 4.5,
+            managerName: app['mentor_name'] ?? 'Mentor',
+            feedback: 'Completed Internship.',
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -888,13 +830,29 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
-  Widget _buildCurrentInternshipCard(String company, bool isUnassigned, bool isMobile) {
+  Widget _buildCurrentInternshipCard(String fallbackCompany, bool isUnassignedShortcut, bool isMobile) {
+    final hasCurrent = _currentInternships.isNotEmpty;
+    final currentApp = hasCurrent ? _currentInternships.first : null;
+    final intern = currentApp?['internships'] ?? {};
+    final comp = intern['companies'] ?? {};
+    
+    final companyName = hasCurrent ? (comp['name'] ?? 'Company') : fallbackCompany;
+    final roleName = hasCurrent ? (intern['role'] ?? 'Intern Role') : 'Not Assigned';
+    final isUnassigned = !hasCurrent && isUnassignedShortcut;
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.01),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -910,7 +868,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.none),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: const Row(
                 children: [
@@ -918,7 +876,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'This student hasn\'t been assigned an internship yet or hasn\'t applied.',
+                      'This student hasn\'t been assigned an active internship yet.',
                       style: TextStyle(color: Color(0xFF64748B), height: 1.4),
                     ),
                   ),
@@ -942,15 +900,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                         company,
+                        companyName,
                         style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Software Engineering Intern',
-                        style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      Text(
+                        roleName,
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -962,27 +920,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             const SizedBox(height: 24),
             const Divider(color: Color(0xFFE2E8F0)),
             const SizedBox(height: 20),
-            // Use Wrap to cleanly flow statistics safely onto a second row on extremely narrow mobile devices.
             Wrap(
               spacing: 32,
               runSpacing: 16,
               children: [
-                _buildInfoColumn('Start Date', 'Sept 1, 2026'),
-                _buildInfoColumn('Duration', '6 Months'),
-                _buildInfoColumn('Reporting Status', 'Active'),
+                _buildInfoColumn('Start Date', currentApp?['start_date'] ?? 'TBD'),
+                _buildInfoColumn('Mentor', currentApp?['mentor_name'] ?? 'Unassigned'),
+                _buildInfoColumn('Status', hasCurrent ? 'ACTIVE' : 'IDLE'),
               ],
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Recent Reports',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-            ),
-            const SizedBox(height: 16),
-            _buildReportListTile('Week 12 Report', 'Submitted Oct 24', true),
-            const SizedBox(height: 8),
-            _buildReportListTile('Week 11 Report', 'Submitted Oct 17', true),
-            const SizedBox(height: 8),
-            _buildReportListTile('Week 10 Report', 'Missed', false),
           ],
         ],
       ),
@@ -990,6 +936,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildAcademicProfileCard(bool isMobile, String department) {
+    final gpa = _studentData?['gpa']?.toString() ?? 'N/A';
+    
     return Container(
       padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: BoxDecoration(
@@ -1007,17 +955,19 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           const SizedBox(height: 24),
           _buildInfoRow(Icons.school_outlined, 'Degree Program', 'B.Tech - $department'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.history_edu_outlined, 'Current Semester', '6th Semester (Year 3)'),
+          _buildInfoRow(Icons.history_edu_outlined, 'Current Status', 'Enrolled'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.grade_outlined, 'Cumulative GPA', '3.8 / 4.0'),
+          _buildInfoRow(Icons.grade_outlined, 'Cumulative GPA', '$gpa / 4.0'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.calendar_month_outlined, 'Expected Graduation', 'May 2027'),
+          _buildInfoRow(Icons.calendar_month_outlined, 'Joined Date', _studentData?['created_at']?.toString().substring(0, 10) ?? 'TBD'),
         ],
       ),
     );
   }
 
   Widget _buildPersonalDetailsCard(bool isMobile, String studentName) {
+    final resumeUrl = _studentData?['resume_url'];
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: BoxDecoration(
@@ -1033,24 +983,30 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 24),
-          _buildInfoRow(Icons.email_outlined, 'Email', '${studentName.toLowerCase().replaceAll(' ', '.')}@college.edu'),
+          _buildInfoRow(Icons.badge_outlined, 'Enrollment ID', _studentData?['enrollment_id'] ?? 'N/A'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.phone_outlined, 'Phone', '+1 (555) 019-2026'),
+          _buildInfoRow(Icons.email_outlined, 'Contact Email', _studentData?['contact_email'] ?? 'Not Given'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.cake_outlined, 'DOB', 'May 12, 2004'),
+          _buildInfoRow(Icons.phone_outlined, 'Phone Number', _studentData?['phone_number'] ?? 'N/A'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.home_outlined, 'Home City', 'San Francisco, CA'),
+          _buildInfoRow(Icons.escalator_warning_outlined, 'Parent Contact', _studentData?['parent_contact'] ?? 'N/A'),
+          const SizedBox(height: 16),
+          _buildInfoRow(Icons.alternate_email_outlined, 'Parent Email', _studentData?['parent_email'] ?? 'N/A'),
+          const SizedBox(height: 16),
+          _buildInfoRow(Icons.location_on_outlined, 'City Location', 'Bangalore'),
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 20),
           OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.description_outlined, size: 18),
-            label: const Text('View Resume', style: TextStyle(fontWeight: FontWeight.w600)),
+            onPressed: resumeUrl != null ? () {
+              // Future: launch resumeUrl
+            } : null,
+            icon: Icon(resumeUrl != null ? Icons.description_outlined : Icons.file_present_outlined, size: 18),
+            label: Text(resumeUrl != null ? 'View Resume' : 'Resume Not Uploaded', style: const TextStyle(fontWeight: FontWeight.w600)),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF0F172A),
+              foregroundColor: resumeUrl != null ? const Color(0xFF0F172A) : Colors.grey,
               minimumSize: const Size(double.infinity, 48),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: BorderSide(color: resumeUrl != null ? const Color(0xFFE2E8F0) : Colors.grey.withValues(alpha: 0.3)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),

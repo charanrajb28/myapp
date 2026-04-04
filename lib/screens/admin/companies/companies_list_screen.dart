@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'company_detail_screen.dart';
 import 'add_company_screen.dart';
 
@@ -26,39 +27,6 @@ class _Company {
   });
 }
 
-const List<_Company> _kCompanies = [
-  _Company(id: 'C-1001', name: 'TechFlow Inc.', industry: 'Software Engineering',
-    location: 'San Francisco, CA', activeInterns: 12, totalPlacements: 45,
-    openRoles: 3, rating: 4.8, status: 'Approved',
-    logoColor: Color(0xFF3B82F6), logoInitial: 'T',
-    about: 'Builds enterprise-grade cloud software used by over 2M professionals worldwide.'),
-  _Company(id: 'C-1002', name: 'DataDynamics', industry: 'Data Analytics',
-    location: 'Austin, TX', activeInterns: 5, totalPlacements: 18,
-    openRoles: 1, rating: 4.5, status: 'Approved',
-    logoColor: Color(0xFF8B5CF6), logoInitial: 'D',
-    about: 'Specialises in real-time data pipelines and predictive analytics for Fortune 500 clients.'),
-  _Company(id: 'C-1003', name: 'Cloud9 Systems', industry: 'Cloud Computing',
-    location: 'Seattle, WA', activeInterns: 0, totalPlacements: 0,
-    openRoles: 2, rating: 0.0, status: 'Pending',
-    logoColor: Color(0xFF64748B), logoInitial: 'C',
-    about: 'Early-stage cloud infrastructure startup focused on edge computing and serverless architecture.'),
-  _Company(id: 'C-1004', name: 'Green Horizons', industry: 'Renewable Energy',
-    location: 'Denver, CO', activeInterns: 2, totalPlacements: 8,
-    openRoles: 0, rating: 4.2, status: 'Restricted',
-    logoColor: Color(0xFF10B981), logoInitial: 'G',
-    about: 'Pioneer in solar and wind energy solutions, currently under compliance review.'),
-  _Company(id: 'C-1005', name: 'Stark Industries', industry: 'Aerospace',
-    location: 'New York, NY', activeInterns: 24, totalPlacements: 120,
-    openRoles: 5, rating: 4.9, status: 'Approved',
-    logoColor: Color(0xFFEF4444), logoInitial: 'S',
-    about: 'Leading aerospace and advanced defence technologies firm with global R&D operations.'),
-  _Company(id: 'C-1006', name: 'Nexus Robotics', industry: 'Mechanical Eng.',
-    location: 'Boston, MA', activeInterns: 7, totalPlacements: 31,
-    openRoles: 2, rating: 4.6, status: 'Approved',
-    logoColor: Color(0xFFF59E0B), logoInitial: 'N',
-    about: 'Designs autonomous industrial robots for manufacturing automation and smart logistics.'),
-];
-
 // ─────────────────────────────────────────────────────────────────
 class CompaniesListScreen extends StatefulWidget {
   const CompaniesListScreen({super.key});
@@ -68,8 +36,50 @@ class CompaniesListScreen extends StatefulWidget {
 
 class _CompaniesListScreenState extends State<CompaniesListScreen> {
   String _query = '';
+  List<_Company> _companies = [];
+  bool _isLoading = true;
 
-  List<_Company> get _filtered => _kCompanies
+  @override
+  void initState() {
+    super.initState();
+    _fetchCompanies();
+  }
+
+  Future<void> _fetchCompanies() async {
+    try {
+      final res = await Supabase.instance.client
+          .from('companies')
+          .select('*')
+          .order('created_at');
+
+      if (mounted) {
+        setState(() {
+          _companies = (res as List).map((c) {
+            return _Company(
+              id: c['id'] ?? '',
+              name: c['name'] ?? 'Unknown',
+              industry: c['industry'] ?? 'General',
+              location: 'Remote/Unspecified', // Dummy fallback as per schema
+              activeInterns: 0,
+              totalPlacements: 0,
+              openRoles: 0,
+              rating: 4.5,
+              status: 'Approved',
+              logoColor: const Color(0xFF3B82F6),
+              logoInitial: (c['name'] != null && c['name'].isNotEmpty) ? c['name'][0].toUpperCase() : 'C',
+              about: c['description'] ?? 'No description provided.',
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching companies: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<_Company> get _filtered => _companies
       .where((c) =>
           c.name.toLowerCase().contains(_query.toLowerCase()) ||
           c.industry.toLowerCase().contains(_query.toLowerCase()))
@@ -92,7 +102,9 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
           child: Container(color: const Color(0xFFE2E8F0), height: 1),
         ),
       ),
-      body: Column(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) 
+        : Column(
         children: [
           // ── Toolbar ──
           Padding(
@@ -156,7 +168,7 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
                     builder: (context, constraints) {
                       return GridView.builder(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 450,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,

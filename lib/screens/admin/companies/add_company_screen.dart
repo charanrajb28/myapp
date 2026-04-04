@@ -1,5 +1,5 @@
-// ignore_for_file: unused_field, deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'company_detail_screen.dart';
 
 class AddCompanyScreen extends StatefulWidget {
@@ -52,11 +52,91 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
     'Other'
   ];
 
-  void _submit() {
+  bool _isSubmitting = false;
+
+  Future<void> _selectMOUDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF0F172A),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _mouDate = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Company Added Successfully')));
-      Navigator.pop(context);
+      
+      setState(() => _isSubmitting = true);
+      
+      try {
+        final supabase = Supabase.instance.client;
+        
+        // 1. Create Login Account
+        final AuthResponse res = await supabase.auth.signUp(
+          email: _hrEmail.trim(),
+          password: _password,
+          data: {
+            'role': 'company',
+            'name': _companyName,
+          }
+        );
+
+        if (res.user != null) {
+          // 2. Wait for trigger to create profile, then Update detailed attributes
+          bool updated = false;
+          for (int i = 0; i < 5; i++) {
+            final updRes = await supabase.from('companies').update({
+              'industry': _industry,
+              'location': _location,
+              'website': _website,
+              'phone': _phone,
+              'contact_email': _hrEmail,
+              'description': _about,
+              'mou_date': _mouDate,
+              'partner_since': int.tryParse(_partnerSince) ?? DateTime.now().year,
+            }).eq('user_id', res.user!.id).select();
+
+            if ((updRes as List).isNotEmpty) {
+              updated = true;
+              break;
+            }
+            await Future.delayed(const Duration(milliseconds: 600));
+          }
+
+          if (mounted) {
+            Navigator.pop(context, true);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Company Profile & Access Point Created Successfully'), backgroundColor: Colors.green)
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -161,12 +241,16 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
 
               Row(children: [
                 Expanded(
-                  child: _InputField(
-                    label: 'MOU Signed Date',
-                    hint: 'MM/DD/YYYY',
-                    icon: Icons.handshake_rounded,
-                    required: false,
-                    onSaved: (v) => _mouDate = v ?? '',
+                  child: InkWell(
+                    onTap: _selectMOUDate,
+                    child: _InputField(
+                      label: 'MOU Signed Date',
+                      hint: 'Select Date',
+                      icon: Icons.handshake_rounded,
+                      required: false,
+                      enabled: false, // Prevents typing, forces use of calendar
+                      controller: TextEditingController(text: _mouDate),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -292,7 +376,9 @@ class _InputField extends StatelessWidget {
   final TextInputType keyboardType;
   final Widget? suffixIcon;
   final String? initialValue;
+  final TextEditingController? controller;
   final void Function(String?)? onSaved;
+  final bool enabled;
 
   const _InputField({
     required this.label,
@@ -304,7 +390,9 @@ class _InputField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.suffixIcon,
     this.initialValue,
+    this.controller,
     this.onSaved,
+    this.enabled = true,
   });
 
   @override
@@ -323,7 +411,9 @@ class _InputField extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         TextFormField(
-          initialValue: initialValue,
+          initialValue: controller == null ? initialValue : null,
+          controller: controller,
+          enabled: enabled,
           obscureText: obscureText,
           maxLines: maxLines,
           keyboardType: keyboardType,

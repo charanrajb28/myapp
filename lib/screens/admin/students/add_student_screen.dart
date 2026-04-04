@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
 
 class AddStudentScreen extends StatefulWidget {
   const AddStudentScreen({super.key});
@@ -12,31 +15,39 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
-  final TextEditingController _dobController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _parentContactController = TextEditingController();
+  final TextEditingController _parentEmailController = TextEditingController();
   
   final TextEditingController _gpaController = TextEditingController();
   final TextEditingController _expectedGradController = TextEditingController();
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  
+  final TextEditingController _adminSmtpEmailController = TextEditingController(text: 'charanrajb282004@gmail.com');
+  final TextEditingController _adminSmtpPasswordController = TextEditingController(text: 'nftj sgzj occd kgid');
 
   String _selectedDepartment = 'Computer Science';
   String _selectedSemester = '6th Semester (Year 3)';
   String _selectedGender = 'Male';
   bool _sendInvite = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _idController.dispose();
-    _dobController.dispose();
     _phoneController.dispose();
+    _parentContactController.dispose();
+    _parentEmailController.dispose();
     _gpaController.dispose();
     _expectedGradController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _adminSmtpEmailController.dispose();
+    _adminSmtpPasswordController.dispose();
     super.dispose();
   }
 
@@ -49,6 +60,138 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     setState(() {
       _passwordController.text = password;
     });
+  }
+
+  Future<void> _submitStudent() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty || _firstNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('First Name, Email, and Password are required fields.'), backgroundColor: Colors.red)
+      );
+      return;
+    }
+    
+    setState(() => _isSubmitting = true);
+    
+    try {
+      // 1. Isolated client to prevent logging the Admin out during creation
+      final inviteClient = SupabaseClient(
+        'https://nfurwspybtiaycqntzev.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+        authOptions: const AuthClientOptions(
+          authFlowType: AuthFlowType.implicit,
+        ),
+      );
+      
+      // 2. Call Auth API. Database triggers instantly convert this Auth insert -> 'users' -> 'students'
+      final AuthResponse res = await inviteClient.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        data: {
+          'role': 'student',
+          'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+        }
+      );
+      
+      if (res.user != null) {
+        // 3. Inject explicit student attributes (with retry loop for triggers)
+        final gpaVal = double.tryParse(_gpaController.text) ?? 0.0;
+        bool updated = false;
+        
+        for (int i = 0; i < 3; i++) {
+          final updRes = await Supabase.instance.client.from('students').update({
+            'college': 'Sheshadri Institute of Technology', 
+            'enrollment_id': _idController.text.trim(),
+            'contact_email': _emailController.text.trim(),
+            'phone_number': _phoneController.text.trim(),
+            'parent_contact': _parentContactController.text.trim(),
+            'parent_email': _parentEmailController.text.trim(),
+            'department': _selectedDepartment,
+            'gpa': gpaVal,
+            'graduation_year': int.tryParse(_expectedGradController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+          }).eq('user_id', res.user!.id).select();
+
+          if ((updRes as List).isNotEmpty) {
+            updated = true;
+            break;
+          }
+          await Future.delayed(const Duration(milliseconds: 600));
+        }
+
+        if (!updated) {
+          throw Exception("Student record not found in database. Trigger might have failed or reached timeout.");
+        }
+        
+        // 4. Mailing Automation API Pipeline
+        if (_sendInvite) {
+          await _dispatchEmailAutomation(
+            email: _emailController.text.trim(),
+            name: _firstNameController.text.trim(),
+            tempPassword: _passwordController.text,
+          );
+        }
+        
+        if (mounted) {
+          // Returning true tells the list screen to refresh
+          Navigator.pop(context, true); 
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Student Profile integrated & invite dispatched securely!'),
+              backgroundColor: Color(0xFF16A34A),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error creating student: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _dispatchEmailAutomation({required String email, required String name, required String tempPassword}) async {
+    final String senderEmail = _adminSmtpEmailController.text.trim();
+    final String senderPassword = _adminSmtpPasswordController.text.trim();
+    
+    if (senderEmail.isEmpty || senderPassword.isEmpty) {
+      debugPrint('SMTP Credentials missing, skipping actual send.');
+      return;
+    }
+
+    // Configured for Gmail SMTP by default as it's the most common for Option C
+    final smtpServer = gmail(senderEmail, senderPassword);
+
+    final message = Message()
+      ..from = Address(senderEmail, 'ScholarBridge Admin')
+      ..recipients.add(email)
+      ..subject = 'Welcome to ScholarBridge Internship Portal'
+      ..html = """
+        <div style='font-family: sans-serif; padding: 20px; color: #0F172A;'>
+          <h2 style='color: #2563EB;'>Welcome to the Program, $name!</h2>
+          <p>Your internship tracking account has been successfully created by the administration.</p>
+          <div style='background: #F1F5F9; padding: 15px; border-radius: 8px; margin: 20px 0;'>
+            <p style='margin: 5px 0;'><strong>Portal Link:</strong> <a href='#'>Open ScholarBridge</a></p>
+            <p style='margin: 5px 0;'><strong>Username:</strong> $email</p>
+            <p style='margin: 5px 0;'><strong>One-Time Password:</strong> $tempPassword</p>
+          </div>
+          <p style='font-size: 12px; color: #64748B;'>Please change your password immediately upon your first login.</p>
+        </div>
+      """;
+
+    try {
+      final sendReport = await send(message, smtpServer);
+      debugPrint('Message sent: $sendReport');
+    } catch (e) {
+      debugPrint('Email error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Mailing failed: Check your SMTP credentials'), backgroundColor: Colors.orange)
+        );
+      }
+    }
   }
 
   @override
@@ -109,7 +252,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                           ]),
                           const SizedBox(height: 20),
                           _buildResponsiveRow(isMobile, [
-                            _buildTextField(label: 'Date of Birth', controller: _dobController, hint: 'MM/DD/YYYY', icon: Icons.cake_outlined),
+                            _buildTextField(label: 'Student Mobile', controller: _phoneController, hint: '+91 00000 00000', icon: Icons.phone_outlined),
                             _buildDropdownField(
                               label: 'Gender',
                               value: _selectedGender,
@@ -119,8 +262,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                           ]),
                           const SizedBox(height: 20),
                           _buildResponsiveRow(isMobile, [
-                            _buildTextField(label: 'Phone Number', controller: _phoneController, hint: '+1 (555) 000-0000', icon: Icons.phone_outlined),
-                            const SizedBox(), // Empty for alignment 
+                            _buildTextField(label: 'Parent Contact Number', controller: _parentContactController, hint: '+91 00000 00000', icon: Icons.escalator_warning_outlined),
+                            _buildTextField(label: 'Parent Email Address', controller: _parentEmailController, hint: 'parent@example.com', icon: Icons.alternate_email_outlined),
                           ]),
                         ],
                       ),
@@ -135,7 +278,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildResponsiveRow(isMobile, [
-                            _buildTextField(label: 'College ID Number', controller: _idController, hint: 'e.g. STU-2024-001', icon: Icons.badge_outlined),
+                            _buildTextField(label: 'Enrollment ID', controller: _idController, hint: 'e.g. STU-2024-001', icon: Icons.badge_outlined),
                             _buildDropdownField(
                               label: 'Department / Major',
                               value: _selectedDepartment,
@@ -293,19 +436,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            // Submit Logic
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Comprehensive Student Profile created successfully.'),
-                                backgroundColor: Color(0xFF16A34A),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.check_circle_rounded, size: 20),
-                          label: const Text('Create Student Profile', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          onPressed: _isSubmitting ? null : _submitStudent,
+                          icon: _isSubmitting 
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.check_circle_rounded, size: 20),
+                          label: Text(_isSubmitting ? 'Creating...' : 'Create Student Profile', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
@@ -341,19 +476,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                           ),
                           const SizedBox(width: 16),
                           ElevatedButton.icon(
-                            onPressed: () {
-                              // Submit Logic
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Comprehensive Student Profile created successfully.'),
-                                  backgroundColor: Color(0xFF16A34A),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.check_circle_rounded, size: 20),
-                            label: const Text('Create Student Profile', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                            onPressed: _isSubmitting ? null : _submitStudent,
+                            icon: _isSubmitting 
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Icon(Icons.check_circle_rounded, size: 20),
+                            label: Text(_isSubmitting ? 'Creating...' : 'Create Student Profile', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2563EB),
                               foregroundColor: Colors.white,

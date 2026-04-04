@@ -1,10 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../feedbacks/admin_feedbacks_screen.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  int _totalStudents = 0;
+  int _partnerCompanies = 0;
+  int _activeInternships = 0;
+  int _redAlerts = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboardStats();
+  }
+
+  Future<void> _fetchDashboardStats() async {
+    try {
+      final client = Supabase.instance.client;
+
+      // Fetch total students
+      final studentsRes = await client.from('students').select('id').count(CountOption.exact);
+      final studentsCount = studentsRes.count ?? 0;
+
+      // Fetch partner companies
+      final companiesRes = await client.from('companies').select('id').count(CountOption.exact);
+      final companiesCount = companiesRes.count ?? 0;
+
+      // Fetch active internships
+      final internshipsRes = await client.from('applications').select('id').eq('status', 'Active').count(CountOption.exact);
+      final internshipsCount = internshipsRes.count ?? 0;
+
+      // Fetch red alerts count
+      int redAlertsCount = 0;
+      try {
+        final alertsRes = await client.from('red_alerts').select('id').count(CountOption.exact);
+        redAlertsCount = alertsRes.count ?? 0;
+      } catch (e) {
+        // Ignored if table doesnt exist
+      }
+
+      if (mounted) {
+        setState(() {
+          _totalStudents = studentsCount;
+          _partnerCompanies = companiesCount;
+          _activeInternships = internshipsCount;
+          _redAlerts = redAlertsCount;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching stats: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -37,10 +105,10 @@ class AdminDashboardScreen extends StatelessWidget {
                       spacing: 14,
                       runSpacing: 14,
                       children: [
-                        _StatCard(title: 'Total Students', value: '1,242', icon: Icons.people_alt_rounded, color: const Color(0xFF3B82F6), constraints: constraints),
-                        _StatCard(title: 'Partner Companies', value: '38', icon: Icons.domain_rounded, color: const Color(0xFF8B5CF6), constraints: constraints),
-                        _StatCard(title: 'Active Internships', value: '89', icon: Icons.work_outline_rounded, color: const Color(0xFF10B981), constraints: constraints),
-                        _StatCard(title: 'Red Alerts', value: '3', icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444), constraints: constraints),
+                        _StatCard(title: 'Total Students', value: _totalStudents.toString(), icon: Icons.people_alt_rounded, color: const Color(0xFF3B82F6), constraints: constraints),
+                        _StatCard(title: 'Partner Companies', value: _partnerCompanies.toString(), icon: Icons.domain_rounded, color: const Color(0xFF8B5CF6), constraints: constraints),
+                        _StatCard(title: 'Active Internships', value: _activeInternships.toString(), icon: Icons.work_outline_rounded, color: const Color(0xFF10B981), constraints: constraints),
+                        _StatCard(title: 'Red Alerts', value: _redAlerts.toString(), icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444), constraints: constraints),
                       ],
                     ),
                     
@@ -96,7 +164,12 @@ class AdminDashboardScreen extends StatelessWidget {
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                         const Spacer(),
                         TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AdminFeedbacksScreen()),
+                            );
+                          },
                           style: TextButton.styleFrom(foregroundColor: const Color(0xFF3B82F6)),
                           child: const Text('View All', style: TextStyle(fontWeight: FontWeight.w700)),
                         )
@@ -312,35 +385,62 @@ class _ActionTile extends StatelessWidget {
 class _FeedbackList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _FeedbackTile(
-          student: 'Arjun Mehta',
-          company: 'TechFlow Inc.',
-          type: 'Compliment',
-          comment: 'The mentorship program is excellent. I am learning a lot about cloud architecture and enterprise software practices.',
-          date: '2 hours ago',
-        ),
-        const SizedBox(height: 12),
-        _FeedbackTile(
-          student: 'Sanya Sharma',
-          company: 'DataDynamics',
-          type: 'Complaint',
-          comment: 'There was a slight delay in the onboarding process, but the technical team eventually resolved it. Would appreciate faster communication.',
-          date: 'Yesterday',
-        ),
-        const SizedBox(height: 12),
-        _FeedbackTile(
-          student: 'Vikram Singh',
-          company: 'Stark Industries',
-          type: 'Compliment',
-          comment: 'Incredible work environment. The facilities and the R&D projects are state-of-the-art. Very grateful for this opportunity.',
-          date: 'Mar 31',
-        ),
-      ],
+    return FutureBuilder(
+      future: Supabase.instance.client
+          .from('feedbacks')
+          .select('*, students(name), companies(name)')
+          .order('created_at', ascending: false)
+          .limit(3),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || (snapshot.data as List).isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.mark_email_read_rounded, size: 48, color: Color(0xFF94A3B8)),
+                  SizedBox(height: 16),
+                  Text('No Feedbacks Yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  SizedBox(height: 4),
+                  Text("Students haven't posted any feedback.", style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final items = snapshot.data as List;
+        return Column(
+          children: items.map((f) {
+            final date = DateTime.tryParse(f['created_at'].toString()) ?? DateTime.now();
+            final now = DateTime.now();
+            final difference = now.difference(date).inDays;
+            final dateString = difference == 0 ? 'Today' : difference == 1 ? 'Yesterday' : '$difference days ago';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _FeedbackTile(
+                student: f['students']?['name'] ?? 'Unknown Student',
+                company: f['companies']?['name'] ?? 'Unknown Company',
+                type: f['type'] ?? 'Suggestion',
+                comment: f['comment'] ?? '',
+                date: dateString,
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
+
 
 class _FeedbackTile extends StatelessWidget {
   final String student;
