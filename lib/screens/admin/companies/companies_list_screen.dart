@@ -13,6 +13,7 @@ class _Company {
   final int openRoles;
   final double rating;
   final String status;
+  final bool isBlacklisted;
   final Color logoColor;
   final String logoInitial;
   final String about;
@@ -23,7 +24,7 @@ class _Company {
     required this.totalPlacements, required this.openRoles,
     required this.rating, required this.status,
     required this.logoColor, required this.logoInitial,
-    required this.about,
+    required this.about, required this.isBlacklisted,
   });
 }
 
@@ -68,6 +69,7 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
               logoColor: const Color(0xFF3B82F6),
               logoInitial: (c['name'] != null && c['name'].isNotEmpty) ? c['name'][0].toUpperCase() : 'C',
               about: c['description'] ?? 'No description provided.',
+              isBlacklisted: (c['is_blacklisted'] as bool?) ?? false,
             );
           }).toList();
           _isLoading = false;
@@ -76,6 +78,25 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
     } catch (e) {
       debugPrint('Error fetching companies: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleBlacklist(String id, bool currentState) async {
+    try {
+      await Supabase.instance.client
+          .from('companies')
+          .update({'is_blacklisted': !currentState})
+          .eq('id', id);
+          
+      _fetchCompanies();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(currentState ? 'Company Whitelisted' : 'Company Blocked Successfully'))
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling blacklist: $e');
     }
   }
 
@@ -172,7 +193,7 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
                           maxCrossAxisExtent: 450,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          mainAxisExtent: 200, // Fixed height for consistency
+                          mainAxisExtent: 215, // Increased height to prevent overflow
                         ),
                         itemCount: companies.length,
                         itemBuilder: (_, i) => _CompanyCard(company: companies[i]),
@@ -207,7 +228,30 @@ class _CompanyCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () {},
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CompanyDetailScreen(
+                  company: CompanyDetailArgs(
+                    id: company.id,
+                    name: company.name,
+                    industry: company.industry,
+                    location: company.location,
+                    activeInterns: company.activeInterns,
+                    totalPlacements: company.totalPlacements,
+                    openRoles: company.openRoles,
+                    rating: company.rating,
+                    status: company.status,
+                    logoColor: company.logoColor,
+                    logoInitial: company.logoInitial,
+                    about: company.about,
+                    isBlacklisted: company.isBlacklisted,
+                  ),
+                ),
+              ),
+            ).then((_) => (context.findAncestorStateOfType<_CompaniesListScreenState>())?._fetchCompanies());
+          },
           child: Stack(
             children: [
               // Subtle background decoration
@@ -233,11 +277,32 @@ class _CompanyCard extends StatelessWidget {
                 children: [
                   // ── Top Bar with Status ──
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 14, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 10, 0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        _StatusPill(status: company.status),
+                        _StatusPill(status: company.isBlacklisted ? 'Blocked' : company.status),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert_rounded, size: 20, color: Color(0xFF94A3B8)),
+                          padding: EdgeInsets.zero,
+                          onSelected: (val) {
+                            if (val == 'block') {
+                              (context.findAncestorStateOfType<_CompaniesListScreenState>())?._toggleBlacklist(company.id, company.isBlacklisted);
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            PopupMenuItem(
+                              value: 'block',
+                              child: Row(
+                                children: [
+                                  Icon(company.isBlacklisted ? Icons.check_circle_outline : Icons.block_rounded, size: 18, color: company.isBlacklisted ? Colors.green : Colors.orange),
+                                  const SizedBox(width: 8),
+                                  Text(company.isBlacklisted ? 'Unblock Partner' : 'Block Partner'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -250,7 +315,7 @@ class _CompanyCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _Avatar(company: company),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Text(company.name,
                             style: const TextStyle(
                               fontWeight: FontWeight.w800, color: Color(0xFF0F172A),
@@ -339,6 +404,7 @@ class _StatsRow extends StatelessWidget {
           rating: company.rating, status: company.status,
           logoColor: company.logoColor, logoInitial: company.logoInitial,
           about: company.about,
+          isBlacklisted: company.isBlacklisted,
         ),
       ),
     ));
@@ -383,7 +449,9 @@ class _StatusPill extends StatelessWidget {
         ? const Color(0xFF10B981)
         : status == 'Pending'
             ? const Color(0xFFF59E0B)
-            : const Color(0xFFEF4444);
+            : status == 'Blocked'
+                ? const Color(0xFF0F172A) // Dark/Black for Blocked
+                : const Color(0xFFEF4444);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

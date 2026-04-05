@@ -5,7 +5,8 @@ import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
 class AddStudentScreen extends StatefulWidget {
-  const AddStudentScreen({super.key});
+  final Map<String, dynamic>? student;
+  const AddStudentScreen({super.key, this.student});
 
   @override
   State<AddStudentScreen> createState() => _AddStudentScreenState();
@@ -29,12 +30,32 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final TextEditingController _adminSmtpPasswordController = TextEditingController(text: 'nftj sgzj occd kgid');
 
   String _selectedDepartment = 'Computer Science';
-  String _selectedSemester = '6th Semester (Year 3)';
+  String _selectedSemester = '6th Semester';
   String _selectedGender = 'Male';
   bool _sendInvite = true;
   bool _isSubmitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.student != null) {
+      final s = widget.student!;
+      final nameParts = (s['name'] ?? '').split(' ');
+      _firstNameController.text = nameParts.length > 0 ? nameParts[0] : '';
+      _lastNameController.text = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      _idController.text = s['enrollment_id']?.toString() ?? '';
+      _phoneController.text = s['phone_number']?.toString() ?? '';
+      _parentContactController.text = s['parent_contact']?.toString() ?? '';
+      _parentEmailController.text = s['parent_email']?.toString() ?? '';
+      _gpaController.text = s['gpa']?.toString() ?? '';
+      _expectedGradController.text = s['graduation_year']?.toString() ?? '';
+      _emailController.text = s['contact_email']?.toString() ?? '';
+      _selectedDepartment = s['department'] ?? 'Computer Science';
+      _selectedSemester = s['semester'] ?? '6th Semester';
+      // Passwords are not fetched for security
+      _sendInvite = false; 
+    }
+  }
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -63,7 +84,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   }
 
   Future<void> _submitStudent() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty || _firstNameController.text.isEmpty) {
+    final isEdit = widget.student != null;
+    
+    if (!isEdit && (_emailController.text.isEmpty || _passwordController.text.isEmpty || _firstNameController.text.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('First Name, Email, and Password are required fields.'), backgroundColor: Colors.red)
       );
@@ -73,56 +96,52 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     setState(() => _isSubmitting = true);
     
     try {
-      // 1. Isolated client to prevent logging the Admin out during creation
-      final inviteClient = SupabaseClient(
-        'https://nfurwspybtiaycqntzev.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-        authOptions: const AuthClientOptions(
-          authFlowType: AuthFlowType.implicit,
-        ),
-      );
-      
-      // 2. Call Auth API. Database triggers instantly convert this Auth insert -> 'users' -> 'students'
-      final AuthResponse res = await inviteClient.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        data: {
-          'role': 'student',
-          'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-        }
-      );
-      
-      if (res.user != null) {
-        // 3. Inject explicit student attributes (with retry loop for triggers)
-        final gpaVal = double.tryParse(_gpaController.text) ?? 0.0;
-        bool updated = false;
-        
-        for (int i = 0; i < 3; i++) {
-          final updRes = await Supabase.instance.client.from('students').update({
-            'college': 'Sheshadri Institute of Technology', 
-            'enrollment_id': _idController.text.trim(),
-            'contact_email': _emailController.text.trim(),
-            'phone_number': _phoneController.text.trim(),
-            'parent_contact': _parentContactController.text.trim(),
-            'parent_email': _parentEmailController.text.trim(),
-            'department': _selectedDepartment,
-            'gpa': gpaVal,
-            'graduation_year': int.tryParse(_expectedGradController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-          }).eq('user_id', res.user!.id).select();
+      final supabase = Supabase.instance.client;
+      String? userId;
 
-          if ((updRes as List).isNotEmpty) {
-            updated = true;
-            break;
+      if (!isEdit) {
+        // 1. Isolated client to prevent logging the Admin out during creation
+        final inviteClient = SupabaseClient(
+          'https://nfurwspybtiaycqntzev.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+          authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+        );
+        
+        final AuthResponse res = await inviteClient.auth.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          data: {
+            'role': 'student',
+            'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
           }
-          await Future.delayed(const Duration(milliseconds: 600));
-        }
+        );
+        userId = res.user?.id;
+      } else {
+        userId = widget.student!['user_id'];
+      }
+      
+      if (userId != null) {
+        // 2. Update student profile
+        final gpaVal = double.tryParse(_gpaController.text) ?? 0.0;
+        final updRes = await supabase.from('students').update({
+          'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
+          'enrollment_id': _idController.text.trim(),
+          'college': 'Shesadripuram College',
+          'contact_email': _emailController.text.trim(),
+          'phone_number': _phoneController.text.trim(),
+          'parent_contact': _parentContactController.text.trim(),
+          'parent_email': _parentEmailController.text.trim(),
+          'department': _selectedDepartment,
+          'semester': _selectedSemester,
+          'gpa': gpaVal,
+          'graduation_year': int.tryParse(_expectedGradController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+        }).eq('user_id', userId).select();
 
-        if (!updated) {
-          throw Exception("Student record not found in database. Trigger might have failed or reached timeout.");
+        if ((updRes as List).isEmpty) {
+          throw Exception("Failed to sync profile. Student record not found.");
         }
         
-        // 4. Mailing Automation API Pipeline
-        if (_sendInvite) {
+        if (!isEdit && _sendInvite) {
           await _dispatchEmailAutomation(
             email: _emailController.text.trim(),
             name: _firstNameController.text.trim(),
@@ -131,19 +150,17 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         }
         
         if (mounted) {
-          // Returning true tells the list screen to refresh
           Navigator.pop(context, true); 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Student Profile integrated & invite dispatched securely!'),
-              backgroundColor: Color(0xFF16A34A),
-              behavior: SnackBarBehavior.floating,
+            SnackBar(
+              content: Text(isEdit ? 'Student Profile Updated!' : 'Student Profile Created!'),
+              backgroundColor: const Color(0xFF16A34A),
             ),
           );
         }
       }
     } catch (e) {
-      debugPrint('Error creating student: $e');
+      debugPrint('Error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red));
       }
@@ -196,6 +213,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.student != null;
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -229,7 +247,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Create Student Profile',
+                      widget.student != null ? 'Edit Student Profile' : 'Create Student Profile',
                       style: TextStyle(fontSize: isMobile ? 22 : 24, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A), letterSpacing: -0.5),
                     ),
                     const SizedBox(height: 8),
@@ -291,10 +309,10 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                             _buildDropdownField(
                               label: 'Current Semester',
                               value: _selectedSemester,
-                              items: ['4th Semester (Year 2)', '5th Semester (Year 3)', '6th Semester (Year 3)', '7th Semester (Year 4)', '8th Semester (Year 4)'],
+                              items: ['1st Semester', '2nd Semester', '3rd Semester', '4th Semester', '5th Semester', '6th Semester'],
                               onChanged: (val) => setState(() => _selectedSemester = val!),
                             ),
-                            _buildTextField(label: 'Current GPA', controller: _gpaController, hint: 'e.g. 3.8', icon: Icons.grade_outlined),
+                            _buildTextField(label: 'Current GPA', controller: _gpaController, hint: 'e.g. 8.5 / 10.0', icon: Icons.grade_outlined),
                             _buildTextField(label: 'Expected Graduation', controller: _expectedGradController, hint: 'e.g. May 2027', icon: Icons.calendar_month_outlined),
                           ]),
                         ],
@@ -302,72 +320,40 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // ── System Credentials Section ──
-                    _buildSectionHeader('SYSTEM CREDENTIALS', Icons.admin_panel_settings_outlined),
-                    _buildCard(
-                      isMobile: isMobile,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildResponsiveRow(isMobile, [
-                            _buildTextField(label: 'College Email Address', controller: _emailController, hint: 'student@college.edu', icon: Icons.email_outlined),
-                            const SizedBox(),
-                          ]),
-                          const SizedBox(height: 20),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Temporary Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
-                              const SizedBox(height: 8),
-                              if (isMobile) ...[
-                                TextField(
-                                  controller: _passwordController,
-                                  style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                                  decoration: InputDecoration(
-                                    hintText: 'Enter or generate...',
-                                    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                                    prefixIcon: const Icon(Icons.password_rounded, size: 20, color: Color(0xFF64748B)),
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5)),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _generatePassword,
-                                    icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-                                    label: const Text('Generate Secure Token', style: TextStyle(fontWeight: FontWeight.w600)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFF1F5F9),
-                                      foregroundColor: const Color(0xFF0F172A),
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    if (widget.student == null) ...[
+                      _buildSectionHeader('SYSTEM CREDENTIALS', Icons.admin_panel_settings_outlined),
+                      _buildCard(
+                        isMobile: isMobile,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildResponsiveRow(isMobile, [
+                              _buildTextField(label: 'College Email Address', controller: _emailController, hint: 'student@college.edu', icon: Icons.email_outlined),
+                              const SizedBox(),
+                            ]),
+                            const SizedBox(height: 20),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Temporary Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                                const SizedBox(height: 8),
+                                if (isMobile) ...[
+                                  TextField(
+                                    controller: _passwordController,
+                                    style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter or generate...',
+                                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                      prefixIcon: const Icon(Icons.password_rounded, size: 20, color: Color(0xFF64748B)),
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5)),
                                     ),
                                   ),
-                                ),
-                              ] else ...[
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 2,
-                                      child: TextField(
-                                        controller: _passwordController,
-                                        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                                        decoration: InputDecoration(
-                                          hintText: 'Enter or generate secure password...',
-                                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                                          prefixIcon: const Icon(Icons.password_rounded, size: 20, color: Color(0xFF64748B)),
-                                          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5)),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    ElevatedButton.icon(
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
                                       onPressed: _generatePassword,
                                       icon: const Icon(Icons.auto_awesome_rounded, size: 16),
                                       label: const Text('Generate Secure Token', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -379,56 +365,89 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2.0),
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: Checkbox(
-                                      value: _sendInvite,
-                                      onChanged: (val) {
-                                        setState(() {
-                                          _sendInvite = val ?? false;
-                                        });
-                                      },
-                                      activeColor: const Color(0xFF0F172A),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                ] else ...[
+                                  Row(
                                     children: [
-                                      Text('Send System Invite Email', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                                      SizedBox(height: 4),
-                                      Text('Automatically dispatch an email containing the secure generated credentials and portal link to the student.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4)),
+                                      Expanded(
+                                        flex: 2,
+                                        child: TextField(
+                                          controller: _passwordController,
+                                          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                                          decoration: InputDecoration(
+                                            hintText: 'Enter or generate secure password...',
+                                            hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                                            prefixIcon: const Icon(Icons.password_rounded, size: 20, color: Color(0xFF64748B)),
+                                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5)),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      ElevatedButton.icon(
+                                        onPressed: _generatePassword,
+                                        icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                                        label: const Text('Generate Secure Token', style: TextStyle(fontWeight: FontWeight.w600)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFFF1F5F9),
+                                          foregroundColor: const Color(0xFF0F172A),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
+                                ],
                               ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 24),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2.0),
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: Checkbox(
+                                        value: _sendInvite,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _sendInvite = val ?? false;
+                                          });
+                                        },
+                                        activeColor: const Color(0xFF0F172A),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Send System Invite Email', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                        SizedBox(height: 4),
+                                        Text('Automatically dispatch an email containing the secure generated credentials and portal link to the student.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 48),
 
                     // ── Action Buttons ──
@@ -440,7 +459,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                           icon: _isSubmitting 
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : const Icon(Icons.check_circle_rounded, size: 20),
-                          label: Text(_isSubmitting ? 'Creating...' : 'Create Student Profile', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                          label: Text(_isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Student Profile'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,

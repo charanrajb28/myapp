@@ -669,32 +669,63 @@ class _LoginPageState extends State<LoginPage>
                             const SizedBox(height: 12),
                             ElevatedButton.icon(
                               onPressed: () async {
+                                setState(() => _isLoading = true);
                                 final client = Supabase.instance.client;
                                 try {
-                                  await client.auth.signUp(
+                                  // 1. Wipe public tables via RPC function (If created)
+                                  try {
+                                    await client.rpc('reset_demo_db');
+                                  } catch (e) {
+                                    debugPrint('RPC Reset failed (Function might not exist yet): $e');
+                                    // Fallback if the user hasn't run the SQL yet
+                                    await client.from('applications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                    await client.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                    await client.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                  }
+
+                                  // 2. Create Fresh Demo Auth Accounts with Isolated Client
+                                  // We use a temporary client to batch create WITHOUT logging the current user out.
+                                  final inviteClient = SupabaseClient(
+                                    'https://nfurwspybtiaycqntzev.supabase.co',
+                                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+                                    authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+                                  );
+
+                                  await inviteClient.auth.signUp(
                                     email: 'admin@scholarbridge.com',
                                     password: 'adminpassword123',
                                     data: {'role': 'admin', 'name': 'System Admin'},
                                   );
-                                  await client.auth.signUp(
+                                  await inviteClient.auth.signUp(
                                     email: 'student@college.edu',
                                     password: 'studentpassword123',
-                                    data: {'role': 'student', 'name': 'Alex Demo'},
+                                    data: {'role': 'student', 'name': 'Alex Student', 'semester': '6th Semester'},
                                   );
-                                  await client.auth.signUp(
+                                  await inviteClient.auth.signUp(
                                     email: 'hr@techcorp.com',
                                     password: 'companypassword123',
                                     data: {'role': 'company', 'name': 'TechCorp HR'},
                                   );
+
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demo users created! You can now log in.')));
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Database Reset & Demo Users Created!')));
                                   }
                                 } catch(e) {
-                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Note: Some Auth users might already exist. Proceed to login.')));
+                                } finally {
+                                  if (mounted) setState(() => _isLoading = false);
                                 }
                               },
-                              icon: const Icon(Icons.bolt),
-                              label: const Text('Generate Demo Users via Auth API'),
+                              icon: _isLoading 
+                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF92400E)))
+                                : const Icon(Icons.bolt_rounded),
+                              label: const Text('Wipe DB & Generate Demo Credentials'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFDE68A), // amber-200
+                                foregroundColor: const Color(0xFF92400E), // amber-900
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
                             ),
                           ],
                         ),

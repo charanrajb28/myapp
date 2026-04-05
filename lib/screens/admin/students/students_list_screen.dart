@@ -183,6 +183,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                               final name = student['name'] ?? 'Unknown';
                               final department = student['department'] ?? 'Dept. Not Assigned';
                               final collegeId = student['college'] ?? 'ID-Not-Set';
+                              final semester = student['semester'] ?? 'N/A';
                               
                               final email = department;
                                 
@@ -195,6 +196,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                 email: email,
                                 collegeId: collegeId,
                                 department: department,
+                                semester: semester,
                                 status: status,
                                 company: company,
                                 onTap: () {
@@ -212,6 +214,13 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                                   ).then((value) {
                                     if (value == true) _fetchStudents();
                                   });
+                                },
+                                onEdit: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => AddStudentScreen(student: student)),
+                                  );
+                                  if (result == true) _fetchStudents();
                                 },
                                 onBlacklist: () => _toggleBlacklist(student['id'], student['is_blacklisted'] ?? false),
                                 onDelete: () => _deleteStudent(student['id']),
@@ -370,9 +379,11 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
     required String email,
     required String collegeId,
     required String department,
+    required String semester,
     required String status,
     required String company,
     required VoidCallback onTap,
+    required VoidCallback onEdit,
     required VoidCallback onBlacklist,
     required VoidCallback onDelete,
     bool isBlacklisted = false,
@@ -461,7 +472,7 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        collegeId,
+                        semester,
                         style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                       ),
                     ],
@@ -502,10 +513,21 @@ class _StudentsListScreenState extends State<StudentsListScreen> {
                     size: 20
                   ),
                   onSelected: (value) {
+                    if (value == 'edit') onEdit();
                     if (value == 'blacklist') onBlacklist();
                     if (value == 'delete') onDelete();
                   },
                   itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                          const SizedBox(width: 8),
+                          Text('Edit Profile'),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'blacklist',
                       child: Row(

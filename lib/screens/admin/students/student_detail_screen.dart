@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'add_student_screen.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final String studentId;
@@ -144,6 +145,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     final studentName = _studentData?['name'] ?? widget.studentName;
     final collegeId = _studentData?['college'] ?? widget.collegeId;
     final department = _studentData?['department'] ?? widget.department;
+    final semester = _studentData?['semester'] ?? 'Semester Not Set';
     final status = widget.status;
     final company = widget.company;
 
@@ -164,6 +166,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B)),
+            onPressed: () async {
+              if (_studentData != null) {
+                // Ensure AddStudentScreen is imported
+                // (Already imported or will be handled by auto-imports in local dev)
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => AddStudentScreen(student: _studentData)),
+                );
+                if (result == true) {
+                  _fetchStudentAdditionalData();
+                }
+              }
+            },
+            tooltip: 'Edit Profile',
+          ),
           IconButton(
             icon: Icon(
               _isBlacklisted ? Icons.block_flipped : Icons.block_rounded,
@@ -260,10 +279,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.badge_outlined, size: 16, color: Color(0xFF64748B)),
+                                    const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF64748B)),
                                     const SizedBox(width: 6),
                                     Text(
-                                      collegeId,
+                                      semester,
                                       style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                                     ),
                                   ],

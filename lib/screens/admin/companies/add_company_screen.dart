@@ -89,8 +89,14 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
       try {
         final supabase = Supabase.instance.client;
         
-        // 1. Create Login Account
-        final AuthResponse res = await supabase.auth.signUp(
+        // 1. Isolated client to prevent logging the Admin out during creation
+        final inviteClient = SupabaseClient(
+          'https://nfurwspybtiaycqntzev.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+          authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+        );
+
+        final AuthResponse res = await inviteClient.auth.signUp(
           email: _hrEmail.trim(),
           password: _password,
           data: {

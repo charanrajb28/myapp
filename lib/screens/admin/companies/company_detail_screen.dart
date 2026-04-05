@@ -17,6 +17,7 @@ class CompanyDetailArgs {
   final Color logoColor;
   final String logoInitial;
   final String about;
+  final bool isBlacklisted;
 
   const CompanyDetailArgs({
     required this.id, required this.name, required this.industry,
@@ -24,7 +25,7 @@ class CompanyDetailArgs {
     required this.totalPlacements, required this.openRoles,
     required this.rating, required this.status,
     required this.logoColor, required this.logoInitial,
-    required this.about,
+    required this.about, required this.isBlacklisted,
   });
 }
 
@@ -83,6 +84,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             logoColor: widget.company.logoColor,
             logoInitial: widget.company.logoInitial,
             about: companyRes['description'] ?? widget.company.about,
+            isBlacklisted: (companyRes['is_blacklisted'] as bool?) ?? false,
           );
           _openRoles = List<Map<String, dynamic>>.from(rolesRes);
           _isLoading = false;
@@ -91,6 +93,26 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     } catch (e) {
       debugPrint('Error fetching company: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleBlacklist() async {
+    final c = _dynamicCompany ?? widget.company;
+    try {
+      await Supabase.instance.client
+          .from('companies')
+          .update({'is_blacklisted': !c.isBlacklisted})
+          .eq('id', c.id);
+          
+      _fetchCompanyData();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(c.isBlacklisted ? 'Company Whitelisted' : 'Company Blocked Successfully'))
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling blacklist: $e');
     }
   }
 
@@ -118,6 +140,14 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
               ));
             },
             tooltip: 'Edit',
+          ),
+          IconButton(
+            icon: Icon(
+              c.isBlacklisted ? Icons.check_circle_outline : Icons.block_rounded,
+              color: c.isBlacklisted ? Colors.green : Colors.orange,
+            ),
+            onPressed: _toggleBlacklist,
+            tooltip: c.isBlacklisted ? 'Unblock Partner' : 'Block Partner',
           ),
           const SizedBox(width: 8),
         ],
@@ -242,7 +272,7 @@ class _HeroCard extends StatelessWidget {
                           Text('Syncing...', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
                         ]),
                       )
-                    : _StatusBadgeLight(status: c.status),
+                    : _StatusBadgeLight(status: c.isBlacklisted ? 'Blocked' : c.status),
                 ),
               ],
             ),
@@ -427,20 +457,27 @@ class _StatusBadgeLight extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isBlocked = status == 'Blocked';
     final Color dot = status == 'Approved'
         ? const Color(0xFF4ADE80)
-        : status == 'Pending' ? const Color(0xFFFBBF24) : const Color(0xFFFC8181);
+        : status == 'Pending' 
+            ? const Color(0xFFFBBF24) 
+            : isBlocked ? const Color(0xFF0F172A) : const Color(0xFFFC8181);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: isBlocked ? const Color(0xFF0F172A).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: isBlocked ? Colors.white : dot, shape: BoxShape.circle)),
         const SizedBox(width: 5),
-        Text(status, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+        Text(status, style: TextStyle(
+          fontSize: 11, 
+          fontWeight: FontWeight.w700, 
+          color: isBlocked ? const Color(0xFF0F172A) : Colors.white
+        )),
       ]),
     );
   }
