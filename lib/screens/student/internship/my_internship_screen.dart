@@ -5,6 +5,7 @@ import '../student_portal_repository.dart';
 
 const List<StudentInternship> kStudentInternships = [
   StudentInternship(
+    applicationId: 'APP-INT-2024-001',
     id: 'INT-2024-001',
     company: 'TechFlow Inc.',
     role: 'Software Engineering Intern',
@@ -12,9 +13,11 @@ const List<StudentInternship> kStudentInternships = [
     location: 'San Francisco, CA',
     startDate: 'Sep 1, 2024',
     endDate: 'Nov 30, 2024',
+    deadline: '25 Aug 2024',
     progress: 0.67,
     daysLeft: 42,
     status: 'Active',
+    internshipStatus: 'ACTIVE',
     brandColor: const Color(0xFF3B82F6),
     logoInitial: 'T',
     stipend: '₹15,000 / month',
@@ -25,6 +28,7 @@ const List<StudentInternship> kStudentInternships = [
         'Builds enterprise-grade cloud software used by over 2 million professionals worldwide.',
   ),
   StudentInternship(
+    applicationId: 'APP-INT-2023-007',
     id: 'INT-2023-007',
     company: 'Nexus Robotics',
     role: 'Robotics Engineering Intern',
@@ -32,9 +36,11 @@ const List<StudentInternship> kStudentInternships = [
     location: 'Boston, MA',
     startDate: 'Jan 1, 2025',
     endDate: 'Jun 30, 2025',
+    deadline: '20 Dec 2024',
     progress: 0.15,
     daysLeft: 124,
     status: 'Active',
+    internshipStatus: 'ACTIVE',
     brandColor: const Color(0xFFF59E0B),
     logoInitial: 'N',
     stipend: '₹18,000 / month',
@@ -144,9 +150,7 @@ class MyInternshipScreen extends StatefulWidget {
   State<MyInternshipScreen> createState() => _MyInternshipScreenState();
 }
 
-class _MyInternshipScreenState extends State<MyInternshipScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tab;
+class _MyInternshipScreenState extends State<MyInternshipScreen> {
   final _repository = StudentPortalRepository();
   String _searchQuery = '';
   String _selectedIndustry = 'All';
@@ -163,22 +167,30 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
     }).toList();
   }
 
-  List<StudentInternship> get _active =>
-      _studentInternships.where((i) => i.status == 'Active').toList();
+  String _normalizedStatus(String status) => status.trim().toLowerCase();
+
+  List<StudentInternship> get _ongoing => _studentInternships.where((i) {
+        final status = _normalizedStatus(i.status);
+        return status == 'applied' || status == 'active';
+      }).toList();
+
+  List<StudentInternship> get _active => _studentInternships
+      .where((i) => _normalizedStatus(i.status) == 'active')
+      .toList();
+
+  List<StudentInternship> get _history => _studentInternships.where((i) {
+        final status = _normalizedStatus(i.status);
+        return status == 'completed' || status == 'rejected' || status == 'removed';
+      }).toList();
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
-    _tab.addListener(() {
-      if (mounted) setState(() {});
-    });
     _loadInternshipData();
   }
 
   @override
   void dispose() {
-    _tab.dispose();
     super.dispose();
   }
 
@@ -210,104 +222,315 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'Internships',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
-            letterSpacing: -0.3,
-          ),
+        title: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Internships',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+            _applicationsButton(),
+          ],
         ),
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: TabBar(
-              controller: _tab,
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicatorPadding: EdgeInsets.zero,
-              labelPadding: EdgeInsets.zero,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: -0.2),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-              labelColor: Colors.white,
-              unselectedLabelColor: const Color(0xFF64748B),
-              indicator: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('EXPLORE'),
-                      const SizedBox(width: 4),
-                      _tabBadge(_availableInternships.length, const Color(0xFF3B82F6), isActive: _tab.index == 0),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('ACTIVE'),
-                      const SizedBox(width: 4),
-                      _tabBadge(_active.length, const Color(0xFF10B981), isActive: _tab.index == 1),
-                    ],
-                  ),
-                ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('HISTORY'),
-                      const SizedBox(width: 4),
-                      _tabBadge(_studentInternships.length, const Color(0xFF64748B), isActive: _tab.index == 2),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-        controller: _tab,
-        children: [
-          // ── Explore tab ──
-          _exploreTab(),
-          // ── Active tab ──
-          _internshipList(
-            _active,
-            emptyMsg: 'No active internships available',
+          : _exploreTab(),
+    );
+  }
+  Widget _applicationsButton() {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => _MyApplicationsPage(
+              ongoing: _ongoing,
+              history: _history,
+            ),
           ),
-          // ── History tab ──
-          _internshipList(
-            _studentInternships,
-            emptyMsg: 'No internship history available',
-          ),
-        ],
+        );
+      },
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.assignment_rounded, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            const Text(
+              'My Applications',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_ongoing.length + _history.length}',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Future<void> _showApplicationsSheet() async {
+    var selectedView = 0;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final list = selectedView == 0 ? _ongoing : _history;
+            final emptyMsg = selectedView == 0
+                ? 'No ongoing applications available'
+                : 'No application history available';
+            return DraggableScrollableSheet(
+              initialChildSize: 0.86,
+              minChildSize: 0.55,
+              maxChildSize: 0.94,
+              expand: false,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'My Applications',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _applicationsToggle(
+                                  label: 'ONGOING',
+                                  count: _ongoing.length,
+                                  selected: selectedView == 0,
+                                  onTap: () => setModalState(() => selectedView = 0),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _applicationsToggle(
+                                  label: 'HISTORY',
+                                  count: _history.length,
+                                  selected: selectedView == 1,
+                                  onTap: () => setModalState(() => selectedView = 1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: _applicationsListView(
+                          list,
+                          emptyMsg: emptyMsg,
+                          controller: scrollController,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _applicationsToggle({
+    required String label,
+    required int count,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                color: selected ? Colors.white : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.16)
+                    : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: selected ? Colors.white : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _applicationsListView(
+    List<StudentInternship> list, {
+    required String emptyMsg,
+    ScrollController? controller,
+  }) {
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.work_off_rounded,
+                  size: 42,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                emptyMsg,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'No related internship data is available for this section yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        return _InternshipCard(internship: list[index]);
+      },
+    );
+  }
+
   Widget _exploreTab() {
     return CustomScrollView(
       slivers: [
@@ -719,37 +942,55 @@ class _InternshipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color statusColor;
     final String statusLabel;
-    final bool isActive = internship.status == 'Active';
+    final normalizedStatus = internship.status.trim().toLowerCase();
+    final bool isActive = normalizedStatus == 'active';
+    final bool canOpenDetails = normalizedStatus != 'rejected';
 
-    switch (internship.status) {
-      case 'Applied':
+    switch (normalizedStatus) {
+      case 'applied':
         statusColor = const Color(0xFFF59E0B);
         statusLabel = 'Applied';
         break;
-      case 'Active':
+      case 'active':
         statusColor = const Color(0xFF10B981);
         statusLabel = 'Active';
         break;
-      case 'Completed':
+      case 'completed':
         statusColor = const Color(0xFF3B82F6);
         statusLabel = 'Completed';
         break;
+      case 'rejected':
+        statusColor = const Color(0xFFEF4444);
+        statusLabel = 'Rejected';
+        break;
+      case 'removed':
+        statusColor = const Color(0xFF7C3AED);
+        statusLabel = 'Removed';
+        break;
       default:
-        statusColor = const Color(0xFFF59E0B);
-        statusLabel = 'Upcoming';
+        statusColor = const Color(0xFF64748B);
+        statusLabel = internship.status;
     }
 
     return Column(
       children: [
         InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => InternshipDetailScreen(internship: internship),
-              ),
-            );
-          },
+          onTap: canOpenDetails
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => InternshipDetailScreen(internship: internship),
+                    ),
+                  );
+                }
+              : () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Rejected application details are not accessible.'),
+                    ),
+                  );
+                },
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),
             child: Row(
@@ -781,6 +1022,18 @@ class _InternshipCard extends StatelessWidget {
                         internship.role,
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                       ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 6,
+                        children: [
+                          _metaTag(Icons.calendar_today_rounded, 'Deadline ${internship.deadline}'),
+                          if (internship.status == 'Active' && internship.endDate != 'Not set')
+                            _metaTag(Icons.flag_rounded, 'Ends ${internship.endDate}')
+                          else if (internship.status != 'Active' && internship.endDate != 'Not set')
+                            _metaTag(Icons.event_available_rounded, 'Ended ${internship.endDate}'),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -796,13 +1049,254 @@ class _InternshipCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 20),
+                Icon(
+                  canOpenDetails ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
+                  color: canOpenDetails
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFF94A3B8),
+                  size: 20,
+                ),
               ],
             ),
           ),
         ),
         const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
       ],
+    );
+  }
+
+  Widget _metaTag(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: const Color(0xFF94A3B8)),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF94A3B8),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MyApplicationsPage extends StatefulWidget {
+  final List<StudentInternship> ongoing;
+  final List<StudentInternship> history;
+
+  const _MyApplicationsPage({
+    required this.ongoing,
+    required this.history,
+  });
+
+  @override
+  State<_MyApplicationsPage> createState() => _MyApplicationsPageState();
+}
+
+class _MyApplicationsPageState extends State<_MyApplicationsPage> {
+  int _selectedView = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _selectedView == 0 ? widget.ongoing : widget.history;
+    final emptyMsg = _selectedView == 0
+        ? 'No ongoing applications available'
+        : 'No application history available';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'My Applications',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.4,
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF2F7),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _applicationsToggle(
+                      label: 'ONGOING',
+                      count: widget.ongoing.length,
+                      selected: _selectedView == 0,
+                      onTap: () => setState(() => _selectedView = 0),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _applicationsToggle(
+                      label: 'HISTORY',
+                      count: widget.history.length,
+                      selected: _selectedView == 1,
+                      onTap: () => setState(() => _selectedView = 1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: _ApplicationsListView(
+              list: list,
+              emptyMsg: emptyMsg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _applicationsToggle({
+    required String label,
+    required int count,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF0F172A) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? const Color(0xFF0F172A) : Colors.transparent,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.18),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                color: selected ? Colors.white : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(width: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.16)
+                    : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: selected ? Colors.white : const Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicationsListView extends StatelessWidget {
+  final List<StudentInternship> list;
+  final String emptyMsg;
+
+  const _ApplicationsListView({
+    required this.list,
+    required this.emptyMsg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.work_off_rounded,
+                  size: 42,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                emptyMsg,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'No related internship data is available for this section yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        return _InternshipCard(internship: list[index]);
+      },
     );
   }
 }
@@ -1478,9 +1972,12 @@ class _OpportunityListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        InkWell(
+    final accent = opportunity.brandColor;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           onTap: () async {
             final changed = await Navigator.push<bool>(
               context,
@@ -1492,105 +1989,183 @@ class _OpportunityListItem extends StatelessWidget {
               await onApplicationChanged();
             }
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: opportunity.brandColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      opportunity.logoInitial,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: opportunity.brandColor,
+          borderRadius: BorderRadius.circular(24),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                colors: [
+                  accent.withValues(alpha: 0.10),
+                  Colors.white,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.14),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.10),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          accent.withValues(alpha: 0.18),
+                          accent.withValues(alpha: 0.08),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Center(
+                      child: Text(
+                        opportunity.logoInitial,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: accent,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        opportunity.company,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    opportunity.company,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    opportunity.role,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: Color(0xFF94A3B8),
+                                size: 18,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        opportunity.role,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (opportunity.isApplied == true)
+                              _statusBadge('Applied', const Color(0xFF10B981)),
+                            _infoPill(
+                              Icons.location_on_rounded,
+                              opportunity.location,
+                              accent,
+                            ),
+                            _infoPill(
+                              Icons.payments_rounded,
+                              opportunity.stipend,
+                              accent,
+                            ),
+                            _infoPill(
+                              Icons.event_rounded,
+                              opportunity.deadline,
+                              accent,
+                            ),
+                          ],
                         ),
-                      ),
-                      if (opportunity.isApplied == true) ...[
-                        const SizedBox(height: 8),
-                        _statusBadge('Applied', const Color(0xFF10B981)),
                       ],
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          _tag(Icons.location_on_rounded, opportunity.location),
-                          const SizedBox(width: 12),
-                          _tag(Icons.payments_rounded, opportunity.stipend),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 18),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-        const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
-      ],
+      ),
     );
   }
 
-  Widget _tag(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: const Color(0xFF94A3B8)),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF94A3B8),
-            fontWeight: FontWeight.w500,
+  Widget _infoPill(IconData icon, String label, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: accent.withValues(alpha: 0.85)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _statusBadge(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.2,
           color: color,
         ),
       ),
@@ -1604,12 +2179,20 @@ class _AttendanceCalendarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mock attendance data: true = present, false = absent, null = upcoming
-    final List<bool?> attendance = List.generate(31, (i) {
-      if (i > 25) return null; // Upcoming days
-      if (i == 12 || i == 13 || i == 20) return false; // Mock absences/weekends
-      return true; // Present
-    });
+    final now = DateTime.now();
+    final totalDays = DateTime(now.year, now.month + 1, 0).day;
+    final monthLabel = _monthLabel(now);
+    final checkinMap = <int, Map<String, dynamic>>{};
+    for (final entry in internship.checkins) {
+      final parsedDate = DateTime.tryParse(entry['checkin_date']?.toString() ?? '');
+      if (parsedDate == null || parsedDate.year != now.year || parsedDate.month != now.month) {
+        continue;
+      }
+      checkinMap[parsedDate.day] = entry;
+    }
+    final presentCount = checkinMap.values
+        .where((entry) => entry['check_in_at'] != null || entry['status']?.toString() == 'Present')
+        .length;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1633,7 +2216,7 @@ class _AttendanceCalendarCard extends StatelessWidget {
               Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF3B82F6)),
               SizedBox(width: 8),
               Text(
-                'Attendance History',
+                'Check-In History',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w900,
@@ -1647,8 +2230,8 @@ class _AttendanceCalendarCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'March 2024',
+              Text(
+                monthLabel,
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1E293B)),
               ),
               Container(
@@ -1657,8 +2240,8 @@ class _AttendanceCalendarCard extends StatelessWidget {
                   color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  '92% RATE',
+                child: Text(
+                  '$presentCount CHECK-INS',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF10B981), letterSpacing: 0.5),
                 ),
               ),
@@ -1674,18 +2257,22 @@ class _AttendanceCalendarCard extends StatelessWidget {
               crossAxisSpacing: 8,
               childAspectRatio: 1,
             ),
-            itemCount: 31,
+            itemCount: totalDays,
             itemBuilder: (context, index) {
-              final status = attendance[index];
+              final day = index + 1;
+              final statusEntry = checkinMap[day];
               Color bgColor = const Color(0xFFF1F5F9);
               Color textColor = const Color(0xFF64748B);
               IconData? icon;
 
-              if (status == true) {
+              final hasCheckIn = statusEntry?['check_in_at'] != null;
+              final isAbsent = statusEntry?['status']?.toString().toLowerCase() == 'absent';
+
+              if (hasCheckIn) {
                 bgColor = const Color(0xFF10B981).withValues(alpha: 0.12);
                 textColor = const Color(0xFF059669);
                 icon = Icons.check_circle_rounded;
-              } else if (status == false) {
+              } else if (isAbsent) {
                 bgColor = const Color(0xFFEF4444).withValues(alpha: 0.1);
                 textColor = const Color(0xFFDC2626);
                 icon = Icons.close_rounded;
@@ -1697,9 +2284,9 @@ class _AttendanceCalendarCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
-                  child: status == null
+                  child: statusEntry == null
                       ? Text(
-                          '${index + 1}',
+                          '$day',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textColor.withValues(alpha: 0.5)),
                         )
                       : Icon(icon, size: 16, color: textColor),
@@ -1713,12 +2300,30 @@ class _AttendanceCalendarCard extends StatelessWidget {
             children: [
               _legendItem('Present', const Color(0xFF10B981)),
               _legendItem('Absent', const Color(0xFFEF4444)),
-              _legendItem('Holiday', const Color(0xFF94A3B8)),
+              _legendItem('No Check-In', const Color(0xFF94A3B8)),
             ],
           ),
         ],
       ),
     );
+  }
+
+  String _monthLabel(DateTime value) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[value.month - 1]} ${value.year}';
   }
 
   Widget _legendItem(String label, Color color) {

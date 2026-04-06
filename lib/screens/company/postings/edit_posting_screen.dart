@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditPostingScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
@@ -14,15 +16,108 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
   late TextEditingController stipendController;
   late TextEditingController durationController;
   late TextEditingController responsibilityController;
+  late DateTime _selectedDeadline;
+  bool isRemote = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    roleController = TextEditingController(text: widget.posting['role']);
-    descController = TextEditingController(text: 'Our company is scaling decentralised AI nodes. We need a high-performance engineer to build technical dashboards and cloud infra for enterprise monitoring.');
-    stipendController = TextEditingController(text: '25000');
-    durationController = TextEditingController(text: '06');
-    responsibilityController = TextEditingController(text: '- Architect and scale responsive UI modules.\n- Optimize Node.js service layers.\n- Integrate Firebase functions.');
+    roleController = TextEditingController(text: widget.posting['role']?.toString() ?? '');
+    descController = TextEditingController(text: widget.posting['about']?.toString() ?? '');
+    stipendController = TextEditingController(text: widget.posting['stipend']?.toString() ?? '');
+    durationController = TextEditingController(text: widget.posting['duration']?.toString() ?? '');
+    final responsibilities = (widget.posting['responsibilities'] as List?)
+            ?.map((item) => item.toString())
+            .join('\n') ??
+        '';
+    responsibilityController = TextEditingController(text: responsibilities);
+    isRemote = (widget.posting['location']?.toString().toLowerCase() ?? 'remote') == 'remote';
+    final parsedDeadline = DateTime.tryParse(widget.posting['deadline']?.toString() ?? '');
+    _selectedDeadline = parsedDeadline ?? DateTime.now().add(const Duration(days: 30));
+  }
+
+  @override
+  void dispose() {
+    roleController.dispose();
+    descController.dispose();
+    stipendController.dispose();
+    durationController.dispose();
+    responsibilityController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePosting() async {
+    if (roleController.text.trim().isEmpty || descController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all required job details.')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await Supabase.instance.client.from('internships').update({
+        'role': roleController.text.trim(),
+        'about': descController.text.trim(),
+        'stipend': stipendController.text.trim(),
+        'duration': durationController.text.trim(),
+        'location': isRemote ? 'Remote' : 'On-site',
+        'responsibilities': responsibilityController.text
+            .split('\n')
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty)
+            .toList(),
+        'deadline': DateTime(
+          _selectedDeadline.year,
+          _selectedDeadline.month,
+          _selectedDeadline.day,
+        ).toIso8601String(),
+      }).eq('id', widget.posting['id']);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Posting updated successfully!')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to update posting: $e')),
+      );
+      setState(() => _isSaving = false);
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _pickDeadline() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDeadline.isBefore(now) ? now : _selectedDeadline,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF6366F1),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() => _selectedDeadline = picked);
   }
 
   @override
@@ -56,6 +151,8 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                     Expanded(child: _industrialField('DURATION (MO)', durationController, isNumeric: true)),
                   ],
                 ),
+                const SizedBox(height: 20),
+                _deadlineField(),
                 const SizedBox(height: 32),
                 const Text('> LOCATION_SELECT_TERMINAL', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
                 const SizedBox(height: 16),
@@ -70,12 +167,15 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
               ],
             ),
           ),
+          if (_isSaving)
+            Container(
+              color: Colors.white60,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
   }
-
-  bool isRemote = true;
 
   Widget _locationOption() {
     return Row(
@@ -106,6 +206,61 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     );
   }
 
+  Widget _deadlineField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '> SELECTION_DEADLINE',
+          style: TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 8,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickDeadline,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_month_rounded,
+                  color: Color(0xFF6366F1),
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    DateFormat('dd MMM yyyy').format(_selectedDeadline),
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.expand_more_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _industrialField(String label, TextEditingController controller, {int maxLines = 1, bool isNumeric = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,10 +285,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
 
   Widget _commitBtn(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('RECORDS_COMMITTED_SUCCESSFULLY. DATA_SYNC_ACTIVE.')));
-        Navigator.pop(context);
-      },
+      onTap: _isSaving ? null : _savePosting,
       child: Container(
         width: double.infinity, height: 52,
         decoration: BoxDecoration(

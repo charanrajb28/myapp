@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
 import '../student_portal_repository.dart';
 
@@ -17,6 +17,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   List<StudentInternship> _activeInternships = [];
   final Map<String, bool> _checkedInStatus = {};
   final Map<String, bool> _checkedOutStatus = {};
+  final Map<String, List<Map<String, dynamic>>> _checkinEntries = {};
   
   bool _submitting = false;
   late AnimationController _pulseController;
@@ -48,7 +49,12 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       if (!mounted) return;
       setState(() {
         _activeInternships =
-            internships.where((internship) => internship.status == 'Active').toList();
+            internships
+                .where((internship) =>
+                    internship.status == 'Active' &&
+                    internship.internshipStatus.toUpperCase() == 'ACTIVE')
+                .toList();
+        _syncCheckinState(_activeInternships);
         _isLoading = false;
       });
     } catch (e) {
@@ -89,15 +95,34 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   Future<void> _processCheckIn() async {
     final active = _activeInternships;
     if (active.isEmpty) return;
-    final companyId = active[_selectedInternshipIndex].id;
+    final internship = active[_selectedInternshipIndex];
+    final applicationId = internship.applicationId;
 
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _submitting = false;
-      _checkedInStatus[companyId] = true;
-    });
-    _showSnackBar('Check-in recorded for ${active[_selectedInternshipIndex].company}!', const Color(0xFF10B981));
+    try {
+      final updatedCheckins = await _repository.recordApplicationCheckin(
+        applicationId: applicationId,
+        isCheckout: false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _checkinEntries[applicationId] = updatedCheckins;
+        _checkedInStatus[applicationId] = _hasTodayCheckIn(updatedCheckins);
+        _checkedOutStatus[applicationId] = _hasTodayCheckOut(updatedCheckins);
+      });
+      _showSnackBar(
+        'Check-in recorded for ${internship.company}!',
+        const Color(0xFF10B981),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      _showSnackBar(
+        'Unable to record check-in: $e',
+        const Color(0xFFDC2626),
+      );
+    }
   }
 
   Future<void> _submitCheckOut() async {
@@ -121,15 +146,34 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   Future<void> _processCheckOut() async {
     final active = _activeInternships;
     if (active.isEmpty) return;
-    final companyId = active[_selectedInternshipIndex].id;
+    final internship = active[_selectedInternshipIndex];
+    final applicationId = internship.applicationId;
 
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _submitting = false;
-      _checkedOutStatus[companyId] = true;
-    });
-    _showSnackBar('Check-out recorded for ${active[_selectedInternshipIndex].company}!', const Color(0xFF3B82F6));
+    try {
+      final updatedCheckins = await _repository.recordApplicationCheckin(
+        applicationId: applicationId,
+        isCheckout: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _checkinEntries[applicationId] = updatedCheckins;
+        _checkedInStatus[applicationId] = _hasTodayCheckIn(updatedCheckins);
+        _checkedOutStatus[applicationId] = _hasTodayCheckOut(updatedCheckins);
+      });
+      _showSnackBar(
+        'Check-out recorded for ${internship.company}!',
+        const Color(0xFF3B82F6),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      _showSnackBar(
+        'Unable to record check-out: $e',
+        const Color(0xFFDC2626),
+      );
+    }
   }
 
   void _showSnackBar(String msg, Color color) {
@@ -150,6 +194,180 @@ class _CheckinsScreenState extends State<CheckinsScreen>
         ),
       );
     }
+  }
+
+  void _syncCheckinState(List<StudentInternship> internships) {
+    for (final internship in internships) {
+      final checkins = internship.checkins;
+      _checkinEntries[internship.applicationId] = checkins;
+      _checkedInStatus[internship.applicationId] = _hasTodayCheckIn(checkins);
+      _checkedOutStatus[internship.applicationId] = _hasTodayCheckOut(checkins);
+    }
+  }
+
+  String _todayLabel() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Map<String, dynamic>? _todayCheckin(List<Map<String, dynamic>> checkins) {
+    final today = _todayLabel();
+    for (final entry in checkins) {
+      if (entry['checkin_date']?.toString() == today) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  bool _hasTodayCheckIn(List<Map<String, dynamic>> checkins) {
+    final todayEntry = _todayCheckin(checkins);
+    return todayEntry?['check_in_at'] != null;
+  }
+
+  bool _hasTodayCheckOut(List<Map<String, dynamic>> checkins) {
+    final todayEntry = _todayCheckin(checkins);
+    return todayEntry?['check_out_at'] != null;
+  }
+
+  List<_CheckInRecord> _buildHistory(
+    StudentInternship internship,
+    List<Map<String, dynamic>> checkins,
+  ) {
+    final checkinByDate = <String, Map<String, dynamic>>{};
+    for (final entry in checkins) {
+      final key = entry['checkin_date']?.toString();
+      if (key != null && key.isNotEmpty) {
+        checkinByDate[key] = entry;
+      }
+    }
+
+    final startDate = _parseInternshipDate(internship.startDate);
+    final today = DateTime.now();
+    final firstDay = startDate ?? today;
+    final records = <_CheckInRecord>[];
+
+    for (var date = DateTime(firstDay.year, firstDay.month, firstDay.day);
+        !date.isAfter(DateTime(today.year, today.month, today.day));
+        date = date.add(const Duration(days: 1))) {
+      if (_isWeekend(date)) {
+        continue;
+      }
+
+      final dateKey = _ymd(date);
+      final entry = checkinByDate[dateKey];
+      final checkInAt = DateTime.tryParse(entry?['check_in_at']?.toString() ?? '');
+      final present = checkInAt != null;
+
+      records.add(
+        _CheckInRecord(
+          date: _formatHistoryDate(date),
+          day: _formatHistoryDay(date),
+          time: present ? _formatHistoryTime(checkInAt.toLocal()) : '—',
+          present: present,
+          sortDate: date,
+        ),
+      );
+    }
+
+    records.sort((a, b) => b.sortDate.compareTo(a.sortDate));
+    return records;
+  }
+
+  DateTime? _parseInternshipDate(String raw) {
+    final normalized = raw.trim();
+    if (normalized.isEmpty || normalized == 'Not set') {
+      return null;
+    }
+
+    return DateTime.tryParse(normalized) ??
+        _tryParseMonthDayYear(normalized) ??
+        _tryParseDayMonthYear(normalized);
+  }
+
+  DateTime? _tryParseMonthDayYear(String value) {
+    final match = RegExp(r'^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$').firstMatch(value);
+    if (match == null) return null;
+    final month = _monthIndex(match.group(1)!);
+    final day = int.tryParse(match.group(2)!);
+    final year = int.tryParse(match.group(3)!);
+    if (month == null || day == null || year == null) return null;
+    return DateTime(year, month, day);
+  }
+
+  DateTime? _tryParseDayMonthYear(String value) {
+    final match = RegExp(r'^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$').firstMatch(value);
+    if (match == null) return null;
+    final day = int.tryParse(match.group(1)!);
+    final month = _monthIndex(match.group(2)!);
+    final year = int.tryParse(match.group(3)!);
+    if (month == null || day == null || year == null) return null;
+    return DateTime(year, month, day);
+  }
+
+  int? _monthIndex(String raw) {
+    const months = {
+      'jan': 1,
+      'feb': 2,
+      'mar': 3,
+      'apr': 4,
+      'may': 5,
+      'jun': 6,
+      'jul': 7,
+      'aug': 8,
+      'sep': 9,
+      'oct': 10,
+      'nov': 11,
+      'dec': 12,
+      'january': 1,
+      'february': 2,
+      'march': 3,
+      'april': 4,
+      'june': 6,
+      'july': 7,
+      'august': 8,
+      'september': 9,
+      'october': 10,
+      'november': 11,
+      'december': 12,
+    };
+    return months[raw.trim().toLowerCase()];
+  }
+
+  bool _isWeekend(DateTime date) =>
+      date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+
+  String _ymd(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+  String _formatHistoryDate(DateTime value) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[value.month - 1]} ${value.day}';
+  }
+
+  String _formatHistoryDay(DateTime value) {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return days[value.weekday - 1];
+  }
+
+  String _formatHistoryTime(DateTime value) {
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    final period = value.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
   }
 
   @override
@@ -228,8 +446,10 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     }
     final int safeIndex = _selectedInternshipIndex.clamp(0, active.length - 1);
     final currentInternship = active[safeIndex];
-    final bool checkedIn = _checkedInStatus[currentInternship.id] ?? false;
-    final bool checkedOut = _checkedOutStatus[currentInternship.id] ?? false;
+    final applicationId = currentInternship.applicationId;
+    final checkins = _checkinEntries[applicationId] ?? currentInternship.checkins;
+    final bool checkedIn = _checkedInStatus[applicationId] ?? _hasTodayCheckIn(checkins);
+    final bool checkedOut = _checkedOutStatus[applicationId] ?? _hasTodayCheckOut(checkins);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -253,7 +473,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
-          // ── Company Selector ──
+          // â”€â”€ Company Selector â”€â”€
           if (active.length > 1) ...[
             const Text(
               'Select Company',
@@ -261,7 +481,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 100,
+              height: 112,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: active.length,
@@ -296,6 +516,20 @@ class _CheckinsScreenState extends State<CheckinsScreen>
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF0F172A), fontWeight: FontWeight.w800, fontSize: 12),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            intern.role,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white.withValues(alpha: 0.72)
+                                  : const Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -306,20 +540,20 @@ class _CheckinsScreenState extends State<CheckinsScreen>
             const SizedBox(height: 32),
           ],
 
-          // ── Today's status card ──
+          // â”€â”€ Today's status card â”€â”€
           _todayCard(currentInternship, checkedIn, checkedOut),
           const SizedBox(height: 24),
 
-          // ── Check-in button ──
+          // â”€â”€ Check-in button â”€â”€
           _checkInButton(checkedIn, checkedOut),
           const SizedBox(height: 28),
 
-          // ── This week calendar strip ──
-          _weekStrip(checkedIn),
+          // â”€â”€ This week calendar strip â”€â”€
+          _weekStrip(currentInternship, checkins),
           const SizedBox(height: 28),
 
-          // ── History section ──
-          _historySection(currentInternship.company),
+          // â”€â”€ History section â”€â”€
+          _historySection(currentInternship, checkins),
           const SizedBox(height: 40),
         ],
       ),
@@ -352,16 +586,16 @@ class _CheckinsScreenState extends State<CheckinsScreen>
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Mesh background
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: checkedIn
-                      ? [const Color(0xFF059669), const Color(0xFF10B981)]
-                      : [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: checkedIn
+                        ? [const Color(0xFF059669), const Color(0xFF10B981)]
+                        : [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
               ),
             ),
@@ -402,6 +636,15 @@ class _CheckinsScreenState extends State<CheckinsScreen>
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          internship.role,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.82),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -597,10 +840,24 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     );
   }
 
-  Widget _weekStrip(bool checkedIn) {
-    final today = DateTime.now().weekday; // 1=Mon ... 7=Sun
+  Widget _weekStrip(StudentInternship internship, List<Map<String, dynamic>> checkins) {
+    final now = DateTime.now();
+    final today = now.weekday; // 1=Mon ... 7=Sun
+    final startOfWeek = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    final internshipStart = _parseInternshipDate(internship.startDate);
     const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    // Mock: Mon–today checked in, rest missing/upcoming
+    final weekStatuses = <int, String>{};
+    for (final entry in checkins) {
+      final parsedDate = DateTime.tryParse(entry['checkin_date']?.toString() ?? '');
+      if (parsedDate == null) continue;
+      if (parsedDate.isBefore(startOfWeek) || parsedDate.isAfter(endOfWeek)) {
+        continue;
+      }
+      weekStatuses[parsedDate.weekday] =
+          entry['check_in_at'] != null ? 'present' : 'absent';
+    }
+    // Mock: Monâ€“today checked in, rest missing/upcoming
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -630,19 +887,27 @@ class _CheckinsScreenState extends State<CheckinsScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(7, (i) {
               final dayNum = i + 1;
+              final date = startOfWeek.add(Duration(days: i));
               final isToday = dayNum == today;
-              final isPast = dayNum < today;
               final isWeekend = dayNum >= 6;
-              final isChecked = isPast && !isWeekend;
+              final status = weekStatuses[dayNum];
+              final isChecked = status == 'present';
+              final started =
+                  internshipStart == null || !date.isBefore(DateTime(internshipStart.year, internshipStart.month, internshipStart.day));
+              final isMissed = !isWeekend && started && status != 'present' && !date.isAfter(DateTime(now.year, now.month, now.day));
 
               Color accentColor = const Color(0xFF64748B);
               bool showCheck = false;
+              bool showAbsent = false;
 
               if (isWeekend) {
                 accentColor = const Color(0xFFE2E8F0);
-              } else if ((isToday && checkedIn) || isChecked) {
+              } else if (isChecked) {
                 accentColor = const Color(0xFF10B981);
                 showCheck = true;
+              } else if (isMissed) {
+                accentColor = const Color(0xFFEF4444);
+                showAbsent = true;
               } else if (isToday) {
                 accentColor = const Color(0xFF3B82F6);
               }
@@ -671,9 +936,11 @@ class _CheckinsScreenState extends State<CheckinsScreen>
                       children: [
                         if (showCheck)
                           Icon(Icons.check_circle_rounded, size: 18, color: accentColor)
+                        else if (showAbsent)
+                          Icon(Icons.close_rounded, size: 18, color: accentColor)
                         else
                           Text(
-                            '${dayNum + 10}', // Mock dates
+                            '${date.day}',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -699,15 +966,8 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     );
   }
 
-  Widget _historySection(String companyName) {
-    const history = [
-      _CheckInRecord('Mar 14', 'Friday', '9:08 AM', true),
-      _CheckInRecord('Mar 13', 'Thursday', '9:21 AM', true),
-      _CheckInRecord('Mar 12', 'Wednesday', '9:15 AM', true),
-      _CheckInRecord('Mar 11', 'Tuesday', '—', false),
-      _CheckInRecord('Mar 10', 'Monday', '9:33 AM', true),
-      _CheckInRecord('Mar 7', 'Friday', '9:02 AM', true),
-    ];
+  Widget _historySection(StudentInternship internship, List<Map<String, dynamic>> checkins) {
+    final history = _buildHistory(internship, checkins);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -726,15 +986,15 @@ class _CheckinsScreenState extends State<CheckinsScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                color: const Color(0xFF0F172A).withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
-                '42 total',
-                style: TextStyle(
+              child: Text(
+                '${history.length} total',
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF10B981),
+                  color: Color(0xFF475569),
                 ),
               ),
             ),
@@ -747,18 +1007,30 @@ class _CheckinsScreenState extends State<CheckinsScreen>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: history.length,
-            separatorBuilder: (_, index) => const Divider(
-              height: 1,
-              thickness: 1,
-              color: Color(0xFFF1F5F9),
-              indent: 60,
-            ),
-            itemBuilder: (_, i) => _CheckInTile(record: history[i]),
-          ),
+          child: history.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: Text(
+                    'No check-in records available yet.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: history.length,
+                  separatorBuilder: (_, index) => const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFF1F5F9),
+                    indent: 60,
+                  ),
+                  itemBuilder: (_, i) => _CheckInTile(record: history[i]),
+                ),
         ),
       ],
     );
@@ -770,7 +1042,14 @@ class _CheckInRecord {
   final String day;
   final String time;
   final bool present;
-  const _CheckInRecord(this.date, this.day, this.time, this.present);
+  final DateTime sortDate;
+  const _CheckInRecord({
+    required this.date,
+    required this.day,
+    required this.time,
+    required this.present,
+    required this.sortDate,
+  });
 }
 
 class _CheckInTile extends StatelessWidget {
@@ -808,7 +1087,7 @@ class _CheckInTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${record.date}  ·  ${record.day}',
+                  '${record.date}  Â·  ${record.day}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,

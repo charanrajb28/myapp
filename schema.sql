@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS applications (
   mentor_email VARCHAR(255),
   offer_letter_id VARCHAR(255),
   alerts JSONB DEFAULT '[]'::jsonb,
+  checkins JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(student_id, internship_id)
@@ -496,38 +497,12 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- 7. Create check-ins table
-CREATE TABLE IF NOT EXISTS internship_checkins (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  application_id UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
-  checkin_date DATE NOT NULL,
-  status VARCHAR(50) DEFAULT 'Present',
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(application_id, checkin_date)
-);
-
-ALTER TABLE internship_checkins ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Companies can view check-ins for their internships" ON internship_checkins;
-CREATE POLICY "Companies can view check-ins for their internships" ON internship_checkins
-FOR SELECT TO authenticated
-USING (
-  application_id IN (
-    SELECT a.id FROM applications a
-    JOIN internships i ON a.internship_id = i.id
-    JOIN companies c ON i.company_id = c.id
-    WHERE c.user_id = auth.uid()
-  )
-);
-
-DROP POLICY IF EXISTS "Students can view own check-ins" ON internship_checkins;
-CREATE POLICY "Students can view own check-ins" ON internship_checkins
-FOR SELECT TO authenticated
-USING (
-  application_id IN (
-    SELECT id FROM applications
-    WHERE student_id IN (SELECT id FROM students WHERE user_id = auth.uid())
-  )
-);
+-- Check-ins are stored inside applications.checkins as JSONB entries.
+-- Example item:
+-- {
+--   "checkin_date": "2026-04-06",
+--   "status": "Present",
+--   "check_in_at": "2026-04-06T09:05:00Z",
+--   "check_out_at": "2026-04-06T17:10:00Z",
+--   "notes": ""
+-- }

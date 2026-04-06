@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'manage_postings_screen.dart';
 
@@ -15,6 +16,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   final stipendController = TextEditingController();
   final durationController = TextEditingController();
   final responsibilityController = TextEditingController();
+  DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 30));
   bool isRemote = true;
   bool _isSaving = false;
 
@@ -54,7 +56,11 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'status': 'INTERVIEWING',
         'logo_initial': (companyRes['name'] as String).isNotEmpty ? (companyRes['name'] as String)[0].toUpperCase() : 'C',
         'responsibilities': responsibilityController.text.split('\n').where((s) => s.trim().isNotEmpty).toList(),
-        'deadline': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+        'deadline': DateTime(
+          _selectedDeadline.year,
+          _selectedDeadline.month,
+          _selectedDeadline.day,
+        ).toIso8601String(),
       });
 
       if (mounted) {
@@ -101,6 +107,8 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                     Expanded(child: _industrialField('DURATION (MO)', durationController, isNumeric: true, hint: 'e.g. 06')),
                   ],
                 ),
+                const SizedBox(height: 20),
+                _deadlineField(),
                 const SizedBox(height: 32),
                 const Text('WORK LOCATION', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                 const SizedBox(height: 16),
@@ -149,6 +157,89 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         ),
       ],
     );
+  }
+
+  Widget _deadlineField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'SELECTION DEADLINE',
+          style: TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 8,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickDeadline,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.calendar_month_rounded,
+                  color: Color(0xFF6366F1),
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    DateFormat('dd MMM yyyy').format(_selectedDeadline),
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.expand_more_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickDeadline() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDeadline.isBefore(now) ? now : _selectedDeadline,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF6366F1),
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDeadline = picked;
+    });
   }
 
   Widget _locationOption() {

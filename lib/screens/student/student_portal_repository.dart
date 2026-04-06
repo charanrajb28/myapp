@@ -69,6 +69,7 @@ class StudentPortalRepository {
         .from('applications')
         .select(
           'id, status, progress, start_date, end_date, mentor_name, '
+          'checkins, '
           'mentor_email, offer_letter_id, internships('
           'id, role, industry, location, stipend, duration, deadline, '
           'brand_color, logo_initial, about, status, companies(name))',
@@ -213,6 +214,53 @@ class StudentPortalRepository {
         .eq('user_id', user.id)
         .eq('is_read', false)
         .timeout(const Duration(seconds: 15));
+  }
+
+  Future<List<Map<String, dynamic>>> recordApplicationCheckin({
+    required String applicationId,
+    required bool isCheckout,
+  }) async {
+    final response = await _client
+        .from('applications')
+        .select('checkins')
+        .eq('id', applicationId)
+        .single()
+        .timeout(const Duration(seconds: 15));
+
+    final checkins = _jsonObjectList(response['checkins']);
+    final today = DateTime.now();
+    final todayLabel = DateFormat('yyyy-MM-dd').format(today);
+    final nowIso = today.toUtc().toIso8601String();
+    final index = checkins.indexWhere(
+      (item) => item['checkin_date']?.toString() == todayLabel,
+    );
+
+    if (index >= 0) {
+      final updated = Map<String, dynamic>.from(checkins[index]);
+      updated['status'] = 'Present';
+      if (isCheckout) {
+        updated['check_out_at'] = nowIso;
+      } else {
+        updated['check_in_at'] = nowIso;
+      }
+      checkins[index] = updated;
+    } else {
+      checkins.add({
+        'checkin_date': todayLabel,
+        'status': 'Present',
+        'check_in_at': isCheckout ? null : nowIso,
+        'check_out_at': isCheckout ? nowIso : null,
+        'notes': '',
+      });
+    }
+
+    await _client
+        .from('applications')
+        .update({'checkins': checkins})
+        .eq('id', applicationId)
+        .timeout(const Duration(seconds: 15));
+
+    return checkins;
   }
 
   Future<List<StudentDocumentItem>> fetchStudentDocuments() async {
@@ -400,9 +448,14 @@ class StudentPortalRepository {
     final internship = (item['internships'] as Map<String, dynamic>?) ?? {};
     final status = item['status']?.toString() ?? 'Applied';
     final startDate = item['start_date']?.toString();
-    final endDate = item['end_date']?.toString();
+    final endDate = _resolvedEndDateRaw(
+      endDateRaw: item['end_date']?.toString(),
+      startDateRaw: startDate,
+      durationRaw: internship['duration'],
+    );
 
     return StudentInternship(
+      applicationId: item['id']?.toString() ?? '',
       id: internship['id']?.toString() ?? item['id'].toString(),
       company: internship['companies']?['name']?.toString() ?? 'Company',
       role: internship['role']?.toString() ?? 'Intern',
@@ -410,9 +463,11 @@ class StudentPortalRepository {
       location: internship['location']?.toString() ?? 'Not specified',
       startDate: _formatDate(startDate),
       endDate: _formatDate(endDate),
+      deadline: _formatDate(internship['deadline']?.toString()),
       progress: _toDouble(item['progress']),
       daysLeft: _daysLeft(endDate),
       status: _mapApplicationStatus(status),
+      internshipStatus: internship['status']?.toString() ?? '',
       brandColor: _parseColor(internship['brand_color']?.toString()),
       logoInitial: internship['logo_initial']?.toString() ??
           (internship['companies']?['name']?.toString().isNotEmpty == true
@@ -423,6 +478,7 @@ class StudentPortalRepository {
       mentorEmail: item['mentor_email']?.toString() ?? 'Not assigned',
       offerLetterId: item['offer_letter_id']?.toString() ?? 'Not issued',
       about: internship['about']?.toString() ?? 'No description available.',
+      checkins: _jsonObjectList(item['checkins']),
     );
   }
 
@@ -583,18 +639,64 @@ class StudentPortalRepository {
     return diff < 0 ? 0 : diff;
   }
 
+  String? _resolvedEndDateRaw({
+    required String? endDateRaw,
+    required String? startDateRaw,
+    required dynamic durationRaw,
+  }) {
+    if (endDateRaw != null && endDateRaw.trim().isNotEmpty) {
+      return endDateRaw;
+    }
+
+    final startDate = DateTime.tryParse(startDateRaw ?? '');
+    if (startDate == null) {
+      return null;
+    }
+
+    final durationMonths = _durationMonths(durationRaw);
+    if (durationMonths <= 0) {
+      return null;
+    }
+
+    final plannedEndDate = DateTime(
+      startDate.year,
+      startDate.month + durationMonths,
+      startDate.day,
+    );
+    return plannedEndDate.toIso8601String();
+  }
+
+  int _durationMonths(dynamic rawDuration) {
+    final text = rawDuration?.toString().trim() ?? '';
+    final match = RegExp(r'(\d+)').firstMatch(text);
+    return int.tryParse(match?.group(1) ?? '') ?? 0;
+  }
+
   String _mapApplicationStatus(String status) {
-    switch (status) {
+    final normalized = status.trim().toLowerCase().replaceAll('_', ' ');
+    switch (normalized) {
+      case 'applied':
       case 'Applied':
         return 'Applied';
+      case 'active':
       case 'Active':
         return 'Active';
+      case 'completed':
       case 'Completed':
         return 'Completed';
+      case 'rejected':
+      case 'Rejected':
+        return 'Rejected';
+      case 'removed':
+      case 'Removed':
+        return 'Removed';
+      case 'under review':
+        return 'Applied';
+      case 'upcoming':
       case 'Upcoming':
         return 'Upcoming';
       default:
-        return status;
+        return status.trim();
     }
   }
 
@@ -620,6 +722,23 @@ class StudentPortalRepository {
           .toList();
     }
     return const [];
+  }
+
+  List<Map<String, dynamic>> _jsonObjectList(dynamic value) {
+    if (value is List) {
+      return value.map((item) {
+        if (item is Map<String, dynamic>) {
+          return Map<String, dynamic>.from(item);
+        }
+        if (item is Map) {
+          return item.map(
+            (key, val) => MapEntry(key.toString(), val),
+          );
+        }
+        return <String, dynamic>{};
+      }).where((item) => item.isNotEmpty).toList();
+    }
+    return <Map<String, dynamic>>[];
   }
 
   StudentNotificationType _mapNotificationType(String? value) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class StudentInternship {
+  final String applicationId;
   final String id;
   final String company;
   final String role;
@@ -8,9 +9,11 @@ class StudentInternship {
   final String location;
   final String startDate;
   final String endDate;
+  final String deadline;
   final double progress; // 0.0 – 1.0
   final int daysLeft;
   final String status; // 'Active' | 'Completed' | 'Upcoming'
+  final String internshipStatus;
   final Color brandColor;
   final String logoInitial;
   final String stipend;
@@ -18,8 +21,10 @@ class StudentInternship {
   final String mentorEmail;
   final String offerLetterId;
   final String about;
+  final List<Map<String, dynamic>> checkins;
 
   const StudentInternship({
+    required this.applicationId,
     required this.id,
     required this.company,
     required this.role,
@@ -27,9 +32,11 @@ class StudentInternship {
     required this.location,
     required this.startDate,
     required this.endDate,
+    required this.deadline,
     required this.progress,
     required this.daysLeft,
     required this.status,
+    required this.internshipStatus,
     required this.brandColor,
     required this.logoInitial,
     required this.stipend,
@@ -37,6 +44,7 @@ class StudentInternship {
     required this.mentorEmail,
     required this.offerLetterId,
     required this.about,
+    this.checkins = const [],
   });
 }
 

@@ -891,10 +891,8 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                 candidate['resumeUrl'] as String,
               ),
               const SizedBox(height: 32),
-              if (candidate['status'] == 'Active') ...[
-                const SizedBox(height: 32),
-                _CheckInCalendar(applicationId: candidate['id'] as String),
-              ],
+              const SizedBox(height: 32),
+              _CheckInCalendar(applicationId: candidate['id'] as String),
               const SizedBox(height: 32),
 
               if (candidate['status'] == 'Active') ...[
@@ -1639,19 +1637,31 @@ class _CheckInCalendarState extends State<_CheckInCalendar> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final start = DateTime(_viewDate.year, _viewDate.month, 1);
-      final end = DateTime(_viewDate.year, _viewDate.month + 1, 0, 23, 59, 59);
-
       final res = await Supabase.instance.client
-          .from('internship_checkins')
-          .select()
-          .eq('application_id', widget.applicationId)
-          .gte('checkin_date', start.toIso8601String().split('T')[0])
-          .lte('checkin_date', end.toIso8601String().split('T')[0]);
+          .from('applications')
+          .select('checkins')
+          .eq('id', widget.applicationId)
+          .maybeSingle();
+
+      final rawCheckins = (res?['checkins'] as List?) ?? const [];
+      final monthPrefix =
+          '${_viewDate.year.toString().padLeft(4, '0')}-${_viewDate.month.toString().padLeft(2, '0')}';
+      final parsedCheckins = rawCheckins
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .where(
+            (item) =>
+                (item['checkin_date']?.toString() ?? '').startsWith(monthPrefix),
+          )
+          .toList();
 
       if (mounted) {
         setState(() {
-          _checkins = List<Map<String, dynamic>>.from(res as List);
+          _checkins = parsedCheckins;
           _isLoading = false;
         });
       }
@@ -1676,7 +1686,7 @@ class _CheckInCalendarState extends State<_CheckInCalendar> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              '> INTERNSHIP_CHECKINS',
+              '> APPLICATION_CHECKINS',
               style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2),
             ),
             Row(
@@ -2134,6 +2144,12 @@ _StatusMeta _statusMeta(String status) {
         color: Color(0xFF10B981),
         backgroundColor: Color(0xFFF0FDF4),
         icon: Icons.check,
+      );
+    case 'Removed':
+      return const _StatusMeta(
+        color: Color(0xFF7C3AED),
+        backgroundColor: Color(0xFFF5F3FF),
+        icon: Icons.person_remove_alt_1_rounded,
       );
     case 'Rejected':
       return const _StatusMeta(
