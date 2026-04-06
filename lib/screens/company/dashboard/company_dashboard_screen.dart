@@ -1,11 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../company_shell.dart';
 
-class CompanyDashboardScreen extends StatelessWidget {
+class CompanyDashboardScreen extends StatefulWidget {
   const CompanyDashboardScreen({super.key});
 
   @override
+  State<CompanyDashboardScreen> createState() => _CompanyDashboardScreenState();
+}
+
+class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
+  bool _isLoading = true;
+  String _companyName = 'Loading...';
+  String _recruitmentPool = '0';
+  String _interviewing = '0';
+  String _hired = '0';
+  List<Map<String, dynamic>> _activePostings = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboardData();
+  }
+
+  Future<void> _fetchDashboardData() async {
+    setState(() => _isLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // 1. Get Company Profile
+      final companyRes = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('user_id', user.id)
+          .single();
+      
+      final companyId = companyRes['id'];
+      
+      // 2. Get Postings and Application Counts
+      final postingsRes = await supabase
+          .from('internships')
+          .select('id, role, brand_color')
+          .eq('company_id', companyId);
+      
+      final List<String> postingIds = (postingsRes as List).map((p) => p['id'].toString()).toList();
+      
+      int pool = 0;
+      int interviewing = 0;
+      int hired = 0;
+
+      if (postingIds.isNotEmpty) {
+        final appsRes = await supabase
+            .from('applications')
+            .select('status')
+            .inFilter('internship_id', postingIds);
+            
+        final apps = appsRes as List;
+        pool = apps.length;
+        interviewing = apps.where((a) => a['status'] == 'Under Review' || a['status'] == 'Active').length;
+        hired = apps.where((a) => a['status'] == 'Completed' || a['status'] == 'Active').length;
+      }
+
+      // 3. Prepare Display List (Top 3 Postings)
+      final List<Map<String, dynamic>> displayPostings = [];
+      for (var p in (postingsRes as List).take(3)) {
+        int count = 0;
+        if (postingIds.isNotEmpty) {
+           final specApps = await supabase.from('applications').select('id').eq('internship_id', p['id']);
+           count = (specApps as List).length;
+        }
+        
+        displayPostings.add({
+          'role': p['role'],
+          'applicants': count.toString(),
+          'color': _parseColor(p['brand_color'] ?? '#6366F1'),
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _companyName = companyRes['name'] ?? 'Partner Company';
+          _recruitmentPool = pool.toString();
+          _interviewing = interviewing.toString();
+          _hired = hired.toString();
+          _activePostings = displayPostings;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching company dashboard: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return const Color(0xFF6366F1);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       body: Stack(
@@ -16,15 +122,14 @@ class CompanyDashboardScreen extends StatelessWidget {
               physics: const BouncingScrollPhysics(),
               slivers: [
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                const SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
-                  sliver: SliverToBoxAdapter(child: _IndustrialHeader()),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverToBoxAdapter(child: _DashboardHeader(companyName: _companyName)),
                 ),
                 
                 const SliverToBoxAdapter(child: SizedBox(height: 48)),
 
-                
-                // ── PREMIUM_BENTO_GRID ──
+                // ── SUMMARY_CARDS ──
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   sliver: SliverToBoxAdapter(
@@ -33,16 +138,16 @@ class CompanyDashboardScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           flex: 3,
-                          child: _premiumLargeCard('RECRUITMENT_POOL', '3,422', const Color(0xFF6366F1), Icons.group_add_rounded),
+                          child: _premiumLargeCard('TOTAL APPLICANTS', _recruitmentPool, const Color(0xFF6366F1), Icons.group_add_rounded),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           flex: 2,
                           child: Column(
                             children: [
-                              _premiumMiniCard('INTERVIEWING', '86', const Color(0xFFF59E0B), Icons.forum_rounded),
+                              _premiumMiniCard('INTERVIEWING', _interviewing, const Color(0xFFF59E0B), Icons.forum_rounded),
                               const SizedBox(height: 16),
-                              _premiumMiniCard('HIRED_NODES', '12', const Color(0xFF10B981), Icons.verified_rounded),
+                              _premiumMiniCard('TOTAL HIRES', _hired, const Color(0xFF10B981), Icons.verified_rounded),
                             ],
                           ),
                         ),
@@ -53,21 +158,34 @@ class CompanyDashboardScreen extends StatelessWidget {
                 
                 const SliverToBoxAdapter(child: SizedBox(height: 48)),
                 
-                // ── OPERATIONS_LOG ──
+                // ── RECENT_JOBS_LIST ──
                 const SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: 24),
                   sliver: SliverToBoxAdapter(
-                    child: Text('> RECRUITMENT_LOG_FEED', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                    child: Text('RECENT JOB POSTINGS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
                 
-                SliverPadding(
+                _activePostings.isEmpty 
+                ? const SliverToBoxAdapter(
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.work_outline_rounded, color: Color(0xFFCBD5E1), size: 40),
+                          SizedBox(height: 12),
+                          Text('NO ACTIVE POSTINGS', style: TextStyle(color: Color(0xFF0F172A), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                          Text('You haven\'t posted any jobs yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                  )
+                : SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _LogItemCard(posting: _dummyLogs[index]),
-                      childCount: _dummyLogs.length,
+                      (context, index) => _LogItemCard(posting: _activePostings[index]),
+                      childCount: _activePostings.length,
                     ),
                   ),
                 ),
@@ -80,7 +198,6 @@ class CompanyDashboardScreen extends StatelessWidget {
       ),
     );
   }
-
 
   Widget _premiumLargeCard(String title, String value, Color color, IconData icon) {
     return Container(
@@ -165,19 +282,20 @@ class CompanyDashboardScreen extends StatelessWidget {
   }
 }
 
-class _IndustrialHeader extends StatelessWidget {
-  const _IndustrialHeader();
+class _DashboardHeader extends StatelessWidget {
+  final String companyName;
+  const _DashboardHeader({required this.companyName});
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('FRACTAL_OS v2.4', style: TextStyle(color: Color(0xFF6366F1), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 3)),
-            SizedBox(height: 10),
-            Text('Cloud9 Systems', style: TextStyle(color: Color(0xFF0F172A), fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+            const Text('RECRUITER DASHBOARD', style: TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2)),
+            const SizedBox(height: 10),
+            Text(companyName, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
           ],
         ),
         GestureDetector(
@@ -220,7 +338,7 @@ class _LogItemCard extends StatelessWidget {
           Container(
             width: 48, height: 48,
             decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(Icons.token_rounded, color: color, size: 20),
+            child: Icon(Icons.work_rounded, color: color, size: 20),
           ),
           const SizedBox(width: 20),
           Expanded(
@@ -229,7 +347,7 @@ class _LogItemCard extends StatelessWidget {
               children: [
                 Text((posting['role'] as String).toUpperCase(), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                 const SizedBox(height: 6),
-                Text('${posting['applicants']} NODES SYNCED', style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                Text('${posting['applicants']} APPLICANTS', style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
               ],
             ),
           ),
@@ -263,9 +381,3 @@ class _DotPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-final _dummyLogs = [
-  {'role': 'Full Stack Developer', 'applicants': '42', 'color': const Color(0xFF6366F1)},
-  {'role': 'UI/UX Design Intern', 'applicants': '18', 'color': const Color(0xFF8B5CF6)},
-  {'role': 'DevOps Engineering', 'applicants': '09', 'color': const Color(0xFF64748B)},
-];

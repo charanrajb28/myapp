@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
-import '../internship/my_internship_screen.dart'; // To access kStudentInternships
+import '../student_portal_repository.dart';
 
 class CheckinsScreen extends StatefulWidget {
   const CheckinsScreen({super.key});
@@ -11,7 +11,10 @@ class CheckinsScreen extends StatefulWidget {
 
 class _CheckinsScreenState extends State<CheckinsScreen>
     with SingleTickerProviderStateMixin {
+  final _repository = StudentPortalRepository();
   int _selectedInternshipIndex = 0;
+  bool _isLoading = true;
+  List<StudentInternship> _activeInternships = [];
   final Map<String, bool> _checkedInStatus = {};
   final Map<String, bool> _checkedOutStatus = {};
   
@@ -29,12 +32,35 @@ class _CheckinsScreenState extends State<CheckinsScreen>
     _pulseAnim = Tween<double>(begin: 0.9, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _loadInternships();
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadInternships() async {
+    setState(() => _isLoading = true);
+    try {
+      final internships = await _repository.fetchStudentInternships();
+      if (!mounted) return;
+      setState(() {
+        _activeInternships =
+            internships.where((internship) => internship.status == 'Active').toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to load check-in data: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    }
   }
 
   Future<void> _submitCheckIn() async {
@@ -61,7 +87,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   }
 
   Future<void> _processCheckIn() async {
-    final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    final active = _activeInternships;
     if (active.isEmpty) return;
     final companyId = active[_selectedInternshipIndex].id;
 
@@ -93,7 +119,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   }
 
   Future<void> _processCheckOut() async {
-    final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    final active = _activeInternships;
     if (active.isEmpty) return;
     final companyId = active[_selectedInternshipIndex].id;
 
@@ -128,12 +154,76 @@ class _CheckinsScreenState extends State<CheckinsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final active = kStudentInternships.where((i) => i.status == 'Active').toList();
+    final active = _activeInternships;
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     if (active.isEmpty) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        appBar: AppBar(title: const Text('Daily Check-In')),
-        body: const Center(child: Text('No active internships to check in.')),
+        appBar: AppBar(
+          title: const Text(
+            'Daily Check-In',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.3,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: const Color(0xFFE2E8F0), height: 1),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.qr_code_scanner_rounded,
+                    size: 40,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'No check-in data available',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'You do not have any active internship assigned yet, so there is nothing to check in for right now.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF94A3B8),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
     final int safeIndex = _selectedInternshipIndex.clamp(0, active.length - 1);

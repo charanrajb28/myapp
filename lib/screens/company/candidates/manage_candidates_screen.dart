@@ -1,23 +1,102 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
-class ManageCandidatesScreen extends StatelessWidget {
+class ManageCandidatesScreen extends StatefulWidget {
   const ManageCandidatesScreen({super.key});
 
   @override
+  State<ManageCandidatesScreen> createState() => _ManageCandidatesScreenState();
+}
+
+class _ManageCandidatesScreenState extends State<ManageCandidatesScreen> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _candidates = [];
+  String _filter = 'ALL_CANDIDATES';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCandidates();
+  }
+
+  Future<void> _fetchCandidates() async {
+    setState(() => _isLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final companyRes = await supabase
+          .from('companies')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+      
+      final companyId = companyRes['id'];
+
+      final res = await supabase
+          .from('applications')
+          .select('*, students(name), internships(role)')
+          .eq('internships.company_id', companyId);
+      
+      final List<Map<String, dynamic>> processed = [];
+      for (var app in (res as List)) {
+        if (app['internships'] == null) continue;
+
+        final studentName = app['students']?['name'] ?? 'Unknown Student';
+        final role = app['internships']?['role'] ?? 'Unknown Role';
+        final initials = studentName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase();
+
+        processed.add({
+          'id': app['id'],
+          'initials': initials,
+          'name': studentName,
+          'targetRole': role,
+          'status': app['status'] ?? 'Pending',
+          'appliedDate': DateFormat('dd MMM yyyy').format(DateTime.parse(app['created_at'])),
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _candidates = processed;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching candidates: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    List<Map<String, dynamic>> filtered = _candidates;
+    if (_filter == 'SHORTLISTED') {
+      filtered = _candidates.where((c) => c['status'] == 'Active' || c['status'] == 'Completed').toList();
+    } else if (_filter == 'PENDING_REVIEW') {
+      filtered = _candidates.where((c) => c['status'] == 'Applied' || c['status'] == 'Under Review').toList();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Stack(
         children: [
           Positioned.fill(child: _DotGrid()),
           SafeArea(
-            child: CustomScrollView(
+            child: _isLoading 
+            ? const Center(child: CircularProgressIndicator())
+            : CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 const SliverPadding(
                   padding: EdgeInsets.symmetric(horizontal: 24),
-                  sliver: SliverToBoxAdapter(child: _IndustrialCandidateHeader()),
+                  sliver: SliverToBoxAdapter(child: _CandidateHeader()),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 
@@ -27,11 +106,11 @@ class ManageCandidatesScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
                       children: [
-                        _filterChip('ALL_CANDIDATES', true),
+                        _filterBtn('ALL CANDIDATES'),
                         const SizedBox(width: 10),
-                        _filterChip('SHORTLISTED', false),
+                        _filterBtn('SHORTLISTED'),
                         const SizedBox(width: 10),
-                        _filterChip('PENDING_REVIEW', false),
+                        _filterBtn('PENDING REVIEW'),
                       ],
                     ),
                   ),
@@ -39,12 +118,14 @@ class ManageCandidatesScreen extends StatelessWidget {
                 
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 
-                SliverPadding(
+                filtered.isEmpty 
+                ? const SliverToBoxAdapter(child: Center(child: Text('No candidates found.', style: TextStyle(color: Color(0xFF64748B)))))
+                : SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _CandidateIndustrialCard(candidate: _dummyCandidates[index]),
-                      childCount: _dummyCandidates.length,
+                      (context, index) => _CandidateCard(candidate: filtered[index]),
+                      childCount: filtered.length,
                     ),
                   ),
                 ),
@@ -57,36 +138,40 @@ class ManageCandidatesScreen extends StatelessWidget {
     );
   }
 
-  Widget _filterChip(String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF6366F1) : Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : const Color(0xFF64748B),
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1,
+  Widget _filterBtn(String label) {
+    bool isSelected = _filter == label;
+    return GestureDetector(
+      onTap: () => setState(() => _filter = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6366F1) : Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF64748B),
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1,
+          ),
         ),
       ),
     );
   }
 }
 
-class _IndustrialCandidateHeader extends StatelessWidget {
-  const _IndustrialCandidateHeader({super.key});
+class _CandidateHeader extends StatelessWidget {
+  const _CandidateHeader();
 
   @override
   Widget build(BuildContext context) {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('DB_RECORDS v2.4', style: TextStyle(color: Color(0xFF6366F1), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2.5)),
+        Text('APPLICANT DATABASE', style: TextStyle(color: Color(0xFF6366F1), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
         SizedBox(height: 8),
         Text('Manage Candidates', style: TextStyle(color: Color(0xFF0F172A), fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
       ],
@@ -94,9 +179,9 @@ class _IndustrialCandidateHeader extends StatelessWidget {
   }
 }
 
-class _CandidateIndustrialCard extends StatelessWidget {
+class _CandidateCard extends StatelessWidget {
   final Map<String, dynamic> candidate;
-  const _CandidateIndustrialCard({required this.candidate});
+  const _CandidateCard({required this.candidate});
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +260,11 @@ class _CandidateIndustrialCard extends StatelessWidget {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
+      case 'active':
+      case 'completed':
       case 'shortlisted': return const Color(0xFF10B981);
+      case 'applied':
+      case 'under review':
       case 'pending': return const Color(0xFFF59E0B);
       case 'rejected': return const Color(0xFFEF4444);
       default: return const Color(0xFF6366F1);
@@ -208,9 +297,3 @@ class _DotPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-final _dummyCandidates = [
-  {'initials': 'AM', 'name': 'Arjun Mehta', 'targetRole': 'Full Stack Dev', 'status': 'Shortlisted', 'appliedDate': '02 MAR 2024'},
-  {'initials': 'SK', 'name': 'Sara Khan', 'targetRole': 'UI/UX Design', 'status': 'Pending', 'appliedDate': '03 MAR 2024'},
-  {'initials': 'RV', 'name': 'Rohan Verma', 'targetRole': 'DevOps Eng', 'status': 'In Review', 'appliedDate': '28 FEB 2024'},
-];

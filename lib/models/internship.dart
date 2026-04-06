@@ -54,6 +54,7 @@ class InternshipOpportunity {
   final String about;
   final List<String> requirements;
   final List<String> responsibilities;
+  final bool? isApplied;
 
   const InternshipOpportunity({
     required this.id,
@@ -67,6 +68,7 @@ class InternshipOpportunity {
     required this.brandColor,
     required this.logoInitial,
     required this.about,
+    this.isApplied = false,
     this.requirements = const [
       'Currently pursuing B.Tech/B.E in CS or related fields',
       'Strong understanding of Data Structures and Algorithms',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'screens/auth/forgot_password_screen.dart';
 import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
@@ -36,6 +37,8 @@ class MyApp extends StatelessWidget {
       ),
       home: const LoginPage(),
       routes: {
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/login': (context) => const LoginPage(),
         '/logout': (context) => const LogoutScreen(),
       },
     );
@@ -450,7 +453,11 @@ class _LoginPageState extends State<LoginPage>
                               ],
                             ),
                             TextButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.of(context).pushNamed(
+                                  '/forgot-password',
+                                );
+                              },
                               style: TextButton.styleFrom(
                                 padding: EdgeInsets.zero,
                                 minimumSize: Size.zero,
@@ -552,34 +559,17 @@ class _LoginPageState extends State<LoginPage>
                   const SizedBox(height: 32),
 
                   // ── Register link ─────────────────────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'New company? ',
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: textSecondary,
-                            fontWeight: FontWeight.w500),
-                      ),
-                      InkWell(
-                        onTap: () {},
-                        child: Text(
-                          'Register for an account',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: textPrimary,
-                            decoration: TextDecoration.underline,
-                            decorationColor: textPrimary,
-                            decorationThickness: 1.5,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Credentials are issued by the administrator.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
 
                   // ── Security stamp ────────────────────────────────────
                   Row(

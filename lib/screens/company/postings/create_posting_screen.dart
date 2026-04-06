@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'manage_postings_screen.dart';
 
 class CreatePostingScreen extends StatefulWidget {
@@ -15,6 +16,59 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   final durationController = TextEditingController();
   final responsibilityController = TextEditingController();
   bool isRemote = true;
+  bool _isSaving = false;
+
+  Future<void> _publishPosting() async {
+    if (roleController.text.isEmpty || descController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill in all required job details.')));
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final companyRes = await supabase
+          .from('companies')
+          .select('id, name')
+          .eq('user_id', user.id)
+          .single();
+      
+      final companyId = companyRes['id'];
+      
+      final colors = ['#6366F1', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'];
+      final randomColor = colors[DateTime.now().millisecond % colors.length];
+
+      await supabase.from('internships').insert({
+        'company_id': companyId,
+        'role': roleController.text,
+        'about': descController.text,
+        'stipend': stipendController.text,
+        'duration': durationController.text.trim(),
+        'industry': 'Software Engineering',
+        'location': isRemote ? 'Remote' : 'On-site',
+        'brand_color': randomColor,
+        'status': 'INTERVIEWING',
+        'logo_initial': (companyRes['name'] as String).isNotEmpty ? (companyRes['name'] as String)[0].toUpperCase() : 'C',
+        'responsibilities': responsibilityController.text.split('\n').where((s) => s.trim().isNotEmpty).toList(),
+        'deadline': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Job posted successfully!')));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      debugPrint('Error publishing posting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        setState(() => _isSaving = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +77,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('NEW_POSTING_MISSION', style: TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 2)),
+        title: const Text('CREATE NEW JOB POST', style: TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)),
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), onPressed: () => Navigator.pop(context)),
       ),
       body: Stack(
@@ -34,11 +88,11 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('> METADATA_TERMINAL', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                const Text('JOB DETAILS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                 const SizedBox(height: 24),
-                _industrialField('ROLE_TITLE_LABEL', roleController, hint: 'e.g. Flutter Developer'),
+                _industrialField('JOB TITLE', roleController, hint: 'e.g. Mobile Developer'),
                 const SizedBox(height: 20),
-                _industrialField('MISSION_DESCRIPTION_LOG', descController, maxLines: 4, hint: 'Describe the mission objectives...'),
+                _industrialField('JOB DESCRIPTION', descController, maxLines: 4, hint: 'What will the intern do?'),
                 const SizedBox(height: 32),
                 Row(
                   children: [
@@ -48,19 +102,24 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                const Text('> LOCATION_SELECT_TERMINAL', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                const Text('WORK LOCATION', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                 const SizedBox(height: 16),
                 _locationOption(),
                 const SizedBox(height: 32),
-                const Text('> RESPONSIBILITY_LEDGER', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                const Text('RESPONSIBILITIES', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                 const SizedBox(height: 16),
-                _industrialField('DUTIES_BULLETED', responsibilityController, maxLines: 6, hint: '- Architect UI modules...\n- Scale node services...'),
+                _industrialField('LIST TASKS (ONE PER LINE)', responsibilityController, maxLines: 6, hint: 'Bullet points here...'),
                 const SizedBox(height: 48),
                 _publishBtn(context),
                 const SizedBox(height: 40),
               ],
             ),
           ),
+          if (_isSaving)
+            Container(
+              color: Colors.white60,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
@@ -75,7 +134,9 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         TextField(
           controller: controller,
           maxLines: maxLines,
-          keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+          keyboardType: isNumeric 
+            ? TextInputType.number 
+            : (maxLines > 1 ? TextInputType.multiline : TextInputType.text),
           style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold),
           decoration: InputDecoration(
             hintText: hint,
@@ -93,9 +154,9 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   Widget _locationOption() {
     return Row(
       children: [
-        _locBtn('REMOTE_IN', isRemote, () => setState(() => isRemote = true)),
+        _locBtn('Work from Home', isRemote, () => setState(() => isRemote = true)),
         const SizedBox(width: 12),
-        _locBtn('ONSITE_HQ', !isRemote, () => setState(() => isRemote = false)),
+        _locBtn('On-site Office', !isRemote, () => setState(() => isRemote = false)),
       ],
     );
   }
@@ -121,19 +182,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
 
   Widget _publishBtn(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        if (roleController.text.isNotEmpty) {
-          final colors = [const Color(0xFF6366F1), const Color(0xFF8B5CF6), const Color(0xFF10B981), const Color(0xFFF59E0B)];
-          PostingsRegistry.data.add({
-            'role': roleController.text,
-            'status': 'ACTIVE',
-            'completion': 0.0,
-            'color': colors[PostingsRegistry.data.length % colors.length],
-          });
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('MISSION_PUBLISHED_SUCCESSFULLY. RECRUITMENT_LIVE.')));
-          Navigator.pop(context);
-        }
-      },
+      onTap: _isSaving ? null : _publishPosting,
       child: Container(
         width: double.infinity, height: 52,
         decoration: BoxDecoration(
@@ -147,7 +196,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
             children: [
               Icon(Icons.send_rounded, color: Colors.white, size: 18),
               SizedBox(width: 12),
-              Text('PUBLISH_POSTING', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+              Text('PUBLISH JOB POST', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
             ],
           ),
         ),

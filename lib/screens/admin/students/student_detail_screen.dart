@@ -622,13 +622,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ...List.generate(docUrls.length, (index) {
-          final url = docUrls[index].toString();
+          final rawDoc = docUrls[index];
+          final Map<String, dynamic> doc = rawDoc is Map<String, dynamic>
+              ? rawDoc
+              : rawDoc is Map
+                  ? rawDoc.map((key, value) => MapEntry(key.toString(), value))
+                  : {
+                      'name': 'Student Document ${index + 1}',
+                      'url': rawDoc.toString(),
+                    };
+          final url = doc['url']?.toString() ?? '';
+          final name = doc['name']?.toString().trim().isNotEmpty == true
+              ? doc['name'].toString().trim()
+              : 'Student Document ${index + 1}';
           final String extension = url.split('.').last.toUpperCase().split('?').first;
           
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: _buildDocumentTile(
-              title: 'Student Document ${index + 1}',
+              title: name,
               date: 'Profile Attachment',
               type: extension.length > 4 ? 'DOC' : extension,
               status: 'Verified',

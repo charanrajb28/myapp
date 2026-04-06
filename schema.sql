@@ -4,7 +4,7 @@ DO $$ BEGIN
         CREATE TYPE user_role AS ENUM ('student', 'company', 'admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'application_status') THEN
-        CREATE TYPE application_status AS ENUM ('Applied', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review');
+        CREATE TYPE application_status AS ENUM ('Applied', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review', 'Removed');
     END IF;
 END $$;
 
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS students (
   parent_contact VARCHAR(20),
   parent_email VARCHAR(255),
   resume_url TEXT,
-  document_urls TEXT[] DEFAULT '{}',
+  document_urls JSONB DEFAULT '[]'::jsonb,
   gpa NUMERIC(10, 2),
   graduation_year INTEGER,
   is_blacklisted BOOLEAN DEFAULT false,
@@ -77,6 +77,9 @@ CREATE TABLE IF NOT EXISTS internships (
   about TEXT,
   requirements TEXT[],
   responsibilities TEXT[],
+  status VARCHAR(50) DEFAULT 'INTERVIEWING',
+  start_date DATE,
+  end_date DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -93,9 +96,42 @@ CREATE TABLE IF NOT EXISTS applications (
   mentor_name VARCHAR(255),
   mentor_email VARCHAR(255),
   offer_letter_id VARCHAR(255),
+  alerts JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(student_id, internship_id)
+);
+
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  otp_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS student_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  notification_type VARCHAR(50) DEFAULT 'general',
+  is_read BOOLEAN DEFAULT false,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS student_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  public_url TEXT NOT NULL,
+  source_type VARCHAR(50) DEFAULT 'google_drive',
+  mime_type TEXT,
+  is_resume BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Row Level Security (RLS) basics (You can refine these later)
@@ -104,6 +140,9 @@ ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE internships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE password_reset_otps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_documents ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for basic access
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON users;
@@ -138,6 +177,11 @@ CREATE POLICY "Admins can manage companies" ON companies FOR ALL TO authenticate
   (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
 );
 
+DROP POLICY IF EXISTS "Companies can update own profile" ON companies;
+CREATE POLICY "Companies can update own profile" ON companies FOR UPDATE TO authenticated USING (
+  user_id = auth.uid()
+);
+
 DROP POLICY IF EXISTS "Internships are public" ON internships;
 CREATE POLICY "Internships are public" ON internships FOR SELECT USING (true);
 
@@ -146,11 +190,130 @@ CREATE POLICY "Admins can manage internships" ON internships FOR ALL TO authenti
   (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
 );
 
+DROP POLICY IF EXISTS "Companies can manage their own internships" ON internships;
+CREATE POLICY "Companies can manage their own internships" ON internships FOR ALL TO authenticated USING (
+  company_id IN (SELECT id FROM public.companies WHERE user_id = auth.uid())
+) WITH CHECK (
+  company_id IN (SELECT id FROM public.companies WHERE user_id = auth.uid())
+);
+
 DROP POLICY IF EXISTS "Applications are visible to students and companies" ON applications;
 CREATE POLICY "Applications are visible to students and companies" ON applications FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Admins can manage applications" ON applications;
 CREATE POLICY "Admins can manage applications" ON applications FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Students can create own applications" ON applications;
+CREATE POLICY "Students can create own applications" ON applications
+FOR INSERT TO authenticated
+WITH CHECK (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Students can update own applications" ON applications;
+CREATE POLICY "Students can update own applications" ON applications
+FOR UPDATE TO authenticated
+USING (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Companies can update applications for their internships" ON applications;
+CREATE POLICY "Companies can update applications for their internships" ON applications
+FOR UPDATE TO authenticated
+USING (
+  internship_id IN (
+    SELECT id FROM public.internships WHERE company_id IN (
+      SELECT id FROM public.companies WHERE user_id = auth.uid()
+    )
+  )
+)
+WITH CHECK (
+  internship_id IN (
+    SELECT id FROM public.internships WHERE company_id IN (
+      SELECT id FROM public.companies WHERE user_id = auth.uid()
+    )
+  )
+);
+
+DROP POLICY IF EXISTS "No direct access to password reset otps" ON password_reset_otps;
+CREATE POLICY "No direct access to password reset otps" ON password_reset_otps
+FOR ALL TO authenticated USING (false) WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Students can view own notifications" ON student_notifications;
+CREATE POLICY "Students can view own notifications" ON student_notifications
+FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Students can update own notifications" ON student_notifications;
+CREATE POLICY "Students can update own notifications" ON student_notifications
+FOR UPDATE TO authenticated USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Admins can manage notifications" ON student_notifications;
+CREATE POLICY "Admins can manage notifications" ON student_notifications
+FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+)
+WITH CHECK (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Students can view own documents" ON student_documents;
+CREATE POLICY "Students can view own documents" ON student_documents
+FOR SELECT TO authenticated USING (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Students can insert own documents" ON student_documents;
+CREATE POLICY "Students can insert own documents" ON student_documents
+FOR INSERT TO authenticated
+WITH CHECK (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Students can update own documents" ON student_documents;
+CREATE POLICY "Students can update own documents" ON student_documents
+FOR UPDATE TO authenticated
+USING (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Students can delete own documents" ON student_documents;
+CREATE POLICY "Students can delete own documents" ON student_documents
+FOR DELETE TO authenticated
+USING (
+  student_id IN (
+    SELECT id FROM public.students WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Admins can manage student documents" ON student_documents;
+CREATE POLICY "Admins can manage student documents" ON student_documents
+FOR ALL TO authenticated USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+)
+WITH CHECK (
   (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
 );
 
@@ -162,6 +325,125 @@ BEGIN
    RETURN NEW;
 END;
 $$ language 'plpgsql';
+
+CREATE OR REPLACE FUNCTION public.create_password_reset_otp(
+  p_email TEXT,
+  p_otp TEXT
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = p_email) THEN
+    RAISE EXCEPTION 'No account found for this email';
+  END IF;
+
+  DELETE FROM public.password_reset_otps
+  WHERE expires_at < NOW()
+     OR consumed_at IS NOT NULL;
+
+  DELETE FROM public.password_reset_otps WHERE email = p_email;
+
+  INSERT INTO public.password_reset_otps (
+    email,
+    otp_hash,
+    expires_at
+  )
+  VALUES (
+    p_email,
+    extensions.crypt(p_otp, extensions.gen_salt('bf')),
+    NOW() + INTERVAL '10 minutes'
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.complete_password_reset(
+  p_email TEXT,
+  p_otp TEXT,
+  p_new_password TEXT
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  otp_record public.password_reset_otps%ROWTYPE;
+BEGIN
+  SELECT *
+  INTO otp_record
+  FROM public.password_reset_otps
+  WHERE email = p_email
+    AND consumed_at IS NULL
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF otp_record.id IS NULL THEN
+    RAISE EXCEPTION 'No active OTP found';
+  END IF;
+
+  IF otp_record.expires_at < NOW() THEN
+    RAISE EXCEPTION 'OTP has expired';
+  END IF;
+
+  IF otp_record.otp_hash <> extensions.crypt(p_otp, otp_record.otp_hash) THEN
+    RAISE EXCEPTION 'Invalid OTP';
+  END IF;
+
+  UPDATE auth.users
+  SET encrypted_password = extensions.crypt(p_new_password, extensions.gen_salt('bf')),
+      updated_at = NOW()
+  WHERE email = p_email;
+
+  DELETE FROM public.password_reset_otps
+  WHERE id = otp_record.id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.verify_password_reset_otp(
+  p_email TEXT,
+  p_otp TEXT
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  otp_record public.password_reset_otps%ROWTYPE;
+BEGIN
+  SELECT *
+  INTO otp_record
+  FROM public.password_reset_otps
+  WHERE email = p_email
+    AND consumed_at IS NULL
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF otp_record.id IS NULL THEN
+    RAISE EXCEPTION 'No active OTP found';
+  END IF;
+
+  IF otp_record.expires_at < NOW() THEN
+    DELETE FROM public.password_reset_otps
+    WHERE id = otp_record.id;
+    RAISE EXCEPTION 'OTP has expired';
+  END IF;
+
+  IF otp_record.otp_hash <> extensions.crypt(p_otp, otp_record.otp_hash) THEN
+    RAISE EXCEPTION 'Invalid OTP';
+  END IF;
+
+  DELETE FROM public.password_reset_otps
+  WHERE id = otp_record.id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.create_password_reset_otp(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_password_reset(TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.verify_password_reset_otp(TEXT, TEXT) TO anon, authenticated;
 
 DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
@@ -177,6 +459,9 @@ CREATE TRIGGER update_internships_updated_at BEFORE UPDATE ON internships FOR EA
 
 DROP TRIGGER IF EXISTS update_applications_updated_at ON applications;
 CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON applications FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_student_documents_updated_at ON student_documents;
+CREATE TRIGGER update_student_documents_updated_at BEFORE UPDATE ON student_documents FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Secure Identity Sync via Trigger (The Proper Way)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -210,3 +495,39 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- 7. Create check-ins table
+CREATE TABLE IF NOT EXISTS internship_checkins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  application_id UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  checkin_date DATE NOT NULL,
+  status VARCHAR(50) DEFAULT 'Present',
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(application_id, checkin_date)
+);
+
+ALTER TABLE internship_checkins ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Companies can view check-ins for their internships" ON internship_checkins;
+CREATE POLICY "Companies can view check-ins for their internships" ON internship_checkins
+FOR SELECT TO authenticated
+USING (
+  application_id IN (
+    SELECT a.id FROM applications a
+    JOIN internships i ON a.internship_id = i.id
+    JOIN companies c ON i.company_id = c.id
+    WHERE c.user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Students can view own check-ins" ON internship_checkins;
+CREATE POLICY "Students can view own check-ins" ON internship_checkins
+FOR SELECT TO authenticated
+USING (
+  application_id IN (
+    SELECT id FROM applications
+    WHERE student_id IN (SELECT id FROM students WHERE user_id = auth.uid())
+  )
+);

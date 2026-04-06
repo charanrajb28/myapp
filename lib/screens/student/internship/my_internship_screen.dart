@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
 import 'internship_opportunity_detail_screen.dart';
+import '../student_portal_repository.dart';
 
 const List<StudentInternship> kStudentInternships = [
   StudentInternship(
@@ -146,11 +147,15 @@ class MyInternshipScreen extends StatefulWidget {
 class _MyInternshipScreenState extends State<MyInternshipScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
+  final _repository = StudentPortalRepository();
   String _searchQuery = '';
   String _selectedIndustry = 'All';
+  bool _isLoading = true;
+  List<InternshipOpportunity> _availableInternships = [];
+  List<StudentInternship> _studentInternships = [];
 
   List<InternshipOpportunity> get _filteredInternships {
-    return kAvailableInternships.where((o) {
+    return _availableInternships.where((o) {
       final matchesSearch = o.company.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           o.role.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesIndustry = _selectedIndustry == 'All' || o.industry == _selectedIndustry;
@@ -159,7 +164,7 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
   }
 
   List<StudentInternship> get _active =>
-      kStudentInternships.where((i) => i.status == 'Active').toList();
+      _studentInternships.where((i) => i.status == 'Active').toList();
 
   @override
   void initState() {
@@ -168,12 +173,36 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
     _tab.addListener(() {
       if (mounted) setState(() {});
     });
+    _loadInternshipData();
   }
 
   @override
   void dispose() {
     _tab.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadInternshipData() async {
+    setState(() => _isLoading = true);
+    try {
+      final available = await _repository.fetchAvailableInternships();
+      final student = await _repository.fetchStudentInternships();
+      if (!mounted) return;
+      setState(() {
+        _availableInternships = available;
+        _studentInternships = student;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to load internships: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    }
   }
 
   @override
@@ -229,7 +258,7 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
                     children: [
                       const Text('EXPLORE'),
                       const SizedBox(width: 4),
-                      _tabBadge(kAvailableInternships.length, const Color(0xFF3B82F6), isActive: _tab.index == 0),
+                      _tabBadge(_availableInternships.length, const Color(0xFF3B82F6), isActive: _tab.index == 0),
                     ],
                   ),
                 ),
@@ -249,7 +278,7 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
                     children: [
                       const Text('HISTORY'),
                       const SizedBox(width: 4),
-                      _tabBadge(kStudentInternships.length, const Color(0xFF64748B), isActive: _tab.index == 2),
+                      _tabBadge(_studentInternships.length, const Color(0xFF64748B), isActive: _tab.index == 2),
                     ],
                   ),
                 ),
@@ -258,15 +287,23 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
           ),
         ),
       ),
-      body: TabBarView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
         controller: _tab,
         children: [
           // ── Explore tab ──
           _exploreTab(),
           // ── Active tab ──
-          _internshipList(_active, emptyMsg: 'No active internships'),
+          _internshipList(
+            _active,
+            emptyMsg: 'No active internships available',
+          ),
           // ── History tab ──
-          _internshipList(kStudentInternships, emptyMsg: 'No internships found'),
+          _internshipList(
+            _studentInternships,
+            emptyMsg: 'No internship history available',
+          ),
         ],
       ),
     );
@@ -324,35 +361,7 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
         ),
 
         // ── Featured Section ──
-        if (_searchQuery.isEmpty && _selectedIndustry == 'All')
-           SliverToBoxAdapter(
-             child: Column(
-               crossAxisAlignment: CrossAxisAlignment.start,
-               children: [
-                 const Padding(
-                   padding: EdgeInsets.symmetric(horizontal: 20),
-                   child: Text(
-                     'Featured Opportunities',
-                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5),
-                   ),
-                 ),
-                 const SizedBox(height: 16),
-                 SizedBox(
-                   height: 160,
-                   child: ListView.builder(
-                     scrollDirection: Axis.horizontal,
-                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                     itemCount: kAvailableInternships.length.clamp(0, 3), 
-                     itemBuilder: (context, index) {
-                       final o = kAvailableInternships[index];
-                       return _FeaturedCard(opportunity: o);
-                     },
-                   ),
-                 ),
-                 const SizedBox(height: 32),
-               ],
-             ),
-           ),
+        
 
         // ── Results Header ──
         if (_filteredInternships.isNotEmpty)
@@ -398,7 +407,10 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final opportunity = _filteredInternships[index];
-                      return _OpportunityListItem(opportunity: opportunity);
+                      return _OpportunityListItem(
+                        opportunity: opportunity,
+                        onApplicationChanged: _loadInternshipData,
+                      );
                     },
                     childCount: _filteredInternships.length,
                   ),
@@ -409,7 +421,7 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
   }
 
   Widget _industryFilter() {
-    final industries = ['All', ...kAvailableInternships.map((o) => o.industry).toSet()];
+    final industries = ['All', ..._availableInternships.map((o) => o.industry).toSet()];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -466,8 +478,47 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
   Widget _internshipList(List<StudentInternship> list, {required String emptyMsg}) {
     if (list.isEmpty) {
       return Center(
-        child: Text(emptyMsg,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.work_off_rounded,
+                  size: 42,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                emptyMsg,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'No related internship data is available for this section yet.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
     return ListView.builder(
@@ -489,8 +540,8 @@ class _MyInternshipScreenState extends State<MyInternshipScreen>
         crossAxisSpacing: 16,
         mainAxisExtent: 280,
       ),
-      itemCount: kAvailableInternships.length,
-      itemBuilder: (_, i) => _OpportunityCard(opportunity: kAvailableInternships[i]),
+      itemCount: _availableInternships.length,
+      itemBuilder: (_, i) => _OpportunityCard(opportunity: _availableInternships[i]),
     );
   }
 }
@@ -671,6 +722,10 @@ class _InternshipCard extends StatelessWidget {
     final bool isActive = internship.status == 'Active';
 
     switch (internship.status) {
+      case 'Applied':
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'Applied';
+        break;
       case 'Active':
         statusColor = const Color(0xFF10B981);
         statusLabel = 'Active';
@@ -1294,7 +1349,12 @@ class _Doc {
 
 class _FeaturedCard extends StatelessWidget {
   final InternshipOpportunity opportunity;
-  const _FeaturedCard({required this.opportunity});
+  final Future<void> Function() onApplicationChanged;
+
+  const _FeaturedCard({
+    required this.opportunity,
+    required this.onApplicationChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1313,13 +1373,16 @@ class _FeaturedCard extends StatelessWidget {
         ],
       ),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          final changed = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
               builder: (_) => InternshipOpportunityDetailScreen(opportunity: opportunity),
             ),
           );
+          if (changed == true) {
+            await onApplicationChanged();
+          }
         },
         borderRadius: BorderRadius.circular(20),
         child: Stack(
@@ -1335,22 +1398,31 @@ class _FeaturedCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                    Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(8)),
-                        child: Text(opportunity.logoInitial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Container(
+                         padding: const EdgeInsets.all(6),
+                         decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(8)),
+                         child: Text(opportunity.logoInitial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
                       ),
                       const SizedBox(width: 10),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(opportunity.company, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                          Text(opportunity.industry, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ],
-                  ),
+                           Text(opportunity.company, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                           Text(opportunity.industry, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.w600)),
+                         ],
+                       ),
+                       const Spacer(),
+                       if (opportunity.isApplied == true)
+                         _statusBadge(
+                           'APPLIED',
+                           const Color(0xFF10B981),
+                           textColor: Colors.white,
+                           backgroundColor: const Color(0xFF10B981),
+                         ),
+                     ],
+                   ),
                   const Spacer(),
                   Text(opportunity.role, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: -0.3)),
                   const SizedBox(height: 6),
@@ -1369,24 +1441,56 @@ class _FeaturedCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _statusBadge(
+    String label,
+    Color color, {
+    Color? backgroundColor,
+    Color? textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.7,
+          color: textColor ?? color,
+        ),
+      ),
+    );
+  }
 }
 
 class _OpportunityListItem extends StatelessWidget {
   final InternshipOpportunity opportunity;
-  const _OpportunityListItem({required this.opportunity});
+  final Future<void> Function() onApplicationChanged;
+
+  const _OpportunityListItem({
+    required this.opportunity,
+    required this.onApplicationChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         InkWell(
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            final changed = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
                 builder: (_) => InternshipOpportunityDetailScreen(opportunity: opportunity),
               ),
             );
+            if (changed == true) {
+              await onApplicationChanged();
+            }
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1432,6 +1536,10 @@ class _OpportunityListItem extends StatelessWidget {
                           color: Color(0xFF64748B),
                         ),
                       ),
+                      if (opportunity.isApplied == true) ...[
+                        const SizedBox(height: 8),
+                        _statusBadge('Applied', const Color(0xFF10B981)),
+                      ],
                       const SizedBox(height: 6),
                       Row(
                         children: [
@@ -1468,6 +1576,24 @@ class _OpportunityListItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _statusBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
     );
   }
 }

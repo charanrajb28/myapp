@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
+import '../student_portal_repository.dart';
 
 class InternshipOpportunityDetailScreen extends StatefulWidget {
   final InternshipOpportunity opportunity;
@@ -10,21 +11,44 @@ class InternshipOpportunityDetailScreen extends StatefulWidget {
 }
 
 class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunityDetailScreen> {
+  final _repository = StudentPortalRepository();
   bool _isApplying = false;
   bool _isApplied = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _isApplied = widget.opportunity.isApplied ?? false;
+  }
+
   void _handleEasyApply() async {
     setState(() => _isApplying = true);
-    
-    // Simulate application process
-    await Future.delayed(const Duration(milliseconds: 1800));
-    
-    if (mounted) {
+
+    try {
+      final applied = await _repository.applyForInternship(widget.opportunity);
+
+      if (!mounted) return;
+
       setState(() {
         _isApplying = false;
         _isApplied = true;
       });
-      _showSuccessFeedback();
+
+      if (applied) {
+        _showSuccessFeedback();
+        Navigator.of(context).pop(true);
+      } else {
+        _showInfoFeedback('You have already applied to ${widget.opportunity.company}.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isApplying = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to apply: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
     }
   }
 
@@ -40,6 +64,18 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
         ),
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFF10B981),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(20),
+      ),
+    );
+  }
+
+  void _showInfoFeedback(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(20),
       ),
@@ -177,7 +213,7 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
                       Icon(_isApplied ? Icons.check_circle_rounded : Icons.bolt_rounded, size: 20, color: Colors.white),
                       const SizedBox(width: 8),
                       Text(
-                        _isApplied ? 'APPLICATION SENT' : 'EASY APPLY',
+                        _isApplied ? 'APPLIED' : 'EASY APPLY',
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.8),
                       ),
                     ],

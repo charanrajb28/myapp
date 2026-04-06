@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditCompanyProfileScreen extends StatefulWidget {
   final Map<String, dynamic> companyData;
@@ -10,17 +11,42 @@ class EditCompanyProfileScreen extends StatefulWidget {
 
 class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
   late TextEditingController nameController;
-  late TextEditingController tagController;
-  late TextEditingController bioController;
+  late TextEditingController industryController;
+  late TextEditingController descController;
   late TextEditingController locationController;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     nameController = TextEditingController(text: widget.companyData['name']);
-    tagController = TextEditingController(text: widget.companyData['tagline']);
-    bioController = TextEditingController(text: 'We are a high-performance technology node specializing in AI cloud infra and decentralized system architecture. Our mission is to scale the next generation of digital industrial engines.');
-    locationController = TextEditingController(text: 'Bangalore, MH, India');
+    industryController = TextEditingController(text: widget.companyData['industry']);
+    descController = TextEditingController(text: widget.companyData['description']);
+    locationController = TextEditingController(text: widget.companyData['location']);
+  }
+
+  Future<void> _saveProfile() async {
+     setState(() => _isSaving = true);
+     try {
+       final supabase = Supabase.instance.client;
+       await supabase.from('companies').update({
+         'name': nameController.text,
+         'industry': industryController.text,
+         'description': descController.text,
+         'location': locationController.text,
+       }).eq('id', widget.companyData['id']);
+
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully!')));
+         Navigator.pop(context);
+       }
+     } catch (e) {
+       debugPrint('Error saving profile: $e');
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update Error: $e')));
+         setState(() => _isSaving = false);
+       }
+     }
   }
 
   @override
@@ -30,7 +56,7 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('EDIT_IDENTITY_CONSOLE', style: TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 2)),
+        title: const Text('EDIT PROFILE DETAILS', style: TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)),
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), onPressed: () => Navigator.pop(context)),
       ),
       body: Stack(
@@ -39,7 +65,7 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
           SingleChildScrollView(
             child: Column(
               children: [
-                // ── BRANDING_TERMINAL (Banner & Profile) ──
+                // ── BRANDING_HEADER ──
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -48,27 +74,16 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                       ),
-                      child: Stack(
-                        children: [
-                          Positioned(right: 16, bottom: 16, child: _editBadge(Icons.camera_alt_rounded)),
-                          const Center(child: Text('BANNER_PREVIEW', style: TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 4))),
-                        ],
-                      ),
                     ),
                     Positioned(
                       bottom: -40, left: 24,
-                      child: Stack(
-                        children: [
-                          Container(
-                            width: 80, height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4),
-                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 5))],
-                            ),
-                            child: const Icon(Icons.business_rounded, color: Color(0xFF6366F1), size: 32),
-                          ),
-                          Positioned(right: 0, bottom: 0, child: _editBadge(Icons.edit_rounded, size: 28)),
-                        ],
+                      child: Container(
+                        width: 80, height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 5))],
+                        ),
+                        child: Center(child: Text(nameController.text.isNotEmpty ? nameController.text[0].toUpperCase() : 'C', style: const TextStyle(color: Color(0xFF6366F1), fontSize: 32, fontWeight: FontWeight.w900))),
                       ),
                     ),
                   ],
@@ -76,23 +91,23 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                 
                 const SizedBox(height: 60),
 
-                // ── METADATA_FIELDS ──
+                // ── PROFILE_FIELDS ──
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('> IDENTITY_PARAMETERS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                      const Text('BASIC INFORMATION', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                       const SizedBox(height: 24),
-                      _industrialField('COMPANY_NAME_LABEL', nameController),
+                      _industrialField('COMPANY NAME', nameController),
                       const SizedBox(height: 20),
-                      _industrialField('CORPORATE_TAGLINE', tagController),
+                      _industrialField('INDUSTRY TYPE', industryController),
                       const SizedBox(height: 20),
-                      _industrialField('LOCATION_NODE', locationController),
+                      _industrialField('HEADQUARTERS LOCATION', locationController),
                       const SizedBox(height: 32),
-                      const Text('> MISSION_STORY_LEDGER', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                      const Text('COMPANY DESCRIPTION', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                       const SizedBox(height: 16),
-                      _industrialField('BIO_DESCRIPTION_LOG', bioController, maxLines: 5),
+                      _industrialField('WRITE ABOUT YOUR COMPANY', descController, maxLines: 5),
                       const SizedBox(height: 48),
                       _commitIdentityBtn(context),
                       const SizedBox(height: 40),
@@ -102,16 +117,10 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
               ],
             ),
           ),
+          if (_isSaving)
+            Container(color: Colors.white60, child: const Center(child: CircularProgressIndicator())),
         ],
       ),
-    );
-  }
-
-  Widget _editBadge(IconData icon, {double size = 32}) {
-    return Container(
-      width: size, height: size,
-      decoration: const BoxDecoration(color: Color(0xFF0F172A), shape: BoxShape.circle),
-      child: Icon(icon, color: Colors.white, size: size * 0.5),
     );
   }
 
@@ -138,10 +147,7 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
 
   Widget _commitIdentityBtn(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('IDENTITY_SYNCHRONIZED_SUCCESSFULLY. RE-INDEXING_COMPLETE.')));
-        Navigator.pop(context, {'name': nameController.text, 'tagline': tagController.text});
-      },
+      onTap: _isSaving ? null : _saveProfile,
       child: Container(
         width: double.infinity, height: 52,
         decoration: BoxDecoration(
@@ -153,9 +159,9 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.verified_user_rounded, color: Colors.white, size: 18),
+              Icon(Icons.save_rounded, color: Colors.white, size: 18),
               SizedBox(width: 12),
-              Text('COMMIT_IDENTITY', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+              Text('SAVE CHANGES', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
             ],
           ),
         ),

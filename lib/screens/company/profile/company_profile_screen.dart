@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_company_profile_screen.dart';
 
 class CompanyProfileScreen extends StatefulWidget {
@@ -9,13 +10,52 @@ class CompanyProfileScreen extends StatefulWidget {
 }
 
 class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
-  String companyName = 'Cloud9 Systems Inc.';
-  String tagline = 'Scaling Intelligence for a Decentralized World';
+  bool _isLoading = true;
+  Map<String, dynamic>? _companyData;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    setState(() => _isLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final res = await supabase
+          .from('companies')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+      
+      if (mounted) {
+        setState(() {
+          _companyData = res;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    
+    final name = _companyData?['name'] ?? 'Partner Company';
+    final industry = _companyData?['industry'] ?? 'Technology';
+    final description = _companyData?['description'] ?? 'No description provided.';
+    final location = _companyData?['location'] ?? 'Remote/Unspecified';
+    final since = _companyData?['partner_since']?.toString() ?? '2024';
+
     return DefaultTabController(
-      length: 3,
+      length: 1, // Simplified for now
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         body: Stack(
@@ -45,9 +85,9 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
                             color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 5))],
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 5))],
                           ),
-                          child: const Center(child: Text('C9', style: TextStyle(color: Color(0xFF6366F1), fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -1))),
+                          child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'C', style: const TextStyle(color: Color(0xFF6366F1), fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -1))),
                         ),
                       ),
                     ],
@@ -63,13 +103,13 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(companyName, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                        Text(name, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
                         const SizedBox(height: 4),
                         const Row(
                           children: [
                             Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 14),
                             SizedBox(width: 6),
-                            Text('VERIFIED_CORPORATE_PARTNER', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                            Text('VERIFIED PARTNER', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                           ],
                         ),
                       ],
@@ -85,19 +125,12 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
                   sliver: SliverToBoxAdapter(
                     child: Row(
                       children: [
-                        Expanded(child: _adminBtn('EDIT_CONSOLE', true, Icons.edit_note_rounded, () async {
-                          final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditCompanyProfileScreen(companyData: {'name': companyName, 'tagline': tagline})));
-                          if (result != null) {
-                            setState(() {
-                              companyName = result['name'];
-                              tagline = result['tagline'];
-                            });
-                          }
+                        Expanded(child: _adminBtn('EDIT PROFILE', true, Icons.edit_note_rounded, () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (context) => EditCompanyProfileScreen(companyData: _companyData ?? {})));
+                          _fetchProfile();
                         })),
                         const SizedBox(width: 12),
-                        Expanded(child: _adminBtn('TEAM_SYNC', false, Icons.sync_rounded, () => _showSyncProcess(context))),
-                        const SizedBox(width: 12),
-                        _iconBtn(Icons.settings_input_component_rounded, () => _showSystemDialog(context)),
+                        Expanded(child: _adminBtn('REFRESH DATA', false, Icons.sync_rounded, () => _showSyncProcess(context))),
                       ],
                     ),
                   ),
@@ -105,42 +138,18 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 40)),
 
-                // ── MANAGEMENT_TABS ──
-                const SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
-                  sliver: SliverToBoxAdapter(
-                    child: TabBar(
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      indicatorColor: Color(0xFF6366F1),
-                      indicatorWeight: 3,
-                      labelColor: Color(0xFF0F172A),
-                      labelStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
-                      unselectedLabelColor: Color(0xFF94A3B8),
-                      dividerColor: Color(0xFFE2E8F0),
-                      tabs: [
-                        Tab(text: 'CORP_DATA'),
-                        Tab(text: 'SECURITY_LOG'),
-                        Tab(text: 'BRANDING_MOD'),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
                 // ── TAB_CONTENT ──
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      _narrativeCard(),
+                      _narrativeCard(description),
                       const SizedBox(height: 24),
-                      const Text('> CORPORATE_LEDGER', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                      const Text('COMPANY INFORMATION', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
                       const SizedBox(height: 12),
-                      _ledgerRow('ESTABLISHED', 'OCT 2018', () => _showLedgerDetail(context, 'FOUNDING_DATE')),
-                      _ledgerRow('EMPLOYEE_VAL', '850+ MEMBERS', () => _showLedgerDetail(context, 'ORGANIZATIONAL_SCALE')),
-                      _ledgerRow('HQ_NODE', 'BANGALORE, KA', () => _showLedgerDetail(context, 'PRIMARY_LOCATION')),
+                      _ledgerRow('INDUSTRY', industry.toUpperCase(), () => {}),
+                      _ledgerRow('ESTABLISHED', since, () => {}),
+                      _ledgerRow('HEADQUARTERS', location.toUpperCase(), () => {}),
                       const SizedBox(height: 24),
                       _logoutBtn(context),
                       const SizedBox(height: 100),
@@ -179,22 +188,7 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
     );
   }
 
-  Widget _iconBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44, height: 44,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Icon(icon, color: const Color(0xFF64748B), size: 20),
-      ),
-    );
-  }
-
-  Widget _narrativeCard() {
+  Widget _narrativeCard(String text) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -205,12 +199,9 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('MISSION_STATEMENT', style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w900)),
+          const Text('ABOUT US', style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
-          Text(
-            tagline,
-            style: const TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.6, fontWeight: FontWeight.w500),
-          ),
+          Text(text, style: const TextStyle(color: Color(0xFF475569), fontSize: 13, height: 1.6, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -241,32 +232,19 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
   void _showSyncProcess(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       duration: Duration(seconds: 2),
-      content: Text('INITIALIZING_TEAM_SYNC_V1.2... DATA_FLOW_ACTIVE'),
+      content: Text('Refreshing dashboard data...'),
       backgroundColor: Color(0xFF6366F1),
     ));
   }
 
-  void _showSystemDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('SYSTEM_PARAMETERS', style: TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w900)),
-        content: const Text('ALL_SYSTEMS_OPERATIONAL. LATENCY: 24ms. NODE_ACTIVE.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE', style: TextStyle(color: Color(0xFF6366F1)))),
-        ],
-      ),
-    );
-  }
-
-  void _showLedgerDetail(BuildContext context, String key) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('READING_LEDGER_${key}... ACCESS_GRANTED')));
-  }
-
   Widget _logoutBtn(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).pushNamed('/logout'),
+      onTap: () async {
+        await Supabase.instance.client.auth.signOut();
+        if (context.mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
         decoration: BoxDecoration(
@@ -279,7 +257,7 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
           children: [
             Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 18),
             SizedBox(width: 12),
-            Text('TERMINATE_SESSION', style: TextStyle(color: Color(0xFFDC2626), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            Text('LOGOUT FROM SESSION', style: TextStyle(color: Color(0xFFDC2626), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
           ],
         ),
       ),

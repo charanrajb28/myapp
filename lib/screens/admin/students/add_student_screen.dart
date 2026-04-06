@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
+import '../../../config/mail_config.dart';
+
 class AddStudentScreen extends StatefulWidget {
   final Map<String, dynamic>? student;
   const AddStudentScreen({super.key, this.student});
@@ -26,8 +28,10 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   
-  final TextEditingController _adminSmtpEmailController = TextEditingController(text: 'charanrajb282004@gmail.com');
-  final TextEditingController _adminSmtpPasswordController = TextEditingController(text: 'nftj sgzj occd kgid');
+  final TextEditingController _adminSmtpEmailController =
+      TextEditingController(text: MailConfig.senderEmail);
+  final TextEditingController _adminSmtpPasswordController =
+      TextEditingController(text: MailConfig.senderAppPassword);
 
   String _selectedDepartment = 'Computer Science';
   String _selectedSemester = '6th Semester';
