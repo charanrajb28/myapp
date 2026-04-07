@@ -74,6 +74,9 @@ class _MyAppState extends State<MyApp> {
       navigatorKey: _navigatorKey,
       title: 'ScholarBridge',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        scrollbars: false,
+      ),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1E293B),

@@ -39,14 +39,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final internshipsRes = await client.from('applications').select('id').eq('status', 'Active').count(CountOption.exact);
       final internshipsCount = internshipsRes.count ?? 0;
 
-      // Fetch red alerts count
-      int redAlertsCount = 0;
-      try {
-        final alertsRes = await client.from('red_alerts').select('id').count(CountOption.exact);
-        redAlertsCount = alertsRes.count ?? 0;
-      } catch (e) {
-        // Ignored if table doesnt exist
-      }
+      final redAlertsRes = await client
+          .from('applications')
+          .select('id')
+          .inFilter('status', ['Completed', 'Rejected', 'Removed'])
+          .lt('progress', 0.5)
+          .count(CountOption.exact);
+      final redAlertsCount = redAlertsRes.count ?? 0;
 
       if (mounted) {
         setState(() {
