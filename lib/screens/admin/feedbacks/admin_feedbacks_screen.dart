@@ -402,38 +402,14 @@ class _FeedbackTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Text(DateFormat('hh:mm a').format(feedback.date),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
-              const Spacer(),
-              _buildActionButton('Reply', Icons.reply_rounded, const Color(0xFF3B82F6)),
-              const SizedBox(width: 8),
-              _buildActionButton('Resolve', Icons.check_circle_outline_rounded, const Color(0xFF64748B)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton(String label, IconData icon, Color color) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-            ],
-          ),
+            Row(
+              children: [
+                Text(DateFormat('hh:mm a').format(feedback.date),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
+              ],
+            ),
+          ],
         ),
-      ),
-    );
-  }
+      );
+    }
 }

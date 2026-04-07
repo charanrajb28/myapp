@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
+import '../feedback/send_feedback_screen.dart';
 import '../internship/my_internship_screen.dart';
 import '../internship/student_internship_alerts_screen.dart';
 import '../student_portal_repository.dart';
@@ -325,10 +326,19 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
                 color: const Color(0xFFF59E0B),
               ),
               _StatGridCard(
-                title: 'Mentor',
-                value: currentIntern.mentorName.split(' ').first,
-                icon: Icons.person_outline_rounded,
+                title: 'Feedback',
+                value: 'Send',
+                icon: Icons.rate_review_rounded,
                 color: const Color(0xFFEC4899),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SendFeedbackScreen(internship: currentIntern),
+                    ),
+                  );
+                },
               ),
             ],
           ),

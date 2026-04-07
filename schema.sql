@@ -131,6 +131,15 @@ CREATE TABLE IF NOT EXISTS student_notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS feedbacks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  type VARCHAR(50) NOT NULL DEFAULT 'Suggestion',
+  comment TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS student_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
@@ -151,6 +160,7 @@ ALTER TABLE internships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE password_reset_otps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_documents ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for basic access
@@ -274,6 +284,32 @@ FOR ALL TO authenticated USING (
   (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
 )
 WITH CHECK (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+DROP POLICY IF EXISTS "Students can create own feedback" ON feedbacks;
+CREATE POLICY "Students can create own feedback" ON feedbacks
+FOR INSERT TO authenticated WITH CHECK (
+  student_id IN (
+    SELECT id
+    FROM public.students
+    WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Students can view own feedback" ON feedbacks;
+CREATE POLICY "Students can view own feedback" ON feedbacks
+FOR SELECT TO authenticated USING (
+  student_id IN (
+    SELECT id
+    FROM public.students
+    WHERE user_id = auth.uid()
+  )
+);
+
+DROP POLICY IF EXISTS "Admins can view all feedback" ON feedbacks;
+CREATE POLICY "Admins can view all feedback" ON feedbacks
+FOR SELECT TO authenticated USING (
   (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
 );
 

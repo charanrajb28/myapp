@@ -15,6 +15,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _activeInternships = 0;
   int _redAlerts = 0;
   bool _isLoading = true;
+  bool _isSendingBroadcast = false;
 
   @override
   void initState() {
@@ -60,6 +61,187 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       debugPrint('Error fetching stats: $e');
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _showBroadcastDialog() async {
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    String selectedType = 'announcement';
+
+    final shouldSend = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Broadcast Notification'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedType,
+                      decoration: const InputDecoration(
+                        labelText: 'Type',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'announcement',
+                          child: Text('Announcement'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'general',
+                          child: Text('General'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'academic',
+                          child: Text('Academic'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'message',
+                          child: Text('Message'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'interview',
+                          child: Text('Interview'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'security',
+                          child: Text('Security'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedType = value);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: messageController,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Message',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (titleController.text.trim().isEmpty ||
+                        messageController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Title and message are required.'),
+                          backgroundColor: Color(0xFFDC2626),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, true);
+                  },
+                  child: const Text('Send to All'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (shouldSend == true) {
+      await _sendBroadcastNotification(
+        title: titleController.text.trim(),
+        message: messageController.text.trim(),
+        type: selectedType,
+      );
+    }
+
+    titleController.dispose();
+    messageController.dispose();
+  }
+
+  Future<void> _sendBroadcastNotification({
+    required String title,
+    required String message,
+    required String type,
+  }) async {
+    setState(() => _isSendingBroadcast = true);
+    try {
+      final client = Supabase.instance.client;
+      final studentsRes = await client
+          .from('students')
+          .select('user_id')
+          .not('user_id', 'is', null);
+
+      final userIds = (studentsRes as List)
+          .map((item) => item['user_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      if (userIds.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No students available for broadcast.'),
+            backgroundColor: Color(0xFFDC2626),
+          ),
+        );
+        return;
+      }
+
+      final payload = userIds
+          .map(
+            (userId) => {
+              'user_id': userId,
+              'title': title,
+              'message': message,
+              'notification_type': type,
+              'is_read': false,
+            },
+          )
+          .toList();
+
+      await client.from('student_notifications').insert(payload);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Broadcast sent to ${userIds.length} students'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to send broadcast: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingBroadcast = false);
       }
     }
   }
@@ -130,6 +312,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     
                     Column(
                       children: [
+                        _ActionTile(
+                          title: 'Broadcast Notification',
+                          subtitle: 'Send one announcement to every student',
+                          icon: Icons.campaign_rounded,
+                          color: const Color(0xFFEC4899),
+                          onTap: _isSendingBroadcast
+                              ? () {}
+                              : _showBroadcastDialog,
+                        ),
+                        const SizedBox(height: 12),
                         _ActionTile(
                           title: 'Generate Consent Letters',
                           subtitle: 'Create and batch process student proxy letters',
@@ -513,34 +705,17 @@ class _FeedbackTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   type.toUpperCase(),
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.5),
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF64748B),
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Row(
-                  children: [
-                    Text('Mark as Read', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    SizedBox(width: 4),
-                    Icon(Icons.check_rounded, size: 14),
-                  ],
                 ),
               ),
             ],

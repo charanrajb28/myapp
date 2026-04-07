@@ -17,8 +17,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   final _repository = StudentPortalRepository();
   bool _isLoading = true;
   StudentProfileData? _profile;
-  bool _notificationsEnabled = true;
-  bool _remindersEnabled = true;
 
   @override
   void initState() {
@@ -84,14 +82,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   ),
                   const SizedBox(height: 16),
                   _buildContactCard(profile),
-                  const SizedBox(height: 32),
-                  _buildSectionTitle(
-                    'Preferences',
-                    Icons.tune_rounded,
-                    const Color(0xFFF59E0B),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSettingsSection(),
                   const SizedBox(height: 32),
                   _buildSectionTitle(
                     'Account Actions',
@@ -253,26 +243,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _buildSettingsSection() {
-    return _sectionCard(
-      children: [
-        _toggleTile(
-          'Push Notifications',
-          'Deadlines, attendance & updates',
-          _notificationsEnabled,
-          (value) => setState(() => _notificationsEnabled = value),
-        ),
-        _divider(),
-        _toggleTile(
-          'Check-In Reminders',
-          'Daily alert for attendance logging',
-          _remindersEnabled,
-          (value) => setState(() => _remindersEnabled = value),
-        ),
-      ],
-    );
-  }
-
   Widget _buildAccountSection() {
     return _sectionCard(
       children: [
@@ -379,45 +349,6 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleTile(
-    String title,
-    String subtitle,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch.adaptive(value: value, onChanged: onChanged),
         ],
       ),
     );

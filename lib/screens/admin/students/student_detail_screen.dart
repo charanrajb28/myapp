@@ -30,6 +30,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   bool _isDeleting = false;
   bool _isBlacklisting = false;
   bool _isLoadingData = true;
+  bool _isSendingNotification = false;
 
   Map<String, dynamic>? _studentData;
   List<Map<String, dynamic>> _pastInternships = [];
@@ -136,6 +137,156 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     }
   }
 
+  Future<void> _showSendNotificationDialog() async {
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    String selectedType = 'general';
+
+    final shouldSend = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Send Notification'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedType,
+                      decoration: const InputDecoration(
+                        labelText: 'Type',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'general', child: Text('General')),
+                        DropdownMenuItem(value: 'announcement', child: Text('Announcement')),
+                        DropdownMenuItem(value: 'academic', child: Text('Academic')),
+                        DropdownMenuItem(value: 'message', child: Text('Message')),
+                        DropdownMenuItem(value: 'interview', child: Text('Interview')),
+                        DropdownMenuItem(value: 'security', child: Text('Security')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedType = value);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: messageController,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Message',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (titleController.text.trim().isEmpty ||
+                        messageController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Title and message are required.'),
+                          backgroundColor: Color(0xFFDC2626),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, true);
+                  },
+                  child: const Text('Send'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (shouldSend != true) {
+      titleController.dispose();
+      messageController.dispose();
+      return;
+    }
+
+    await _sendNotification(
+      title: titleController.text.trim(),
+      message: messageController.text.trim(),
+      type: selectedType,
+    );
+
+    titleController.dispose();
+    messageController.dispose();
+  }
+
+  Future<void> _sendNotification({
+    required String title,
+    required String message,
+    required String type,
+  }) async {
+    final userId = _studentData?['user_id']?.toString();
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Student user mapping is missing.'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSendingNotification = true);
+    try {
+      await Supabase.instance.client.from('student_notifications').insert({
+        'user_id': userId,
+        'title': title,
+        'message': message,
+        'notification_type': type,
+        'is_read': false,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Notification sent to ${widget.studentName}'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to send notification: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingNotification = false);
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +317,23 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         actions: [
+          IconButton(
+            icon: _isSendingNotification
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(
+                    Icons.notifications_active_outlined,
+                    color: Color(0xFF64748B),
+                  ),
+            onPressed:
+                _isSendingNotification || _isLoadingData || _studentData == null
+                    ? null
+                    : _showSendNotificationDialog,
+            tooltip: 'Send Notification',
+          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B)),
             onPressed: () async {
