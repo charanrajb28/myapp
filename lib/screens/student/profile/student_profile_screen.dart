@@ -134,22 +134,30 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
             Container(
               width: 100,
               height: 100,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                 ),
+                image: profile?.avatarUrl.trim().isNotEmpty == true
+                    ? DecorationImage(
+                        image: NetworkImage(profile!.avatarUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-              child: Center(
-                child: Text(
-                  profile?.initials ?? 'ST',
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              child: profile?.avatarUrl.trim().isNotEmpty == true
+                  ? null
+                  : Center(
+                      child: Text(
+                        profile?.initials ?? 'ST',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(height: 16),
             Text(

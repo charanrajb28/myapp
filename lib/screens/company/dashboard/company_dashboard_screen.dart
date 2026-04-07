@@ -12,6 +12,7 @@ class CompanyDashboardScreen extends StatefulWidget {
 class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
   bool _isLoading = true;
   String _companyName = 'Loading...';
+  String _companyLogoUrl = '';
   String _recruitmentPool = '0';
   String _interviewing = '0';
   String _hired = '0';
@@ -36,7 +37,7 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       // 1. Get Company Profile
       final companyRes = await supabase
           .from('companies')
-          .select('id, name')
+          .select('id, name, logo_url')
           .eq('user_id', user.id)
           .single();
       
@@ -85,6 +86,7 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       if (mounted) {
         setState(() {
           _companyName = companyRes['name'] ?? 'Partner Company';
+          _companyLogoUrl = companyRes['logo_url']?.toString() ?? '';
           _recruitmentPool = pool.toString();
           _interviewing = interviewing.toString();
           _hired = hired.toString();
@@ -124,7 +126,12 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  sliver: SliverToBoxAdapter(child: _DashboardHeader(companyName: _companyName)),
+                  sliver: SliverToBoxAdapter(
+                    child: _DashboardHeader(
+                      companyName: _companyName,
+                      logoUrl: _companyLogoUrl,
+                    ),
+                  ),
                 ),
                 
                 const SliverToBoxAdapter(child: SizedBox(height: 48)),
@@ -284,7 +291,8 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
 
 class _DashboardHeader extends StatelessWidget {
   final String companyName;
-  const _DashboardHeader({required this.companyName});
+  final String logoUrl;
+  const _DashboardHeader({required this.companyName, required this.logoUrl});
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -307,9 +315,26 @@ class _DashboardHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2), width: 2),
-                image: const DecorationImage(image: NetworkImage('https://i.pravatar.cc/150?u=recruiter'), fit: BoxFit.cover),
+                image: logoUrl.trim().isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(logoUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
                 boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 8))],
               ),
+              child: logoUrl.trim().isNotEmpty
+                  ? null
+                  : Center(
+                      child: Text(
+                        companyName.isNotEmpty ? companyName[0].toUpperCase() : 'C',
+                        style: const TextStyle(
+                          color: Color(0xFF6366F1),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ),

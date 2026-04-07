@@ -19,12 +19,12 @@ class StudentPortalRepository {
       throw Exception('User not logged in');
     }
 
-    final profile = await _client
-        .from('students')
-        .select(
-          'name, college, department, semester, enrollment_id, '
-          'contact_email, graduation_year, gpa, phone_number',
-        )
+      final profile = await _client
+          .from('students')
+          .select(
+            'name, college, department, semester, enrollment_id, '
+            'contact_email, graduation_year, gpa, phone_number, avatar_url',
+          )
         .eq('user_id', user.id)
         .maybeSingle()
         .timeout(const Duration(seconds: 15));
@@ -40,6 +40,7 @@ class StudentPortalRepository {
         graduationYear: 'Not set',
         gpa: 'Not set',
         phone: 'Not set',
+        avatarUrl: '',
       );
     }
 
@@ -69,7 +70,7 @@ class StudentPortalRepository {
         .from('applications')
         .select(
           'id, status, progress, start_date, end_date, mentor_name, '
-          'checkins, '
+          'alerts, checkins, '
           'mentor_email, offer_letter_id, internships('
           'id, role, industry, location, stipend, duration, deadline, '
           'brand_color, logo_initial, about, status, companies(name))',
@@ -444,6 +445,38 @@ class StudentPortalRepository {
         .timeout(const Duration(seconds: 15));
   }
 
+  Future<void> updateStudentProfile({
+    required String name,
+    required String phone,
+    String? avatarUrl,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    final updates = <String, dynamic>{
+      'name': name.trim(),
+      'phone_number': phone.trim(),
+    };
+
+    if (avatarUrl != null) {
+      updates['avatar_url'] = avatarUrl.trim();
+    }
+
+    await _client
+        .from('students')
+        .update(updates)
+        .eq('user_id', user.id)
+        .timeout(const Duration(seconds: 15));
+
+    await _client
+        .from('users')
+        .update({'name': name.trim()})
+        .eq('id', user.id)
+        .timeout(const Duration(seconds: 15));
+  }
+
   StudentInternship _mapStudentInternship(Map<String, dynamic> item) {
     final internship = (item['internships'] as Map<String, dynamic>?) ?? {};
     final status = item['status']?.toString() ?? 'Applied';
@@ -478,6 +511,7 @@ class StudentPortalRepository {
       mentorEmail: item['mentor_email']?.toString() ?? 'Not assigned',
       offerLetterId: item['offer_letter_id']?.toString() ?? 'Not issued',
       about: internship['about']?.toString() ?? 'No description available.',
+      alerts: _jsonObjectList(item['alerts']),
       checkins: _jsonObjectList(item['checkins']),
     );
   }
@@ -819,6 +853,7 @@ class StudentProfileData {
   final String graduationYear;
   final String gpa;
   final String phone;
+  final String avatarUrl;
 
   const StudentProfileData({
     required this.name,
@@ -830,6 +865,7 @@ class StudentProfileData {
     required this.graduationYear,
     required this.gpa,
     required this.phone,
+    required this.avatarUrl,
   });
 
   factory StudentProfileData.fromMap(Map<String, dynamic> map) {
@@ -843,6 +879,7 @@ class StudentProfileData {
       graduationYear: map['graduation_year']?.toString() ?? 'Not set',
       gpa: map['gpa']?.toString() ?? 'Not set',
       phone: map['phone_number']?.toString() ?? 'Not set',
+      avatarUrl: map['avatar_url']?.toString() ?? '',
     );
   }
 

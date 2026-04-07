@@ -40,6 +40,8 @@ dependencies:
   supabase_flutter: ^2.12.2
   intl: ^0.20.2
   mailer: ^6.1.0
+  http: ^1.2.2
+  image_picker: ^1.1.2
   url_launcher: ^6.3.1
 
 dev_dependencies:

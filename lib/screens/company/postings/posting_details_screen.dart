@@ -892,7 +892,10 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
               ),
               const SizedBox(height: 32),
               const SizedBox(height: 32),
-              _CheckInCalendar(applicationId: candidate['id'] as String),
+              _CheckInCalendar(
+                applicationId: candidate['id'] as String,
+                startDate: candidate['startDate']?.toString(),
+              ),
               const SizedBox(height: 32),
 
               if (candidate['status'] == 'Active') ...[
@@ -1616,7 +1619,8 @@ class _StatusMeta {
 
 class _CheckInCalendar extends StatefulWidget {
   final String applicationId;
-  const _CheckInCalendar({required this.applicationId});
+  final String? startDate;
+  const _CheckInCalendar({required this.applicationId, this.startDate});
 
   @override
   State<_CheckInCalendar> createState() => _CheckInCalendarState();
@@ -1646,12 +1650,12 @@ class _CheckInCalendarState extends State<_CheckInCalendar> {
       final rawCheckins = (res?['checkins'] as List?) ?? const [];
       final monthPrefix =
           '${_viewDate.year.toString().padLeft(4, '0')}-${_viewDate.month.toString().padLeft(2, '0')}';
-      final parsedCheckins = rawCheckins
-          .whereType<Map>()
-          .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+        final parsedCheckins = rawCheckins
+            .whereType<Map>()
+            .map(
+              (item) => item.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ),
           )
           .where(
             (item) =>
@@ -1759,9 +1763,19 @@ class _CheckInCalendarState extends State<_CheckInCalendar> {
     for (int day = 1; day <= days; day++) {
         final date = DateTime(_viewDate.year, _viewDate.month, day);
         final dateStr = date.toIso8601String().split('T')[0];
-        final checkin = _checkins.firstWhere((c) => c['checkin_date'] == dateStr, orElse: () => {});
-        
-        items.add(_CalendarDay(day: day, status: checkin['status']));
+        final checkin = _checkins.firstWhere(
+          (c) => c['checkin_date'] == dateStr,
+          orElse: () => {},
+        );
+        final isAbsent = _isMissedCheckinDay(date, checkin);
+
+        items.add(
+          _CalendarDay(
+            day: day,
+            status: checkin['status'],
+            isAbsent: isAbsent,
+          ),
+        );
     }
 
     // Grid split by weeks (7 days)
@@ -1776,12 +1790,85 @@ class _CheckInCalendarState extends State<_CheckInCalendar> {
 
     return rows;
   }
+
+  bool _isMissedCheckinDay(DateTime date, Map<dynamic, dynamic> checkin) {
+    if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+      return false;
+    }
+
+    final startDate = _parseDate(widget.startDate);
+    if (startDate == null) {
+      return false;
+    }
+
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final normalizedStart =
+        DateTime(startDate.year, startDate.month, startDate.day);
+    final today = DateTime.now();
+    final normalizedToday = DateTime(today.year, today.month, today.day);
+
+    if (normalizedDate.isBefore(normalizedStart) ||
+        normalizedDate.isAfter(normalizedToday)) {
+      return false;
+    }
+
+    final status = checkin['status']?.toString().toLowerCase();
+    final hasCheckIn = checkin['check_in_at'] != null;
+
+    if (hasCheckIn || status == 'present') {
+      return false;
+    }
+
+    return checkin.isEmpty || status == 'absent';
+  }
+
+  DateTime? _parseDate(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty || value == 'null') {
+      return null;
+    }
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return DateTime(parsed.year, parsed.month, parsed.day);
+    }
+
+    final match = RegExp(r'^(\d{1,2}) ([A-Za-z]{3}) (\d{4})$').firstMatch(value);
+    if (match == null) {
+      return null;
+    }
+
+    const months = {
+      'Jan': 1,
+      'Feb': 2,
+      'Mar': 3,
+      'Apr': 4,
+      'May': 5,
+      'Jun': 6,
+      'Jul': 7,
+      'Aug': 8,
+      'Sep': 9,
+      'Oct': 10,
+      'Nov': 11,
+      'Dec': 12,
+    };
+
+    final day = int.tryParse(match.group(1) ?? '');
+    final month = months[match.group(2)];
+    final year = int.tryParse(match.group(3) ?? '');
+    if (day == null || month == null || year == null) {
+      return null;
+    }
+
+    return DateTime(year, month, day);
+  }
 }
 
 class _CalendarDay extends StatelessWidget {
   final int day;
   final dynamic status;
-  const _CalendarDay({required this.day, this.status});
+  final bool isAbsent;
+  const _CalendarDay({required this.day, this.status, this.isAbsent = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1793,7 +1880,7 @@ class _CalendarDay extends StatelessWidget {
         color = const Color(0xFF10B981);
         textColor = Colors.white;
         isMarked = true;
-    } else if (status == 'Absent') {
+    } else if (status == 'Absent' || isAbsent) {
         color = const Color(0xFFEF4444);
         textColor = Colors.white;
         isMarked = true;

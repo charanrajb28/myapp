@@ -163,18 +163,26 @@ class _Header extends StatelessWidget {
                         offset: const Offset(0, 4),
                       ),
                     ],
+                    image: profile?.avatarUrl.trim().isNotEmpty == true
+                        ? DecorationImage(
+                            image: NetworkImage(profile!.avatarUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: Center(
-                    child: Text(
-                      initials,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        fontSize: 15,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
+                  child: profile?.avatarUrl.trim().isNotEmpty == true
+                      ? null
+                      : Center(
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              fontSize: 15,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
                 ),
                 Positioned(
                   right: 2,

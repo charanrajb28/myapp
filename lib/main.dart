@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -20,12 +22,56 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final StreamSubscription<AuthState> _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription =
+        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      final event = data.event;
+
+      if (session != null) {
+        return;
+      }
+
+      if (event == AuthChangeEvent.initialSession ||
+          event == AuthChangeEvent.signedOut ||
+          event == AuthChangeEvent.userDeleted) {
+        _redirectToLogin();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
+
+  void _redirectToLogin() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null) return;
+
+      navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'ScholarBridge',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

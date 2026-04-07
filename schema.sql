@@ -27,10 +27,11 @@ CREATE TABLE IF NOT EXISTS students (
   name VARCHAR(255),
   college VARCHAR(255) DEFAULT 'Sheshadri Institute of Technology',
   department VARCHAR(255),
-  semester VARCHAR(50),
-  contact_email TEXT,
-  phone_number VARCHAR(20),
-  parent_contact VARCHAR(20),
+    semester VARCHAR(50),
+    contact_email TEXT,
+    phone_number VARCHAR(20),
+    avatar_url TEXT,
+    parent_contact VARCHAR(20),
   parent_email VARCHAR(255),
   resume_url TEXT,
   document_urls JSONB DEFAULT '[]'::jsonb,
@@ -51,16 +52,23 @@ CREATE TABLE IF NOT EXISTS companies (
   location TEXT,
   website TEXT,
   phone TEXT,
-  contact_email TEXT,
-  description TEXT,
-  logo_url TEXT,
-  mou_date DATE,
+    contact_email TEXT,
+    description TEXT,
+    logo_url TEXT,
+    banner_url TEXT,
+    mou_date DATE,
   partner_since INTEGER,
   is_blacklisted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id)
-);
+    UNIQUE(user_id)
+  );
+
+ALTER TABLE public.students
+ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+ALTER TABLE public.companies
+ADD COLUMN IF NOT EXISTS banner_url TEXT;
 
 -- 5. Create internships table (internship opportunities)
 CREATE TABLE IF NOT EXISTS internships (

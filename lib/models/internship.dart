@@ -21,6 +21,7 @@ class StudentInternship {
   final String mentorEmail;
   final String offerLetterId;
   final String about;
+  final List<Map<String, dynamic>> alerts;
   final List<Map<String, dynamic>> checkins;
 
   const StudentInternship({
@@ -44,6 +45,7 @@ class StudentInternship {
     required this.mentorEmail,
     required this.offerLetterId,
     required this.about,
+    this.alerts = const [],
     this.checkins = const [],
   });
 }

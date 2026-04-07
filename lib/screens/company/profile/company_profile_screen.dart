@@ -72,9 +72,19 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
                       Container(
                         height: 180,
                         width: double.infinity,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                          image: DecorationImage(image: NetworkImage('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000'), fit: BoxFit.cover, opacity: 0.3),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                          image: (_companyData?['banner_url']?.toString().trim().isNotEmpty ?? false)
+                              ? DecorationImage(
+                                  image: NetworkImage(_companyData!['banner_url'].toString()),
+                                  fit: BoxFit.cover,
+                                  opacity: 0.55,
+                                )
+                              : const DecorationImage(
+                                  image: NetworkImage('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000'),
+                                  fit: BoxFit.cover,
+                                  opacity: 0.3,
+                                ),
                         ),
                       ),
                       Positioned(
@@ -86,8 +96,16 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 5))],
+                            image: (_companyData?['logo_url']?.toString().trim().isNotEmpty ?? false)
+                                ? DecorationImage(
+                                    image: NetworkImage(_companyData!['logo_url'].toString()),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
                           ),
-                          child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'C', style: const TextStyle(color: Color(0xFF6366F1), fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -1))),
+                          child: (_companyData?['logo_url']?.toString().trim().isNotEmpty ?? false)
+                              ? null
+                              : Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'C', style: const TextStyle(color: Color(0xFF6366F1), fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -1))),
                         ),
                       ),
                     ],

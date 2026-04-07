@@ -2193,6 +2193,7 @@ class _AttendanceCalendarCard extends StatelessWidget {
     final presentCount = checkinMap.values
         .where((entry) => entry['check_in_at'] != null || entry['status']?.toString() == 'Present')
         .length;
+    final startDate = _parseDate(internship.startDate);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -2257,21 +2258,29 @@ class _AttendanceCalendarCard extends StatelessWidget {
               crossAxisSpacing: 8,
               childAspectRatio: 1,
             ),
-            itemCount: totalDays,
-            itemBuilder: (context, index) {
-              final day = index + 1;
-              final statusEntry = checkinMap[day];
-              Color bgColor = const Color(0xFFF1F5F9);
-              Color textColor = const Color(0xFF64748B);
-              IconData? icon;
+              itemCount: totalDays,
+              itemBuilder: (context, index) {
+                final day = index + 1;
+                final date = DateTime(now.year, now.month, day);
+                final statusEntry = checkinMap[day];
+                Color bgColor = const Color(0xFFF1F5F9);
+                Color textColor = const Color(0xFF64748B);
+                IconData? icon;
 
-              final hasCheckIn = statusEntry?['check_in_at'] != null;
-              final isAbsent = statusEntry?['status']?.toString().toLowerCase() == 'absent';
+                final hasCheckIn = statusEntry?['check_in_at'] != null;
+                final explicitAbsent =
+                    statusEntry?['status']?.toString().toLowerCase() == 'absent';
+                final isAbsent = explicitAbsent ||
+                    _isMissedWorkingDay(
+                      date: date,
+                      startDate: startDate,
+                      statusEntry: statusEntry,
+                    );
 
-              if (hasCheckIn) {
-                bgColor = const Color(0xFF10B981).withValues(alpha: 0.12);
-                textColor = const Color(0xFF059669);
-                icon = Icons.check_circle_rounded;
+                if (hasCheckIn) {
+                  bgColor = const Color(0xFF10B981).withValues(alpha: 0.12);
+                  textColor = const Color(0xFF059669);
+                  icon = Icons.check_circle_rounded;
               } else if (isAbsent) {
                 bgColor = const Color(0xFFEF4444).withValues(alpha: 0.1);
                 textColor = const Color(0xFFDC2626);
@@ -2300,12 +2309,86 @@ class _AttendanceCalendarCard extends StatelessWidget {
             children: [
               _legendItem('Present', const Color(0xFF10B981)),
               _legendItem('Absent', const Color(0xFFEF4444)),
-              _legendItem('No Check-In', const Color(0xFF94A3B8)),
+              _legendItem('Future / N.A.', const Color(0xFF94A3B8)),
             ],
           ),
         ],
       ),
     );
+  }
+
+  bool _isMissedWorkingDay({
+    required DateTime date,
+    required DateTime? startDate,
+    required Map<String, dynamic>? statusEntry,
+  }) {
+    if (startDate == null) {
+      return false;
+    }
+
+    if (date.weekday == DateTime.saturday || date.weekday == DateTime.sunday) {
+      return false;
+    }
+
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final normalizedStart =
+        DateTime(startDate.year, startDate.month, startDate.day);
+    final today = DateTime.now();
+    final normalizedToday = DateTime(today.year, today.month, today.day);
+
+    if (normalizedDate.isBefore(normalizedStart) ||
+        normalizedDate.isAfter(normalizedToday)) {
+      return false;
+    }
+
+    final status = statusEntry?['status']?.toString().toLowerCase();
+    final hasCheckIn = statusEntry?['check_in_at'] != null;
+    if (hasCheckIn || status == 'present') {
+      return false;
+    }
+
+    return statusEntry == null || status == 'absent';
+  }
+
+  DateTime? _parseDate(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty || value == 'Not set' || value == 'TBD') {
+      return null;
+    }
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return DateTime(parsed.year, parsed.month, parsed.day);
+    }
+
+    final match = RegExp(r'^(\d{1,2}) ([A-Za-z]{3}) (\d{4})$').firstMatch(value);
+    if (match == null) {
+      return null;
+    }
+
+    const months = {
+      'Jan': 1,
+      'Feb': 2,
+      'Mar': 3,
+      'Apr': 4,
+      'May': 5,
+      'Jun': 6,
+      'Jul': 7,
+      'Aug': 8,
+      'Sep': 9,
+      'Oct': 10,
+      'Nov': 11,
+      'Dec': 12,
+    };
+
+    final day = int.tryParse(match.group(1) ?? '');
+    final month = months[match.group(2)];
+    final year = int.tryParse(match.group(3) ?? '');
+    if (day == null || month == null || year == null) {
+      return null;
+    }
+
+    return DateTime(year, month, day);
   }
 
   String _monthLabel(DateTime value) {
