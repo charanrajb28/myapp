@@ -84,14 +84,44 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
         bannerUrl = await _cloudinaryService.uploadImage(_selectedBannerImage!);
       }
 
-      await supabase.from('companies').update({
+      final companyUpdate = <String, dynamic>{
         'name': nameController.text.trim(),
         'industry': industryController.text.trim(),
         'description': descController.text.trim(),
         'location': locationController.text.trim(),
         'logo_url': logoUrl,
         'banner_url': bannerUrl,
-      }).eq('id', widget.companyData['id']);
+      };
+
+      try {
+        await supabase
+            .from('companies')
+            .update(companyUpdate)
+            .eq('id', widget.companyData['id']);
+      } on PostgrestException catch (e) {
+        final message = e.message.toLowerCase();
+        if (message.contains('banner_url') &&
+            (message.contains('column') || message.contains('schema cache'))) {
+          companyUpdate.remove('banner_url');
+          await supabase
+              .from('companies')
+              .update(companyUpdate)
+              .eq('id', widget.companyData['id']);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Logo saved. Add banner_url in Supabase to enable company banner saving.',
+                ),
+                backgroundColor: Color(0xFFF59E0B),
+              ),
+            );
+          }
+        } else {
+          rethrow;
+        }
+      }
 
       final userId = widget.companyData['user_id']?.toString();
       if (userId != null && userId.isNotEmpty) {

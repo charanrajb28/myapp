@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'edit_posting_screen.dart';
+import '../../../utils/session_expiry_handler.dart';
 
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
@@ -72,6 +73,11 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     } catch (e) {
       debugPrint('Error fetching posting details: $e');
       if (!mounted) return;
+      if (SessionExpiryHandler.isSessionExpiredError(e)) {
+        setState(() => _isLoading = false);
+        await SessionExpiryHandler.showAndRedirect();
+        return;
+      }
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -148,12 +154,11 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
               'end_date': null,
             })
             .eq('internship_id', _posting['id'])
-            .inFilter('status', ['Active', 'Completed']);
+            .inFilter('status', ['Accepted', 'Active', 'Completed']);
       } else if (newStatus == 'CLOSED') {
         await Supabase.instance.client
             .from('applications')
             .update({
-              'status': 'Completed',
               'end_date': today,
             })
             .eq('internship_id', _posting['id'])
@@ -162,6 +167,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         await Supabase.instance.client
             .from('applications')
             .update({
+              'status': 'Accepted',
               'start_date': null,
               'end_date': null,
             })
@@ -177,7 +183,6 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                 (item) => item['status'] == 'Active'
                     ? {
                         ...item,
-                        'status': 'Completed',
                         'endDate': today,
                       }
                     : item,
@@ -186,11 +191,26 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         } else if (newStatus == 'ACTIVE') {
           _applications = _applications
               .map(
-                (item) => item['status'] == 'Active' || item['status'] == 'Completed'
+                (item) => item['status'] == 'Accepted' ||
+                        item['status'] == 'Active' ||
+                        item['status'] == 'Completed'
                     ? {
                         ...item,
                         'status': 'Active',
                         'startDate': today,
+                        'endDate': null,
+                      }
+                    : item,
+              )
+              .toList();
+        } else if (newStatus == 'INTERVIEWING') {
+          _applications = _applications
+              .map(
+                (item) => item['status'] == 'Active'
+                    ? {
+                        ...item,
+                        'status': 'Accepted',
+                        'startDate': null,
                         'endDate': null,
                       }
                     : item,
@@ -351,6 +371,11 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
       if (newStatus == 'Active') {
         updateData['start_date'] = today;
         updateData['end_date'] = null;
+      } else if (newStatus == 'Accepted' ||
+          newStatus == 'Applied' ||
+          newStatus == 'Under Review') {
+        updateData['start_date'] = null;
+        updateData['end_date'] = null;
       } else if (newStatus == 'Removed' ||
           newStatus == 'Rejected' ||
           newStatus == 'Completed') {
@@ -391,6 +416,115 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _sendCertificateToCandidate(Map<String, dynamic> candidate) async {
+    try {
+      final existingAlerts = List<Map<String, dynamic>>.from(
+        candidate['alerts'] ?? const [],
+      );
+      final alreadySent = existingAlerts.any(
+        (item) =>
+            item['type']?.toString().toLowerCase() == 'certificate' &&
+            item['requires_ack'] == true,
+      );
+
+      if (alreadySent) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Certificate alert already sent to this student'),
+            backgroundColor: Color(0xFF0F172A),
+          ),
+        );
+        return;
+      }
+
+      final now = DateTime.now().toUtc().toIso8601String();
+      final certificateAlert = <String, dynamic>{
+        'id': 'certificate-${candidate['id']}-$now',
+        'title': 'Internship Certificate Ready',
+        'message':
+            'Your internship certificate has been issued by the company. Please confirm once you have received it.',
+        'type': 'certificate',
+        'status': 'pending',
+        'timestamp': now,
+        'requires_ack': true,
+        'acknowledged': false,
+      };
+
+      final updatedAlerts = [...existingAlerts, certificateAlert];
+
+      await Supabase.instance.client
+          .from('applications')
+          .update({'alerts': updatedAlerts})
+          .eq('id', candidate['id']);
+
+      if (!mounted) return;
+      setState(() {
+        _applications = _applications.map((item) {
+          if (item['id'] != candidate['id']) return item;
+          return {
+            ...item,
+            'alerts': updatedAlerts,
+          };
+        }).toList();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Certificate alert sent to ${candidate['name']}'),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to send certificate alert: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
+  }
+
+  bool _hasPendingCertificateAlert(Map<String, dynamic> candidate) {
+    final alerts = List<Map<String, dynamic>>.from(candidate['alerts'] ?? const []);
+    return alerts.any(
+      (item) =>
+          item['type']?.toString().toLowerCase() == 'certificate' &&
+          item['requires_ack'] == true &&
+          item['acknowledged'] != true,
+    );
+  }
+
+  bool _hasAcknowledgedCertificateAlert(Map<String, dynamic> candidate) {
+    final alerts = List<Map<String, dynamic>>.from(candidate['alerts'] ?? const []);
+    return alerts.any(
+      (item) =>
+          item['type']?.toString().toLowerCase() == 'certificate' &&
+          item['acknowledged'] == true,
+    );
+  }
+
+  String _certificateActionLabel(Map<String, dynamic> candidate) {
+    if (_hasAcknowledgedCertificateAlert(candidate)) {
+      return 'CERTIFICATE_RECEIVED';
+    }
+    if (_hasPendingCertificateAlert(candidate)) {
+      return 'CERTIFICATE_SENT';
+    }
+    return 'SEND_CERTIFICATE';
+  }
+
+  Color _certificateActionColor(Map<String, dynamic> candidate) {
+    if (_hasAcknowledgedCertificateAlert(candidate)) {
+      return const Color(0xFF10B981);
+    }
+    if (_hasPendingCertificateAlert(candidate)) {
+      return const Color(0xFF64748B);
+    }
+    return const Color(0xFF0F172A);
   }
 
   @override
@@ -890,15 +1024,34 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                 context,
                 candidate['resumeUrl'] as String,
               ),
-              const SizedBox(height: 32),
-              const SizedBox(height: 32),
-              _CheckInCalendar(
-                applicationId: candidate['id'] as String,
-                startDate: candidate['startDate']?.toString(),
-              ),
-              const SizedBox(height: 32),
+              if (candidate['status'] == 'Active' ||
+                  candidate['status'] == 'Removed' ||
+                  candidate['status'] == 'Completed') ...[
+                const SizedBox(height: 32),
+                const SizedBox(height: 32),
+                _CheckInCalendar(
+                  applicationId: candidate['id'] as String,
+                  startDate: candidate['startDate']?.toString(),
+                ),
+                const SizedBox(height: 32),
+              ],
 
-              if (candidate['status'] == 'Active') ...[
+              if ((_posting['status']?.toString() ?? 'INTERVIEWING') == 'CLOSED' &&
+                  (candidate['status'] == 'Active' ||
+                      candidate['status'] == 'Removed' ||
+                      candidate['status'] == 'Completed')) ...[
+                _actionBtnModal(
+                  _certificateActionLabel(candidate),
+                  _certificateActionColor(candidate),
+                  () {
+                    Navigator.pop(context);
+                    if (_certificateActionLabel(candidate) ==
+                        'SEND_CERTIFICATE') {
+                      _sendCertificateToCandidate(candidate);
+                    }
+                  },
+                ),
+              ] else if (candidate['status'] == 'Active') ...[
                 _actionBtnModal(
                   'REMOVE_CANDIDATE',
                   const Color(0xFFEF4444),
@@ -909,11 +1062,21 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                 ),
               ] else ...[
                 _actionBtnModal(
-                  'ACTIVATE_CANDIDATE',
-                  const Color(0xFF10B981),
+                  (_posting['status']?.toString() ?? 'INTERVIEWING') == 'ACTIVE'
+                      ? 'ACTIVATE_CANDIDATE'
+                      : 'ACCEPT_CANDIDATE',
+                  (_posting['status']?.toString() ?? 'INTERVIEWING') == 'ACTIVE'
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFF2563EB),
                   () {
                     Navigator.pop(context);
-                    _updateApplicationStatus(candidate, 'Active');
+                    _updateApplicationStatus(
+                      candidate,
+                      (_posting['status']?.toString() ?? 'INTERVIEWING') ==
+                              'ACTIVE'
+                          ? 'Active'
+                          : 'Accepted',
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -1597,6 +1760,8 @@ String? plannedEndDateFromDuration(DateTime startDate, dynamic rawDuration) {
 
 _StatusMeta getStatusMeta(String status) {
   switch (status) {
+    case 'Accepted':
+      return const _StatusMeta(color: Color(0xFF2563EB), backgroundColor: Color(0xFFEFF6FF), icon: Icons.verified_rounded);
     case 'Active':
       return const _StatusMeta(color: Color(0xFF10B981), backgroundColor: Color(0xFFF0FDF4), icon: Icons.check);
     case 'Rejected':
@@ -2226,6 +2391,12 @@ Widget _metaPill(IconData icon, String label, Color color) {
 
 _StatusMeta _statusMeta(String status) {
   switch (status) {
+    case 'Accepted':
+      return const _StatusMeta(
+        color: Color(0xFF2563EB),
+        backgroundColor: Color(0xFFEFF6FF),
+        icon: Icons.verified_rounded,
+      );
     case 'Active':
       return const _StatusMeta(
         color: Color(0xFF10B981),

@@ -4,7 +4,22 @@ DO $$ BEGIN
         CREATE TYPE user_role AS ENUM ('student', 'company', 'admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'application_status') THEN
-        CREATE TYPE application_status AS ENUM ('Applied', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review', 'Removed');
+        CREATE TYPE application_status AS ENUM ('Applied', 'Accepted', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review', 'Removed');
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_type
+        WHERE typname = 'application_status'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM pg_enum
+        WHERE enumtypid = 'application_status'::regtype
+          AND enumlabel = 'Accepted'
+    ) THEN
+        ALTER TYPE application_status ADD VALUE 'Accepted' AFTER 'Applied';
     END IF;
 END $$;
 

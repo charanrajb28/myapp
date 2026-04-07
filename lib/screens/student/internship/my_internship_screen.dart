@@ -171,7 +171,7 @@ class _MyInternshipScreenState extends State<MyInternshipScreen> {
 
   List<StudentInternship> get _ongoing => _studentInternships.where((i) {
         final status = _normalizedStatus(i.status);
-        return status == 'applied' || status == 'active';
+        return status == 'applied' || status == 'accepted' || status == 'active';
       }).toList();
 
   List<StudentInternship> get _active => _studentInternships
@@ -950,6 +950,10 @@ class _InternshipCard extends StatelessWidget {
       case 'applied':
         statusColor = const Color(0xFFF59E0B);
         statusLabel = 'Applied';
+        break;
+      case 'accepted':
+        statusColor = const Color(0xFF2563EB);
+        statusLabel = 'Accepted';
         break;
       case 'active':
         statusColor = const Color(0xFF10B981);
@@ -1777,66 +1781,22 @@ class _MentorSection extends StatelessWidget {
 class _DocumentsSection extends StatelessWidget {
   const _DocumentsSection();
 
-  static const _docs = [
-    _Doc('Offer Letter', 'PDF  ·  1.2 MB', Icons.description_rounded,
-        Color(0xFF3B82F6)),
-    _Doc('Consent Letter', 'PDF  ·  0.8 MB', Icons.document_scanner_rounded,
-        Color(0xFF10B981)),
-    _Doc('NDA Agreement', 'PDF  ·  0.5 MB', Icons.gavel_rounded,
-        Color(0xFF8B5CF6)),
-    _Doc('Internship Certificate', 'PDF  ·  2.1 MB', Icons.workspace_premium_rounded,
-        Color(0xFFF59E0B)),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: List.generate(_docs.length, (i) {
-        final doc = _docs[i];
-        return Column(children: [
-          if (i > 0)
-            const Divider(height: 16, thickness: 1, color: Color(0xFFF1F5F9)),
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: doc.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10)),
-              child: Icon(doc.icon, color: doc.color, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child:
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(doc.name,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A))),
-                Text(doc.meta,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF94A3B8),
-                        fontWeight: FontWeight.w500)),
-              ]),
-            ),
-            IconButton(
-              icon: const Icon(Icons.download_rounded,
-                  color: Color(0xFF64748B), size: 20),
-              onPressed: () {},
-            ),
-          ]),
-        ]);
-      }),
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'No internship documents available.',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF94A3B8),
+          ),
+        ),
+      ],
     );
   }
-}
-
-class _Doc {
-  final String name, meta;
-  final IconData icon;
-  final Color color;
-  const _Doc(this.name, this.meta, this.icon, this.color);
 }
 
 

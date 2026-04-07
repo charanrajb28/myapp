@@ -156,6 +156,7 @@ class StudentPortalRepository {
         .select('id, role, industry, location, stipend, duration, deadline, '
             'brand_color, logo_initial, about, requirements, responsibilities, '
             'companies(name)')
+        .eq('status', 'INTERVIEWING')
         .order('created_at', ascending: false)
         .timeout(const Duration(seconds: 15));
 
@@ -712,6 +713,9 @@ class StudentPortalRepository {
       case 'applied':
       case 'Applied':
         return 'Applied';
+      case 'accepted':
+      case 'Accepted':
+        return 'Accepted';
       case 'active':
       case 'Active':
         return 'Active';

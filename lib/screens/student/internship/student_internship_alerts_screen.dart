@@ -1,15 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/internship.dart';
 
-class StudentInternshipAlertsScreen extends StatelessWidget {
+class StudentInternshipAlertsScreen extends StatefulWidget {
   final StudentInternship internship;
 
   const StudentInternshipAlertsScreen({super.key, required this.internship});
 
   @override
+  State<StudentInternshipAlertsScreen> createState() =>
+      _StudentInternshipAlertsScreenState();
+}
+
+class _StudentInternshipAlertsScreenState
+    extends State<StudentInternshipAlertsScreen> {
+  late List<Map<String, dynamic>> _alerts;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _alerts = widget.internship.alerts
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final alerts = _buildAlerts(internship);
+    final alerts = _buildAlerts();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -32,7 +51,7 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
               ),
             ),
             Text(
-              '${internship.company}  •  ${internship.role}',
+              '${widget.internship.company}  •  ${widget.internship.role}',
               style: const TextStyle(
                 color: Color(0xFF64748B),
                 fontSize: 12,
@@ -51,12 +70,7 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final alert = alerts[index];
                 return _alertItem(
-                  title: alert.title,
-                  message: alert.message,
-                  type: alert.type,
-                  icon: alert.icon,
-                  color: alert.color,
-                  time: alert.timeLabel,
+                  alert: alert,
                 );
               },
             ),
@@ -110,19 +124,12 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
     );
   }
 
-  Widget _alertItem({
-    required String title,
-    required String message,
-    required String type,
-    required IconData icon,
-    required Color color,
-    required String time,
-  }) {
+  Widget _alertItem({required _InternshipAlert alert}) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
+        color: alert.color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.1)),
+        border: Border.all(color: alert.color.withValues(alpha: 0.1)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -134,10 +141,10 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
+                    color: alert.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: color, size: 18),
+                  child: Icon(alert.icon, color: alert.color, size: 18),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -145,7 +152,7 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        alert.title,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -154,11 +161,11 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        type.toUpperCase(),
+                        alert.type.toUpperCase(),
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w900,
-                          color: color,
+                          color: alert.color,
                           letterSpacing: 1.0,
                         ),
                       ),
@@ -166,7 +173,7 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  time,
+                  alert.timeLabel,
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF94A3B8),
@@ -177,7 +184,7 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              message,
+              alert.message,
               style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF475569),
@@ -185,14 +192,48 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
+            if (alert.requiresAcknowledgement) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSubmitting || alert.isAcknowledged
+                      ? null
+                      : () => _acknowledgeCertificate(alert),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: alert.isAcknowledged
+                        ? const Color(0xFFE2E8F0)
+                        : const Color(0xFF0F172A),
+                    foregroundColor: alert.isAcknowledged
+                        ? const Color(0xFF64748B)
+                        : Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    alert.isAcknowledged
+                        ? 'CERTIFICATE RECEIVED'
+                        : 'I RECEIVED THE CERTIFICATE',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.7,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  List<_InternshipAlert> _buildAlerts(StudentInternship internship) {
-    return internship.alerts
+  List<_InternshipAlert> _buildAlerts() {
+    return _alerts
         .map(_mapStoredAlert)
         .whereType<_InternshipAlert>()
         .toList();
@@ -227,15 +268,67 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
       raw['createdAt'],
     );
     final timeLabel = _formatAlertTime(timeSource);
+    final requiresAcknowledgement = raw['requires_ack'] == true;
+    final isAcknowledged = raw['acknowledged'] == true;
 
     return _InternshipAlert(
+      id: raw['id']?.toString() ?? '',
       title: title,
       message: message,
       type: type,
       icon: _iconForAlert(status),
       color: _colorForAlert(status),
       timeLabel: timeLabel,
+      requiresAcknowledgement: requiresAcknowledgement,
+      isAcknowledged: isAcknowledged,
     );
+  }
+
+  Future<void> _acknowledgeCertificate(_InternshipAlert alert) async {
+    try {
+      setState(() => _isSubmitting = true);
+      final now = DateTime.now().toUtc().toIso8601String();
+      final updatedAlerts = _alerts.map((item) {
+        if (item['id']?.toString() != alert.id) {
+          return Map<String, dynamic>.from(item);
+        }
+        return {
+          ...Map<String, dynamic>.from(item),
+          'acknowledged': true,
+          'acknowledged_at': now,
+          'status': 'completed',
+        };
+      }).toList();
+
+      await Supabase.instance.client
+          .from('applications')
+          .update({
+            'alerts': updatedAlerts,
+            'status': 'Completed',
+          })
+          .eq('id', widget.internship.applicationId);
+
+      if (!mounted) return;
+      setState(() {
+        _alerts = updatedAlerts;
+        _isSubmitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Certificate receipt confirmed'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to confirm certificate receipt: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
   }
 
   String? _firstNonEmpty(
@@ -338,19 +431,25 @@ class StudentInternshipAlertsScreen extends StatelessWidget {
 }
 
 class _InternshipAlert {
+  final String id;
   final String title;
   final String message;
   final String type;
   final IconData icon;
   final Color color;
   final String timeLabel;
+  final bool requiresAcknowledgement;
+  final bool isAcknowledged;
 
   const _InternshipAlert({
+    required this.id,
     required this.title,
     required this.message,
     required this.type,
     required this.icon,
     required this.color,
     required this.timeLabel,
+    this.requiresAcknowledgement = false,
+    this.isAcknowledged = false,
   });
 }

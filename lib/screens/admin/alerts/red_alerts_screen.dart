@@ -3,8 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RedAlertsScreen extends StatelessWidget {
   const RedAlertsScreen({super.key});
-
-  static const _closedStatuses = ['Completed', 'Rejected', 'Removed'];
+  static const _alertStatuses = ['Removed', 'Completed'];
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +51,7 @@ class RedAlertsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Low Completion Alerts',
+                          'Low Progress Alerts',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -61,7 +60,7 @@ class RedAlertsScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'This list shows students whose closed applications ended with less than 50% progress.',
+                          'This list shows removed and completed students ordered by the least progress first.',
                           style: TextStyle(
                             fontSize: 13,
                             color: Color(0xFFB91C1C),
@@ -105,7 +104,7 @@ class RedAlertsScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'No closed applications are below 50% progress.',
+                          'No removed or completed applications are available for alerts.',
                           style: TextStyle(
                             color: Color(0xFF64748B),
                             fontSize: 13,
@@ -123,7 +122,7 @@ class RedAlertsScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    return _AlertCard(item: item);
+                    return _StudentAlertRow(item: item);
                   },
                 );
               },
@@ -138,14 +137,13 @@ class RedAlertsScreen extends StatelessWidget {
     final response = await Supabase.instance.client
         .from('applications')
         .select(
-          'id, status, progress, end_date, created_at, '
+          'id, status, progress, start_date, end_date, created_at, '
           'students(id, name, department, semester), '
           'internships(role, companies(name))',
         )
-        .inFilter('status', _closedStatuses)
-        .lt('progress', 0.5)
+        .inFilter('status', _alertStatuses)
         .order('progress', ascending: true)
-        .order('end_date', ascending: false);
+        .order('created_at', ascending: true);
 
     return (response as List)
         .whereType<Map>()
@@ -154,10 +152,87 @@ class RedAlertsScreen extends StatelessWidget {
   }
 }
 
-class _AlertCard extends StatelessWidget {
+class _StudentAlertRow extends StatelessWidget {
   final Map<String, dynamic> item;
 
-  const _AlertCard({required this.item});
+  const _StudentAlertRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final student = (item['students'] as Map?)?.cast<String, dynamic>() ?? {};
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => _AlertDetailScreen(item: item),
+            ),
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFFFEF2F2),
+                  foregroundColor: const Color(0xFFDC2626),
+                  radius: 24,
+                  child: Text(
+                    _initial(student['name']?.toString()),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    student['name']?.toString() ?? 'Unknown Student',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF94A3B8),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initial(String? name) {
+    final value = (name ?? '').trim();
+    if (value.isEmpty) return 'S';
+    return value[0].toUpperCase();
+  }
+}
+
+class _AlertDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> item;
+
+  const _AlertDetailScreen({required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +245,81 @@ class _AlertCard extends StatelessWidget {
     final progressValue = ((item['progress'] as num?) ?? 0).toDouble();
     final progressPercent = (progressValue * 100).round();
 
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Text(
+          student['name']?.toString() ?? 'Student Detail',
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          _AlertCard(
+            student: student,
+            internship: internship,
+            company: company,
+            status: status,
+            progressPercent: progressPercent,
+            dateLabel: _dateLabel(
+              item['end_date']?.toString() ??
+                  item['start_date']?.toString() ??
+                  item['created_at']?.toString(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _dateLabel(String? rawDate) {
+    if (rawDate == null || rawDate.trim().isEmpty) return 'Date unavailable';
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) return rawDate;
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
+  }
+}
+
+class _AlertCard extends StatelessWidget {
+  final Map<String, dynamic> student;
+  final Map<String, dynamic> internship;
+  final Map<String, dynamic> company;
+  final String status;
+  final int progressPercent;
+  final String dateLabel;
+
+  const _AlertCard({
+    required this.student,
+    required this.internship,
+    required this.company,
+    required this.status,
+    required this.progressPercent,
+    required this.dateLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -254,7 +404,7 @@ class _AlertCard extends StatelessWidget {
                 ),
                 _metaPill(
                   icon: Icons.calendar_month_rounded,
-                  label: _dateLabel(item['end_date']?.toString()),
+                  label: dateLabel,
                   color: const Color(0xFF64748B),
                 ),
               ],
@@ -268,9 +418,9 @@ class _AlertCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFECACA)),
               ),
-              child: Text(
-                'Closed application recorded below the 50% progress threshold.',
-                style: const TextStyle(
+              child: const Text(
+                'Student record is flagged here because the final internship progress is low.',
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFFB91C1C),

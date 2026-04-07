@@ -50,7 +50,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final active = _internships.where((i) => i.status == 'Active').toList();
+    final homeVisible = _internships
+        .where((i) => i.status == 'Active' || i.status == 'Removed')
+        .toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -66,14 +68,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     ),
                     const SliverToBoxAdapter(child: SizedBox(height: 20)),
                     SliverToBoxAdapter(
-                      child: _InternshipCarousel(internships: active),
+                      child: _InternshipCarousel(internships: homeVisible),
                     ),
                     const SliverToBoxAdapter(child: SizedBox(height: 28)),
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       sliver: SliverToBoxAdapter(
                         child: _QuickActions(
-                          activeInternshipCount: active.length,
+                          activeInternshipCount: homeVisible.length,
                         ),
                       ),
                     ),
@@ -360,7 +362,7 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
           Icon(Icons.work_off_rounded, size: 48, color: Color(0xFF94A3B8)),
           SizedBox(height: 16),
           Text(
-            'No Active Internship',
+            'No Ongoing Internship',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -369,7 +371,7 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
           ),
           SizedBox(height: 4),
           Text(
-            'Check the internships tab for your current applications and offers.',
+            'Only active or removed applications with alerts appear here.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
           ),

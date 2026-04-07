@@ -134,12 +134,6 @@ class StudentInternshipDetailScreen extends StatelessWidget {
             ),
             
             const SizedBox(height: 32),
-            
-            // Offer letter
-            _sectionTitle('Official Documents'),
-            const SizedBox(height: 12),
-            _documentTile('Offer Letter', internship.offerLetterId),
-            
             const SizedBox(height: 40),
           ],
         ),
@@ -171,33 +165,6 @@ class StudentInternshipDetailScreen extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _documentTile(String name, String ref) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.description_rounded, color: Color(0xFF3B82F6), size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                Text('Ref: $ref', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
-        ],
-      ),
     );
   }
 }

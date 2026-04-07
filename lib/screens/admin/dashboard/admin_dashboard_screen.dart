@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -42,8 +43,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final redAlertsRes = await client
           .from('applications')
           .select('id')
-          .inFilter('status', ['Completed', 'Rejected', 'Removed'])
-          .lt('progress', 0.5)
+          .inFilter('status', ['Removed', 'Completed'])
           .count(CountOption.exact);
       final redAlertsCount = redAlertsRes.count ?? 0;
 
@@ -289,7 +289,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _StatCard(title: 'Total Students', value: _totalStudents.toString(), icon: Icons.people_alt_rounded, color: const Color(0xFF3B82F6), constraints: constraints),
                         _StatCard(title: 'Partner Companies', value: _partnerCompanies.toString(), icon: Icons.domain_rounded, color: const Color(0xFF8B5CF6), constraints: constraints),
                         _StatCard(title: 'Active Internships', value: _activeInternships.toString(), icon: Icons.work_outline_rounded, color: const Color(0xFF10B981), constraints: constraints),
-                        _StatCard(title: 'Red Alerts', value: _redAlerts.toString(), icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444), constraints: constraints),
+                        _StatCard(
+                          title: 'Red Alerts',
+                          value: _redAlerts.toString(),
+                          icon: Icons.warning_amber_rounded,
+                          color: const Color(0xFFEF4444),
+                          constraints: constraints,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RedAlertsScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                     
@@ -386,6 +400,7 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final BoxConstraints constraints;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.title,
@@ -393,6 +408,7 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.constraints,
+    this.onTap,
   });
 
   @override
@@ -404,20 +420,24 @@ class _StatCard extends StatelessWidget {
             ? (safeWidth - 24 * 2 - 14 * 2) / 3 - 0.5
             : (safeWidth - 24 * 2 - 14) / 2 - 0.5;
 
-    return Container(
-      width: cardWidth,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 18, offset: const Offset(0, 6)),
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Stack(
-        children: [
+        child: Ink(
+          width: cardWidth,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 18, offset: const Offset(0, 6)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Stack(
+            children: [
           // Background accent blob
           Positioned(
             right: -20, top: -20,
@@ -490,7 +510,9 @@ class _StatCard extends StatelessWidget {
               ],
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
+import 'utils/session_expiry_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    SessionExpiryHandler.configure(_navigatorKey);
     _authSubscription =
         Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final session = data.session;

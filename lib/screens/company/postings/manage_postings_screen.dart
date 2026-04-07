@@ -111,12 +111,11 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
               'end_date': null,
             })
             .eq('internship_id', id)
-            .inFilter('status', ['Active', 'Completed']);
+            .inFilter('status', ['Accepted', 'Active', 'Completed']);
       } else if (newStatus == 'CLOSED') {
         await Supabase.instance.client
             .from('applications')
             .update({
-              'status': 'Completed',
               'end_date': todayLabel,
             })
             .eq('internship_id', id)
@@ -125,12 +124,27 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
         await Supabase.instance.client
             .from('applications')
             .update({
+              'status': 'Accepted',
               'start_date': null,
               'end_date': null,
             })
             .eq('internship_id', id)
             .eq('status', 'Active');
       }
+
+      if (!mounted) return;
+      setState(() {
+        _allPostings = _allPostings
+            .map(
+              (item) => item['id'] == id
+                  ? {
+                      ...item,
+                      ...updateData,
+                    }
+                  : item,
+            )
+            .toList();
+      });
 
       _fetchPostings();
     } catch (e) {
@@ -257,8 +271,7 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                    ? const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 100), child: CircularProgressIndicator())))
                    : Builder(
                     builder: (context) {
-                      final currentTab = DefaultTabController.of(context).index;
-                      final filterStatus = ['INTERVIEWING', 'ACTIVE', 'CLOSED'][currentTab];
+                      final filterStatus = ['INTERVIEWING', 'ACTIVE', 'CLOSED'][_tabIndex];
                       final filteredList = _allPostings.where((p) => p['status'] == filterStatus).toList();
 
                       if (filteredList.isEmpty) {
@@ -306,8 +319,19 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
     );
   }
 
-  void _showPostDetail(BuildContext context, Map<String, dynamic> posting) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => PostingDetailsScreen(posting: posting)));
+  Future<void> _showPostDetail(
+    BuildContext context,
+    Map<String, dynamic> posting,
+  ) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PostingDetailsScreen(posting: posting),
+      ),
+    );
+    if (mounted) {
+      _fetchPostings();
+    }
   }
 
   void _showQRDialog(BuildContext context, String role) {
