@@ -69,6 +69,92 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
     }
   }
 
+  void _removeImage({required bool isBanner}) {
+    setState(() {
+      if (isBanner) {
+        _selectedBannerImage = null;
+        _bannerUrl = '';
+      } else {
+        _selectedLogoImage = null;
+        _logoUrl = '';
+      }
+    });
+  }
+
+  Future<void> _showLogoOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) {
+        final hasLogo = _selectedLogoImage != null || _logoUrl.trim().isNotEmpty;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: SizedBox(
+                    width: 40,
+                    child: Divider(thickness: 4, color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Company Logo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.photo_camera_back_rounded,
+                    color: Color(0xFF2563EB),
+                  ),
+                  title: const Text(
+                    'Change Photo',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(isBanner: false);
+                  },
+                ),
+                if (hasLogo)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFDC2626),
+                    ),
+                    title: const Text(
+                      'Remove Photo',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _removeImage(isBanner: false);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _saveProfile() async {
     setState(() => _isSaving = true);
     try {
@@ -205,37 +291,79 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                     Positioned(
                       top: 16,
                       right: 16,
-                      child: GestureDetector(
-                        onTap: () => _pickImage(isBanner: true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.photo_camera_back_rounded,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Banner',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_selectedBannerImage != null ||
+                              _bannerUrl.trim().isNotEmpty)
+                            GestureDetector(
+                              onTap: () => _removeImage(isBanner: true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF991B1B).withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Remove',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
+                          if (_selectedBannerImage != null ||
+                              _bannerUrl.trim().isNotEmpty)
+                            const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _pickImage(isBanner: true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.photo_camera_back_rounded,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Banner',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                     Positioned(
@@ -244,7 +372,7 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                       child: Stack(
                         children: [
                           GestureDetector(
-                            onTap: () => _pickImage(isBanner: false),
+                            onTap: _showLogoOptions,
                             child: Container(
                               width: 80,
                               height: 80,
@@ -293,7 +421,7 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                             right: 0,
                             bottom: 0,
                             child: GestureDetector(
-                              onTap: () => _pickImage(isBanner: false),
+                              onTap: _showLogoOptions,
                               child: Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: const BoxDecoration(
@@ -301,7 +429,7 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
-                                  Icons.camera_alt_rounded,
+                                  Icons.edit_rounded,
                                   color: Colors.white,
                                   size: 16,
                                 ),

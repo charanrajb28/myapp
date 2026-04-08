@@ -1,8 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'dart:math';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'posting_details_screen.dart';
 import 'create_posting_screen.dart';
+import '../../../utils/qr_payload_security.dart';
 
 class ManagePostingsScreen extends StatefulWidget {
   const ManagePostingsScreen({super.key});
@@ -302,6 +306,7 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                               onTap: () => _showPostDetail(context, filteredList[index]),
                               onStatusChange: (newStatus) => _updateStatus(filteredList[index]['id'], newStatus),
                               onDiscard: () => _discardPosting(filteredList[index]['id']),
+                              onShareQr: () => _showQRDialog(context, filteredList[index]),
                             ),
                             childCount: filteredList.length,
                           ),
@@ -334,37 +339,10 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
     }
   }
 
-  void _showQRDialog(BuildContext context, String role) {
+  void _showQRDialog(BuildContext context, Map<String, dynamic> posting) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('SHARE JOB QR: ${role.toUpperCase()}', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE2E8F0))),
-              child: CustomPaint(size: const Size(200, 200), painter: _QRSimPainter()),
-            ),
-            const SizedBox(height: 24),
-            const Text('SCAN TO APPLY FOR THIS ROLE', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                child: const Text('DOWNLOAD AS IMAGE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) => _CompanyQrDialog(posting: posting),
     );
   }
 }
@@ -374,7 +352,14 @@ class _JobIndustrialCard extends StatelessWidget {
   final VoidCallback onTap;
   final Function(String) onStatusChange;
   final VoidCallback onDiscard;
-  const _JobIndustrialCard({required this.posting, required this.onTap, required this.onStatusChange, required this.onDiscard});
+  final VoidCallback onShareQr;
+  const _JobIndustrialCard({
+    required this.posting,
+    required this.onTap,
+    required this.onStatusChange,
+    required this.onDiscard,
+    required this.onShareQr,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -452,12 +437,18 @@ class _JobIndustrialCard extends StatelessWidget {
       onSelected: (val) {
         if (val == 'DISCARD') {
           onDiscard();
+        } else if (val == 'SHARE_QR') {
+          onShareQr();
         } else {
           onStatusChange(val);
         }
       },
       itemBuilder: (context) => [
         ..._statusMenuItems(status),
+        const PopupMenuItem(
+          value: 'SHARE_QR',
+          child: Text('Share QR Code'),
+        ),
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: 'DISCARD',
@@ -547,22 +538,174 @@ class _DotPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _QRSimPainter extends CustomPainter {
+class _CompanyQrDialog extends StatefulWidget {
+  final Map<String, dynamic> posting;
+
+  const _CompanyQrDialog({required this.posting});
+
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF0F172A);
-    final tileSize = size.width / 15;
-    final random = Random(42);
-    for (int i = 0; i < 15; i++) {
-        for (int j = 0; j < 15; j++) {
-            if ((i < 4 && j < 4) || (i > 10 && j < 4) || (i < 4 && j > 10)) {
-                canvas.drawRect(Rect.fromLTWH(i * tileSize, j * tileSize, tileSize, tileSize), paint);
-            } else if (random.nextBool()) {
-                canvas.drawRect(Rect.fromLTWH(i * tileSize, j * tileSize, tileSize, tileSize), paint);
-            }
-        }
+  State<_CompanyQrDialog> createState() => _CompanyQrDialogState();
+}
+
+class _CompanyQrDialogState extends State<_CompanyQrDialog> {
+  bool _downloading = false;
+
+  String get _payload => jsonEncode(
+        QrPayloadSecurity.buildRolePayload(
+          internshipId: widget.posting['id']?.toString() ?? '',
+          role: widget.posting['role']?.toString() ?? '',
+          status: widget.posting['status']?.toString() ?? '',
+          issuerId: widget.posting['company_id']?.toString() ?? '',
+        ),
+      );
+
+  String get _qrImageUrl =>
+      'https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&format=png&margin=12&data=${Uri.encodeComponent(_payload)}';
+
+  Future<void> _downloadQr() async {
+    try {
+      setState(() => _downloading = true);
+      final response = await http.get(Uri.parse(_qrImageUrl));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('QR service returned ${response.statusCode}');
+      }
+
+      final directory = Directory.systemTemp;
+      final fileName =
+          'job_qr_${(widget.posting['role']?.toString() ?? 'job').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_')}.png';
+      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+      await file.writeAsBytes(response.bodyBytes);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('QR saved to ${file.path}'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to download QR: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _downloading = false);
+      }
     }
   }
+
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    final role = widget.posting['role']?.toString() ?? 'ROLE';
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Text(
+        'SHARE JOB QR: ${role.toUpperCase()}',
+        style: const TextStyle(
+          color: Color(0xFF0F172A),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.5,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  _qrImageUrl,
+                  width: 220,
+                  height: 220,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                  errorBuilder: (context, _, __) => const SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: Center(
+                      child: Text(
+                        'Unable to generate QR',
+                        style: TextStyle(
+                          color: Color(0xFFDC2626),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'DOWNLOAD THIS QR TO DISPLAY OR PRINT FOR STUDENTS',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _downloading ? null : _downloadQr,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: _downloading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.download_rounded),
+              label: Text(
+                _downloading ? 'SAVING' : 'DOWNLOAD AS IMAGE',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

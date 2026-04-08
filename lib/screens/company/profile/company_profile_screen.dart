@@ -19,6 +19,10 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
     _fetchProfile();
   }
 
+  Future<void> refreshData() async {
+    await _fetchProfile();
+  }
+
   Future<void> _fetchProfile() async {
     setState(() => _isLoading = true);
     try {

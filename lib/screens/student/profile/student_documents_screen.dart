@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../student_portal_repository.dart';
 
@@ -140,6 +141,23 @@ class _StudentDocumentsScreenState extends State<StudentDocumentsScreen> {
         backgroundColor: Color(0xFF0F172A),
       ),
     );
+  }
+
+  Future<void> _viewOnline(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showError('Invalid document link.');
+      return;
+    }
+
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened) {
+      _showError('Unable to open document online.');
+    }
   }
 
   Future<void> _showUploadInterface() async {
@@ -354,21 +372,20 @@ class _StudentDocumentsScreenState extends State<StudentDocumentsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    document.publicUrl,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF2563EB),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
                   const SizedBox(height: 14),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      FilledButton.icon(
+                        onPressed: () => _viewOnline(document.publicUrl),
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text('View Online'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
                       OutlinedButton.icon(
                         onPressed: () => _copyLink(document.publicUrl),
                         icon: const Icon(Icons.link_rounded, size: 16),

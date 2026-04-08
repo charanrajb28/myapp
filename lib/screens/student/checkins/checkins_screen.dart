@@ -1,5 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
 import '../../../models/internship.dart';
+import '../../../utils/qr_payload_security.dart';
 import '../student_portal_repository.dart';
 
 class CheckinsScreen extends StatefulWidget {
@@ -70,11 +76,14 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   }
 
   Future<void> _submitCheckIn() async {
-    // Show mock QR scanner first
     _showQRScanner();
   }
 
   void _showQRScanner() {
+    final active = _activeInternships;
+    if (active.isEmpty) return;
+    final internship = active[_selectedInternshipIndex];
+
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -82,9 +91,14 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
         return _QRScannerOverlay(
-          onScanComplete: () {
+          expectedInternshipId: internship.id,
+          onScanComplete: (rawValue) {
             Navigator.pop(context);
-            _processCheckIn();
+            _handleQrScan(
+              rawValue,
+              expectedInternshipId: internship.id,
+              isCheckout: false,
+            );
           },
           onCancel: () => Navigator.pop(context),
         );
@@ -126,6 +140,10 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   }
 
   Future<void> _submitCheckOut() async {
+    final active = _activeInternships;
+    if (active.isEmpty) return;
+    final internship = active[_selectedInternshipIndex];
+
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -133,14 +151,51 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, anim1, anim2) {
         return _QRScannerOverlay(
-          onScanComplete: () {
+          expectedInternshipId: internship.id,
+          onScanComplete: (rawValue) {
             Navigator.pop(context);
-            _processCheckOut();
+            _handleQrScan(
+              rawValue,
+              expectedInternshipId: internship.id,
+              isCheckout: true,
+            );
           },
           onCancel: () => Navigator.pop(context),
         );
       },
     );
+  }
+
+  Future<void> _handleQrScan(
+    String rawValue, {
+    required String expectedInternshipId,
+    required bool isCheckout,
+  }) async {
+    try {
+      final decoded = jsonDecode(rawValue);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Invalid QR payload');
+      }
+
+      final isValid = QrPayloadSecurity.verifyRolePayload(
+        decoded,
+        expectedInternshipId: expectedInternshipId,
+      );
+      if (!isValid) {
+        throw Exception('QR does not match this internship or was tampered');
+      }
+
+      if (isCheckout) {
+        await _processCheckOut();
+      } else {
+        await _processCheckIn();
+      }
+    } catch (e) {
+      _showSnackBar(
+        'Invalid QR code: $e',
+        const Color(0xFFDC2626),
+      );
+    }
   }
 
   Future<void> _processCheckOut() async {
@@ -263,7 +318,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
         _CheckInRecord(
           date: _formatHistoryDate(date),
           day: _formatHistoryDay(date),
-          time: present ? _formatHistoryTime(checkInAt.toLocal()) : '—',
+          time: present ? _formatHistoryTime(checkInAt.toLocal()) : '-',
           present: present,
           sortDate: date,
         ),
@@ -473,7 +528,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         children: [
-          // â”€â”€ Company Selector â”€â”€
+          // Company Selector
           if (active.length > 1) ...[
             const Text(
               'Select Company',
@@ -540,19 +595,19 @@ class _CheckinsScreenState extends State<CheckinsScreen>
             const SizedBox(height: 32),
           ],
 
-          // â”€â”€ Today's status card â”€â”€
+          // Today's status card
           _todayCard(currentInternship, checkedIn, checkedOut),
           const SizedBox(height: 24),
 
-          // â”€â”€ Check-in button â”€â”€
+          // Check-in button
           _checkInButton(checkedIn, checkedOut),
           const SizedBox(height: 28),
 
-          // â”€â”€ This week calendar strip â”€â”€
+          // This week calendar strip
           _weekStrip(currentInternship, checkins),
           const SizedBox(height: 28),
 
-          // â”€â”€ History section â”€â”€
+          // History section
           _historySection(currentInternship, checkins),
           const SizedBox(height: 40),
         ],
@@ -857,7 +912,7 @@ class _CheckinsScreenState extends State<CheckinsScreen>
       weekStatuses[parsedDate.weekday] =
           entry['check_in_at'] != null ? 'present' : 'absent';
     }
-    // Mock: Monâ€“today checked in, rest missing/upcoming
+    // Mock: Week status is derived from real check-in data.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1087,7 +1142,7 @@ class _CheckInTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${record.date}  Â·  ${record.day}',
+                  '${record.date}  -  ${record.day}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1134,8 +1189,15 @@ class _CheckInTile extends StatelessWidget {
 }
 
 class _QRScannerOverlay extends StatefulWidget {
-  final VoidCallback onScanComplete, onCancel;
-  const _QRScannerOverlay({required this.onScanComplete, required this.onCancel});
+  final String expectedInternshipId;
+  final ValueChanged<String> onScanComplete;
+  final VoidCallback onCancel;
+
+  const _QRScannerOverlay({
+    required this.expectedInternshipId,
+    required this.onScanComplete,
+    required this.onCancel,
+  });
 
   @override
   State<_QRScannerOverlay> createState() => _QRScannerOverlayState();
@@ -1143,7 +1205,19 @@ class _QRScannerOverlay extends StatefulWidget {
 
 class _QRScannerOverlayState extends State<_QRScannerOverlay>
     with SingleTickerProviderStateMixin {
+  final MobileScannerController _mobileScannerController =
+      MobileScannerController(
+        formats: const [BarcodeFormat.qrCode],
+        detectionSpeed: DetectionSpeed.noDuplicates,
+        returnImage: false,
+      );
   late AnimationController _scannerController;
+  bool _handledScan = false;
+
+  bool get _supportsLiveScanner =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
   void initState() {
@@ -1152,142 +1226,291 @@ class _QRScannerOverlayState extends State<_QRScannerOverlay>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-
-    // Auto-complete after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) widget.onScanComplete();
-    });
   }
 
   @override
   void dispose() {
+    _mobileScannerController.dispose();
     _scannerController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleDetection(BarcodeCapture capture) async {
+    if (_handledScan || !mounted) {
+      return;
+    }
+
+    String? qrValue;
+    for (final barcode in capture.barcodes) {
+      final rawValue = barcode.rawValue?.trim();
+      if (rawValue != null && rawValue.isNotEmpty) {
+        qrValue = rawValue;
+        break;
+      }
+    }
+
+    if (qrValue == null) {
+      return;
+    }
+
+    _handledScan = true;
+    await _mobileScannerController.stop();
+    if (!mounted) {
+      return;
+    }
+    widget.onScanComplete(qrValue);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.9),
-      body: Stack(
-        children: [
-          // Scanning Frame
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  alignment: Alignment.center,
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            if (_supportsLiveScanner)
+              MobileScanner(
+                controller: _mobileScannerController,
+                onDetect: _handleDetection,
+              ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.28),
+                        Colors.black.withValues(alpha: 0.50),
+                        Colors.black.withValues(alpha: 0.72),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 20,
+              left: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Corner borders
-                    Container(
-                      width: 280,
-                      height: 280,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
-                        borderRadius: BorderRadius.circular(32),
+                    Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: _supportsLiveScanner
+                          ? const Color(0xFF38BDF8)
+                          : const Color(0xFFF59E0B),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      _supportsLiveScanner ? 'LIVE QR SCAN' : 'DESKTOP PREVIEW',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
                       ),
                     ),
-                    // Animated Scanner Line
-                    AnimatedBuilder(
-                      animation: _scannerController,
-                      builder: (context, child) {
-                        return Positioned(
-                          top: 20 + (_scannerController.value * 240),
-                          left: 20,
-                          right: 20,
-                          child: Column(
-                            children: [
-                              Container(
-                                height: 3,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.blue.withValues(alpha: 0),
-                                      Colors.blue.shade400,
-                                      Colors.blue.withValues(alpha: 0),
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.blue.withValues(alpha: 0.6),
-                                      blurRadius: 15,
-                                      spreadRadius: 2,
-                                    )
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.blue.withValues(alpha: 0.15),
-                                      Colors.blue.withValues(alpha: 0),
-                                    ],
-                                  ),
-                                ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 18,
+              right: 20,
+              child: IconButton(
+                onPressed: widget.onCancel,
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  padding: const EdgeInsets.all(14),
+                  side: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+              ),
+            ),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(40),
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF38BDF8).withValues(alpha: 0.16),
+                          const Color(0xFF38BDF8).withValues(alpha: 0.03),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 290,
+                          height: 290,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(38),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.10),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+                                blurRadius: 28,
+                                spreadRadius: 6,
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ),
+                        AnimatedBuilder(
+                          animation: _scannerController,
+                          builder: (context, child) {
+                            return Positioned(
+                              top: 26 + (_scannerController.value * 238),
+                              left: 24,
+                              right: 24,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(999),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          const Color(0xFF38BDF8).withValues(alpha: 0),
+                                          const Color(0xFF67E8F9),
+                                          const Color(0xFF38BDF8).withValues(alpha: 0),
+                                        ],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF38BDF8).withValues(alpha: 0.55),
+                                          blurRadius: 18,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          const Color(0xFF38BDF8).withValues(alpha: 0.18),
+                                          const Color(0xFF38BDF8).withValues(alpha: 0),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        _corner(top: 0, left: 0, angle: 0),
+                        _corner(top: 0, right: 0, angle: 90),
+                        _corner(bottom: 0, left: 0, angle: 270),
+                        _corner(bottom: 0, right: 0, angle: 180),
+                      ],
                     ),
-                    // Masking corners for a "Target" look
-                    _corner(top: 0, left: 0, angle: 0),
-                    _corner(top: 0, right: 0, angle: 90),
-                    _corner(bottom: 0, left: 0, angle: 270),
-                    _corner(bottom: 0, right: 0, angle: 180),
-                  ],
-                ),
-                const SizedBox(height: 60),
-                const Column(
-                  children: [
-                    Text(
-                      'SCANNING...',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 4,
+                  ),
+                  const SizedBox(height: 26),
+                  Container(
+                    width: 360,
+                    padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF08111F).withValues(alpha: 0.88),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.28),
+                          blurRadius: 24,
+                          offset: const Offset(0, 16),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Align QR code within the frame',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: Column(
+                      children: [
+                        Text(
+                          _supportsLiveScanner ? 'QR SCANNER' : 'WINDOWS BUILD',
+                          style: TextStyle(
+                            color: _supportsLiveScanner
+                                ? const Color(0xFF38BDF8)
+                                : const Color(0xFFF59E0B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3.2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _supportsLiveScanner
+                              ? 'Scan the company check-in QR'
+                              : 'Use mobile for live QR scanning',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _supportsLiveScanner
+                              ? 'Only valid QR codes are accepted. Barcodes and other formats will be ignored automatically.'
+                              : 'This Windows app cannot use the mobile scanner plugin. Open the Android or iPhone app to perform the real QR-based check-in.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Header with close button
-          Positioned(
-            top: 60,
-            right: 24,
-            child: IconButton(
-              onPressed: widget.onCancel,
-              icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.1),
-                padding: const EdgeInsets.all(12),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _corner({double? top, double? bottom, double? left, double? right, required double angle}) {
+  Widget _corner({
+    double? top,
+    double? bottom,
+    double? left,
+    double? right,
+    required double angle,
+  }) {
     return Positioned(
       top: top,
       bottom: bottom,
@@ -1296,14 +1519,14 @@ class _QRScannerOverlayState extends State<_QRScannerOverlay>
       child: Transform.rotate(
         angle: angle * 3.14159 / 180,
         child: Container(
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           decoration: const BoxDecoration(
             border: Border(
-              top: BorderSide(color: Colors.blue, width: 4),
-              left: BorderSide(color: Colors.blue, width: 4),
+              top: BorderSide(color: Color(0xFF38BDF8), width: 5),
+              left: BorderSide(color: Color(0xFF38BDF8), width: 5),
             ),
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(12)),
+            borderRadius: BorderRadius.only(topLeft: Radius.circular(16)),
           ),
         ),
       ),

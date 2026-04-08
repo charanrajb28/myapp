@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../company_shell.dart';
+import '../postings/posting_details_screen.dart';
 
 class CompanyDashboardScreen extends StatefulWidget {
   const CompanyDashboardScreen({super.key});
@@ -22,6 +23,10 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
   void initState() {
     super.initState();
     _fetchDashboardData();
+  }
+
+  Future<void> refreshData() async {
+    await _fetchDashboardData();
   }
 
   Future<void> _fetchDashboardData() async {
@@ -46,8 +51,9 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       // 2. Get Postings and Application Counts
       final postingsRes = await supabase
           .from('internships')
-          .select('id, role, brand_color')
-          .eq('company_id', companyId);
+          .select('id, role, brand_color, status, created_at')
+          .eq('company_id', companyId)
+          .order('created_at', ascending: false);
       
       final List<String> postingIds = (postingsRes as List).map((p) => p['id'].toString()).toList();
       
@@ -77,7 +83,10 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
         }
         
         displayPostings.add({
+          'id': p['id'],
           'role': p['role'],
+          'status': p['status'] ?? 'INTERVIEWING',
+          'created_at': p['created_at'],
           'applicants': count.toString(),
           'color': _parseColor(p['brand_color'] ?? '#6366F1'),
         });
@@ -191,7 +200,20 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _LogItemCard(posting: _activePostings[index]),
+                      (context, index) => _LogItemCard(
+                        posting: _activePostings[index],
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PostingDetailsScreen(
+                                posting: _activePostings[index],
+                              ),
+                            ),
+                          );
+                          await refreshData();
+                        },
+                      ),
                       childCount: _activePostings.length,
                     ),
                   ),
@@ -307,7 +329,7 @@ class _DashboardHeader extends StatelessWidget {
           ],
         ),
         GestureDetector(
-          onTap: () => CompanyShell.of(context)?.setIndex(3),
+          onTap: () => CompanyShell.of(context)?.setIndex(2),
           child: Hero(
             tag: 'recruiter_avatar',
             child: Container(
@@ -345,39 +367,43 @@ class _DashboardHeader extends StatelessWidget {
 
 class _LogItemCard extends StatelessWidget {
   final Map<String, dynamic> posting;
-  const _LogItemCard({required this.posting});
+  final VoidCallback onTap;
+  const _LogItemCard({required this.posting, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final color = posting['color'] as Color;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48, height: 48,
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(Icons.work_rounded, color: color, size: 20),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text((posting['role'] as String).toUpperCase(), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                const SizedBox(height: 6),
-                Text('${posting['applicants']} APPLICANTS', style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.work_rounded, color: color, size: 20),
             ),
-          ),
-          const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFCBD5E1), size: 14),
-        ],
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text((posting['role'] as String).toUpperCase(), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                  const SizedBox(height: 6),
+                  Text('${posting['applicants']} APPLICANTS', style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFCBD5E1), size: 14),
+          ],
+        ),
       ),
     );
   }

@@ -52,7 +52,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           .eq('id', widget.studentId)
           .single();
       
-      // 2. Fetch All Applications (Applied, Active, Completed)
+      // 2. Fetch all applications and group by lifecycle
       final appsRes = await Supabase.instance.client
           .from('applications')
           .select('*, internships(*, companies(*))')
@@ -64,9 +64,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         setState(() {
           _studentData = studentRes;
           _isBlacklisted = studentRes['is_blacklisted'] ?? false;
-          _appliedInternships = apps.where((a) => a['status'] == 'Applied' || a['status'] == 'Under Review').toList();
+          _appliedInternships = apps
+              .where((a) =>
+                  a['status'] != 'Completed' &&
+                  a['status'] != 'Removed')
+              .toList();
           _currentInternships = apps.where((a) => a['status'] == 'Active').toList();
-          _pastInternships = apps.where((a) => a['status'] == 'Completed').toList();
+          _pastInternships = apps
+              .where((a) =>
+                  a['status'] == 'Completed' ||
+                  a['status'] == 'Removed')
+              .toList();
           _isLoadingData = false;
         });
       }

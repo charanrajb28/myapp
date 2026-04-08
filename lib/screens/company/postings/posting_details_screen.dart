@@ -1,10 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'edit_posting_screen.dart';
 import '../../../utils/session_expiry_handler.dart';
+import '../../../utils/qr_payload_security.dart';
 
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
@@ -527,6 +532,13 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     return const Color(0xFF0F172A);
   }
 
+  void _showRoleQrDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => _RoleQrDialog(posting: _posting),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = _posting['color'] as Color? ?? const Color(0xFF6366F1);
@@ -645,6 +657,33 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                               const Color(0xFF0EA5E9),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                          onPressed: _showRoleQrDialog,
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: color.withValues(alpha: 0.24),
+                            ),
+                            foregroundColor: const Color(0xFF0F172A),
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: Icon(Icons.qr_code_2_rounded, color: color),
+                          label: const Text(
+                            'SHOW ROLE QR',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -2510,4 +2549,188 @@ class _DotPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _RoleQrDialog extends StatefulWidget {
+  final Map<String, dynamic> posting;
+
+  const _RoleQrDialog({required this.posting});
+
+  @override
+  State<_RoleQrDialog> createState() => _RoleQrDialogState();
+}
+
+class _RoleQrDialogState extends State<_RoleQrDialog> {
+  bool _downloading = false;
+
+  String get _payload => jsonEncode(
+        QrPayloadSecurity.buildRolePayload(
+          internshipId: widget.posting['id']?.toString() ?? '',
+          role: widget.posting['role']?.toString() ?? '',
+          status: widget.posting['status']?.toString() ?? '',
+          issuerId: widget.posting['company_id']?.toString() ?? '',
+        ),
+      );
+
+  String get _qrImageUrl =>
+      'https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&format=png&margin=12&data=${Uri.encodeComponent(_payload)}';
+
+  Future<void> _downloadQr() async {
+    try {
+      setState(() => _downloading = true);
+      final response = await http.get(Uri.parse(_qrImageUrl));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('QR service returned ${response.statusCode}');
+      }
+
+      final directory = Directory.systemTemp;
+      final fileName =
+          'role_qr_${(widget.posting['role']?.toString() ?? 'job').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_')}.png';
+      final file =
+          File('${directory.path}${Platform.pathSeparator}$fileName');
+      await file.writeAsBytes(response.bodyBytes);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('QR saved to ${file.path}'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to download QR: $e'),
+          backgroundColor: const Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _downloading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final role = widget.posting['role']?.toString() ?? 'ROLE';
+
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Text(
+        'ROLE QR: ${role.toUpperCase()}',
+        style: const TextStyle(
+          color: Color(0xFF0F172A),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.5,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  _qrImageUrl,
+                  width: 220,
+                  height: 220,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                  errorBuilder: (context, _, __) => const SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: Center(
+                      child: Text(
+                        'Unable to generate QR',
+                        style: TextStyle(
+                          color: Color(0xFFDC2626),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Download this QR and show it to students for check-in.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _downloading ? null : _downloadQr,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: _downloading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.download_rounded),
+              label: Text(
+                _downloading ? 'SAVING' : 'DOWNLOAD QR',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
