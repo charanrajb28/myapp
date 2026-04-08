@@ -1417,7 +1417,7 @@ class InternshipDetailScreen extends StatelessWidget {
                       title: 'Documents',
                       icon: Icons.folder_rounded,
                       color: const Color(0xFFF59E0B),
-                      child: const _DocumentsSection(),
+                      child: _DocumentsSection(internship: internship),
                     ),
                     const SizedBox(height: 60),
                   ],
@@ -1778,23 +1778,359 @@ class _MentorSection extends StatelessWidget {
 }
 
 // ─── Documents section ────────────────────────────────────────────
-class _DocumentsSection extends StatelessWidget {
-  const _DocumentsSection();
+class _DocumentsSection extends StatefulWidget {
+  final StudentInternship internship;
+
+  const _DocumentsSection({required this.internship});
+
+  @override
+  State<_DocumentsSection> createState() => _DocumentsSectionState();
+}
+
+class _DocumentsSectionState extends State<_DocumentsSection> {
+  final _repository = StudentPortalRepository();
+
+  bool get _canUploadReport =>
+      widget.internship.status == 'Completed' ||
+      widget.internship.status == 'Removed';
+
+  Future<void> _showReportUploadSheet() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ApplicationReportUploadSheet(
+        repository: _repository,
+        internship: widget.internship,
+      ),
+    );
+
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report document saved to your documents box.'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    if (!_canUploadReport) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Report upload becomes available only when the application is completed or removed.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF94A3B8),
+              height: 1.5,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'No internship documents available.',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF94A3B8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFFDE68A)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.description_rounded,
+                  color: Color(0xFFF59E0B),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Final Report Submission',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Upload your final report using a public Google Drive link. It will also be saved in your student documents box.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF92400E),
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton.icon(
+            onPressed: _showReportUploadSheet,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: const Icon(Icons.add_link_rounded, size: 18),
+            label: const Text(
+              'UPLOAD REPORT LINK',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ApplicationReportUploadSheet extends StatefulWidget {
+  final StudentPortalRepository repository;
+  final StudentInternship internship;
+
+  const _ApplicationReportUploadSheet({
+    required this.repository,
+    required this.internship,
+  });
+
+  @override
+  State<_ApplicationReportUploadSheet> createState() =>
+      _ApplicationReportUploadSheetState();
+}
+
+class _ApplicationReportUploadSheetState
+    extends State<_ApplicationReportUploadSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleController;
+  final TextEditingController _linkController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(
+      text: 'Internship Report - ${widget.internship.company} - ${widget.internship.role}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _linkController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await widget.repository.addStudentDocument(
+        title: _titleController.text.trim(),
+        publicUrl: _linkController.text.trim(),
+        isResume: false,
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to save report link: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 24,
+        right: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              'Submit Report Document',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Save the public Google Drive report link for ${widget.internship.company}. This will appear in your documents box.',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                labelText: 'Report title',
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                if ((value ?? '').trim().isEmpty) {
+                  return 'Enter a report title';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _linkController,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: 'Public Google Drive link',
+                hintText: 'https://drive.google.com/file/d/...',
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              validator: (value) {
+                final raw = (value ?? '').trim();
+                if (raw.isEmpty) {
+                  return 'Paste a Google Drive link';
+                }
+                final uri = Uri.tryParse(raw);
+                final host = uri?.host.toLowerCase() ?? '';
+                if (!host.contains('drive.google.com') &&
+                    !host.contains('docs.google.com')) {
+                  return 'Use a Google Drive link';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: Color(0xFF2563EB),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Make sure the Drive file is shared as "Anyone with the link can view" before saving.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.5,
+                        color: Color(0xFF1D4ED8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  _isSaving ? 'SAVING...' : 'SAVE REPORT LINK',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
