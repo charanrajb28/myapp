@@ -65,7 +65,7 @@ class RoleDetailScreen extends StatelessWidget {
           
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 100), // padding bottom for fab/action bar
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -172,54 +172,6 @@ class RoleDetailScreen extends StatelessWidget {
                   // applicant list
                   ...applicants.map((a) => _ApplicantRow(applicant: a)),
                 ],
-              ),
-            ),
-          ),
-          
-          // ── Bottom Fixed Action Bar ──
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -4))],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.file_download_outlined, size: 18),
-                        label: const Text('Export List'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0F172A),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        onPressed: () {},
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        icon: const Icon(Icons.post_add_rounded, size: 18),
-                        label: const Text('Edit Role'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        onPressed: () {},
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),

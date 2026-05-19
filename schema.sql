@@ -526,24 +526,41 @@ CREATE TRIGGER update_student_documents_updated_at BEFORE UPDATE ON student_docu
 -- Secure Identity Sync via Trigger (The Proper Way)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
+DECLARE
+  v_role public.user_role;
+  v_name text;
 BEGIN
-  -- Insert into public.users if not exists
+  -- 1. Safely parse the role, default to 'student' if parsing fails or missing
+  BEGIN
+    v_role := (new.raw_user_meta_data->>'role')::public.user_role;
+  EXCEPTION WHEN OTHERS THEN
+    v_role := 'student'::public.user_role;
+  END;
+
+  IF v_role IS NULL THEN
+    v_role := 'student'::public.user_role;
+  END IF;
+
+  v_name := COALESCE(new.raw_user_meta_data->>'name', 'Unknown User');
+
+  -- 2. Cleanup any stranded public.users row that has the same email 
+  -- (happens if a user was deleted from auth.users but not public.users due to missing CASCADE)
+  DELETE FROM public.users WHERE email = new.email AND id != new.id;
+
+  -- 3. Insert into public.users
   INSERT INTO public.users (id, email, name, role)
-  VALUES (
-    new.id, 
-    new.email, 
-    COALESCE(new.raw_user_meta_data->>'name', 'Unknown User'),
-    COALESCE((new.raw_user_meta_data->>'role')::user_role, 'student'::user_role)
-  ) ON CONFLICT (id) DO UPDATE SET
+  VALUES (new.id, new.email, v_name, v_role) 
+  ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     name = EXCLUDED.name,
     role = EXCLUDED.role;
 
-  IF (new.raw_user_meta_data->>'role') = 'student' THEN
-    INSERT INTO public.students (user_id, name) VALUES (new.id, COALESCE(new.raw_user_meta_data->>'name', 'Unknown'))
+  -- 4. Insert into role-specific tables
+  IF v_role = 'student' THEN
+    INSERT INTO public.students (user_id, name) VALUES (new.id, v_name)
     ON CONFLICT (user_id) DO NOTHING;
-  ELSIF (new.raw_user_meta_data->>'role') = 'company' THEN
-    INSERT INTO public.companies (user_id, name, industry) VALUES (new.id, COALESCE(new.raw_user_meta_data->>'name', 'Unknown'), 'Software')
+  ELSIF v_role = 'company' THEN
+    INSERT INTO public.companies (user_id, name, industry) VALUES (new.id, v_name, 'Software')
     ON CONFLICT (user_id) DO NOTHING;
   END IF;
 
