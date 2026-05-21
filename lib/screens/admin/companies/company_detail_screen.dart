@@ -852,7 +852,6 @@ class _RolesTab extends StatelessWidget {
   final void Function(Map<String, dynamic>)? onNotify;
 
   const _RolesTab({
-    super.key,
     required this.roles,
     required this.statusName,
     required this.emptyIcon,
@@ -962,9 +961,17 @@ class _RolesTab extends StatelessWidget {
                                     slots: role['total_slots']?.toString() ?? '0',
                                     startDate: 'May 1, 2025',
                                     duration: '6 Months',
-                                    description: role['description'] ?? 'No description provided.',
-                                    skills: const ['General Skillset'],
-                                    applicants: const [],
+                                    description: role['about'] ?? 'No description provided.',
+                                    responsibilities: List<String>.from(role['responsibilities'] ?? []),
+                                    applicants: (role['applications'] as List? ?? []).map((app) {
+                                      final student = app['students'] as Map<String, dynamic>? ?? {};
+                                      return {
+                                        'name': student['name']?.toString() ?? 'Unknown Student',
+                                        'id': student['enrollment_id']?.toString() ?? student['id']?.toString() ?? 'N/A',
+                                        'dept': student['department']?.toString() ?? 'CS',
+                                        'status': app['status']?.toString() ?? 'Applied',
+                                      };
+                                    }).toList(),
                                   ),
                                 )),
                                 child: Padding(

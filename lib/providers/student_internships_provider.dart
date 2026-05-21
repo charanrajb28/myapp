@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/internship.dart';
@@ -41,6 +42,15 @@ class StudentInternshipsNotifier extends Notifier<StudentInternshipsState> {
     _repository = ref.watch(studentPortalRepositoryProvider);
     // Fetch available internships and student internships asynchronously on initialization
     Future.microtask(() => loadInternships());
+
+    // Polling: Auto-refresh internships every 30 seconds
+    final timer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      loadInternships();
+    });
+    ref.onDispose(() {
+      timer.cancel();
+    });
+
     return StudentInternshipsState(
       availableInternships: [],
       studentInternships: [],

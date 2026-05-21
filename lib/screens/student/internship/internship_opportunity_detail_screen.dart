@@ -172,11 +172,6 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
             ),
             
             const SizedBox(height: 32),
-            _sectionTitle('Requirements'),
-            const SizedBox(height: 12),
-            ...o.requirements.map(_bulletPoint),
-            
-            const SizedBox(height: 32),
             _sectionTitle('Responsibilities'),
             const SizedBox(height: 12),
             ...o.responsibilities.map(_bulletPoint),

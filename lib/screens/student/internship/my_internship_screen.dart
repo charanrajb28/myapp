@@ -176,9 +176,6 @@ class _MyInternshipScreenState extends ConsumerState<MyInternshipScreen> {
         return status == 'applied' || status == 'accepted' || status == 'active';
       }).toList();
 
-  List<StudentInternship> get _active => _studentInternships
-      .where((i) => _normalizedStatus(i.status) == 'active')
-      .toList();
 
   List<StudentInternship> get _history => _studentInternships.where((i) {
         final status = _normalizedStatus(i.status);

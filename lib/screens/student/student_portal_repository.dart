@@ -204,103 +204,28 @@ class StudentPortalRepository {
 
   Future<List<InternshipOpportunity>> fetchAvailableInternships() async {
     final user = _client.auth.currentUser;
-    if (user == null) {
-      // DEV-ONLY: Guest login bypass
-      return const [
-        InternshipOpportunity(
-          id: 'mock-opp-1',
-          company: 'Google',
-          role: 'Software Engineering Intern',
-          industry: 'Technology',
-          location: 'Mountain View, CA (On-site)',
-          stipend: '\$8,000 / month',
-          duration: '3 Months',
-          deadline: '31 Aug 2026',
-          brandColor: Color(0xFFEA4335), // Google Red
-          logoInitial: 'G',
-          about: 'Join the team building the future of mobile and web applications. You will be working directly on production services.',
-          isApplied: false,
-          requirements: [
-            'Pursuing MS/PhD or BS in Computer Science or related engineering field.',
-            'Experience with Java, C++, Python, or Go.',
-            'Solid foundational knowledge in algorithms and systems design.'
-          ],
-          responsibilities: [
-            'Write clean, robust, well-tested code for web/mobile apps.',
-            'Collaborate with developers, product managers, and designers.',
-            'Analyze and optimize service and client-side performance.'
-          ],
-        ),
-        InternshipOpportunity(
-          id: 'mock-opp-2',
-          company: 'Stripe',
-          role: 'Product Design Intern',
-          industry: 'Fintech',
-          location: 'San Francisco, CA (Hybrid)',
-          stipend: '\$6,500 / month',
-          duration: '4 Months',
-          deadline: '15 Sep 2026',
-          brandColor: Color(0xFF635BFF), // Stripe Purple
-          logoInitial: 'S',
-          about: 'Stripe is looking for a design intern to work with the dashboard and consumer product experiences team.',
-          isApplied: false,
-          requirements: [
-            'Portfolio showcasing UI/UX interaction designs and visual polish.',
-            'Proficiency in Figma and design prototyping tools.',
-            'Familiarity with standard design systems (e.g., Material, Apple Human Interface).'
-          ],
-          responsibilities: [
-            'Design features and flows for the Stripe dashboard.',
-            'Conduct user interviews and gather qualitative data.',
-            'Work closely with engineers to ensure pixel-perfect deployment.'
-          ],
-        ),
-        InternshipOpportunity(
-          id: 'mock-opp-3',
-          company: 'Meta',
-          role: 'AR/VR Software Intern',
-          industry: 'Metaverse / Social',
-          location: 'Seattle, WA',
-          stipend: '\$7,500 / month',
-          duration: '3 Months',
-          deadline: '01 Nov 2026',
-          brandColor: Color(0xFF0668E1), // Meta Blue
-          logoInitial: 'M',
-          about: 'Develop future immersive platforms on the Quest ecosystem. Help define how millions interact in VR/AR environments.',
-          isApplied: false,
-          requirements: [
-            'Experience in C++, C#, or Unity/Unreal engine.',
-            'Strong 3D math and computer graphics understanding.',
-            'Passion for virtualization and augmented platforms.'
-          ],
-          responsibilities: [
-            'Build immersive prototypes in Unity/C#.',
-            'Optimize rendering performance on mobile VR hardware.',
-            'Design modular frameworks for spatial interactions.'
-          ],
-        ),
-      ];
-    }
     Set<String> appliedInternshipIds = {};
 
-    final student = await _client
-        .from('students')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .timeout(const Duration(seconds: 15));
-
-    if (student != null) {
-      final appliedResponse = await _client
-          .from('applications')
-          .select('internship_id')
-          .eq('student_id', student['id'])
+    if (user != null) {
+      final student = await _client
+          .from('students')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle()
           .timeout(const Duration(seconds: 15));
 
-      appliedInternshipIds = (appliedResponse as List)
-          .map((item) => item['internship_id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty)
-          .toSet();
+      if (student != null) {
+        final appliedResponse = await _client
+            .from('applications')
+            .select('internship_id')
+            .eq('student_id', student['id'])
+            .timeout(const Duration(seconds: 15));
+
+        appliedInternshipIds = (appliedResponse as List)
+            .map((item) => item['internship_id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toSet();
+      }
     }
 
     final response = await _client

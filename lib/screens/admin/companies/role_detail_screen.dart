@@ -8,7 +8,7 @@ class RoleDetailScreen extends StatelessWidget {
   final String startDate;
   final String duration;
   final String description;
-  final List<String> skills;
+  final List<String> responsibilities;
   final List<Map<String, String>> applicants;
 
   const RoleDetailScreen({
@@ -20,7 +20,7 @@ class RoleDetailScreen extends StatelessWidget {
     required this.startDate,
     required this.duration,
     required this.description,
-    required this.skills,
+    required this.responsibilities,
     required this.applicants,
   });
 
@@ -110,31 +110,31 @@ class RoleDetailScreen extends StatelessWidget {
                   Text(description,
                     style: const TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.7, fontWeight: FontWeight.w400)),
                   
-                  const SizedBox(height: 36),
-                  
-                  // ── Skills ──
-                  const Text('Requirements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8, runSpacing: 12,
-                    children: skills.map((s) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2))],
-                      ),
+                  if (responsibilities.isNotEmpty) ...[
+                    const SizedBox(height: 36),
+                    const Text('Responsibilities', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
+                    const SizedBox(height: 14),
+                    ...responsibilities.map((r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF64748B)),
-                          const SizedBox(width: 6),
-                          Text(s, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                          Container(
+                            margin: const EdgeInsets.only(top: 6),
+                            width: 5, height: 5,
+                            decoration: const BoxDecoration(color: Color(0xFFCBD5E1), shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              r,
+                              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5, fontWeight: FontWeight.w500),
+                            ),
+                          ),
                         ],
                       ),
-                    )).toList(),
-                  ),
+                    )),
+                  ],
 
                   const SizedBox(height: 48),
 
