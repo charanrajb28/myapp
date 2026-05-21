@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/internship.dart';
+import '../../../providers/student_internships_provider.dart';
 import 'internship_opportunity_detail_screen.dart';
 import '../student_portal_repository.dart';
 
@@ -143,20 +145,20 @@ const List<InternshipOpportunity> kAvailableInternships = [
 ];
 
 // ─────────────────────────────────────────────────────────────────
-class MyInternshipScreen extends StatefulWidget {
+class MyInternshipScreen extends ConsumerStatefulWidget {
   const MyInternshipScreen({super.key});
 
   @override
-  State<MyInternshipScreen> createState() => _MyInternshipScreenState();
+  ConsumerState<MyInternshipScreen> createState() => _MyInternshipScreenState();
 }
 
-class _MyInternshipScreenState extends State<MyInternshipScreen> {
-  final _repository = StudentPortalRepository();
+class _MyInternshipScreenState extends ConsumerState<MyInternshipScreen> {
   String _searchQuery = '';
   String _selectedIndustry = 'All';
-  bool _isLoading = true;
-  List<InternshipOpportunity> _availableInternships = [];
-  List<StudentInternship> _studentInternships = [];
+
+  List<InternshipOpportunity> get _availableInternships => ref.watch(studentInternshipsProvider).availableInternships;
+  List<StudentInternship> get _studentInternships => ref.watch(studentInternshipsProvider).studentInternships;
+  bool get _isLoading => ref.watch(studentInternshipsProvider).isLoading;
 
   List<InternshipOpportunity> get _filteredInternships {
     return _availableInternships.where((o) {
@@ -186,7 +188,6 @@ class _MyInternshipScreenState extends State<MyInternshipScreen> {
   @override
   void initState() {
     super.initState();
-    _loadInternshipData();
   }
 
   @override
@@ -195,30 +196,27 @@ class _MyInternshipScreenState extends State<MyInternshipScreen> {
   }
 
   Future<void> _loadInternshipData() async {
-    setState(() => _isLoading = true);
-    try {
-      final available = await _repository.fetchAvailableInternships();
-      final student = await _repository.fetchStudentInternships();
-      if (!mounted) return;
-      setState(() {
-        _availableInternships = available;
-        _studentInternships = student;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to load internships: $e'),
-          backgroundColor: const Color(0xFFDC2626),
-        ),
-      );
-    }
+    await ref.read(studentInternshipsProvider.notifier).loadInternships();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<StudentInternshipsState>(
+      studentInternshipsProvider,
+      (previous, next) {
+        if (next.errorMessage != null && next.errorMessage != previous?.errorMessage) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Unable to load internships: ${next.errorMessage}'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
+      },
+    );
+
+    final showInitialSpinner = _isLoading && _availableInternships.isEmpty && _studentInternships.isEmpty;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -242,9 +240,12 @@ class _MyInternshipScreenState extends State<MyInternshipScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
-      body: _isLoading
+      body: showInitialSpinner
           ? const Center(child: CircularProgressIndicator())
-          : _exploreTab(),
+          : RefreshIndicator(
+              onRefresh: () => ref.read(studentInternshipsProvider.notifier).loadInternships(),
+              child: _exploreTab(),
+            ),
     );
   }
   Widget _applicationsButton() {

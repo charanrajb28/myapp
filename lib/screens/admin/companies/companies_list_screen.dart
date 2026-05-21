@@ -48,7 +48,94 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
 
   Future<void> _fetchCompanies() async {
     try {
-      final res = await Supabase.instance.client
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser == null) {
+        if (mounted) {
+          setState(() {
+            _companies = [
+              _Company(
+                id: 'comp-1',
+                name: 'TechCorp Solutions',
+                industry: 'Information Technology',
+                location: 'San Francisco, CA',
+                activeInterns: 8,
+                totalPlacements: 24,
+                openRoles: 3,
+                rating: 4.8,
+                status: 'Approved',
+                logoColor: const Color(0xFF3B82F6),
+                logoInitial: 'T',
+                about: 'TechCorp Solutions is a leading provider of cloud infrastructure and modern enterprise software applications.',
+                isBlacklisted: false,
+              ),
+              _Company(
+                id: 'comp-2',
+                name: 'Google',
+                industry: 'Tech & Search',
+                location: 'Mountain View, CA',
+                activeInterns: 15,
+                totalPlacements: 45,
+                openRoles: 5,
+                rating: 4.9,
+                status: 'Approved',
+                logoColor: const Color(0xFFEA4335),
+                logoInitial: 'G',
+                about: 'Organizing the world\'s information and making it universally accessible and useful.',
+                isBlacklisted: false,
+              ),
+              _Company(
+                id: 'comp-3',
+                name: 'Stripe',
+                industry: 'Fintech',
+                location: 'South San Francisco, CA',
+                activeInterns: 6,
+                totalPlacements: 18,
+                openRoles: 2,
+                rating: 4.7,
+                status: 'Approved',
+                logoColor: const Color(0xFF635BFF),
+                logoInitial: 'S',
+                about: 'Stripe provides financial infrastructure for the internet, enabling payments and online billing globally.',
+                isBlacklisted: false,
+              ),
+              _Company(
+                id: 'comp-4',
+                name: 'Meta',
+                industry: 'Social Networking',
+                location: 'Menlo Park, CA',
+                activeInterns: 10,
+                totalPlacements: 30,
+                openRoles: 4,
+                rating: 4.6,
+                status: 'Approved',
+                logoColor: const Color(0xFF0080FF),
+                logoInitial: 'M',
+                about: 'Meta builds technologies that help people connect, find communities, and grow businesses.',
+                isBlacklisted: false,
+              ),
+              _Company(
+                id: 'comp-5',
+                name: 'Legacy Dynamics',
+                industry: 'Consulting',
+                location: 'Boston, MA',
+                activeInterns: 0,
+                totalPlacements: 12,
+                openRoles: 0,
+                rating: 3.5,
+                status: 'Approved',
+                logoColor: const Color(0xFF64748B),
+                logoInitial: 'L',
+                about: 'Legacy business consulting provider. Currently paused operations.',
+                isBlacklisted: true,
+              )
+            ];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final res = await client
           .from('companies')
           .select('*')
           .order('created_at');
@@ -83,7 +170,38 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
 
   Future<void> _toggleBlacklist(String id, bool currentState) async {
     try {
-      await Supabase.instance.client
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser == null) {
+        setState(() {
+          final index = _companies.indexWhere((c) => c.id == id);
+          if (index != -1) {
+            final old = _companies[index];
+            _companies[index] = _Company(
+              id: old.id,
+              name: old.name,
+              industry: old.industry,
+              location: old.location,
+              activeInterns: old.activeInterns,
+              totalPlacements: old.totalPlacements,
+              openRoles: old.openRoles,
+              rating: old.rating,
+              status: old.status,
+              logoColor: old.logoColor,
+              logoInitial: old.logoInitial,
+              about: old.about,
+              isBlacklisted: !currentState,
+            );
+          }
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(currentState ? 'Company Whitelisted (Dev Mode)' : 'Company Blocked Successfully (Dev Mode)'))
+          );
+        }
+        return;
+      }
+
+      await client
           .from('companies')
           .update({'is_blacklisted': !currentState})
           .eq('id', id);
@@ -250,7 +368,11 @@ class _CompanyCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ).then((_) => (context.findAncestorStateOfType<_CompaniesListScreenState>())?._fetchCompanies());
+            ).then((_) {
+              if (context.mounted) {
+                context.findAncestorStateOfType<_CompaniesListScreenState>()?._fetchCompanies();
+              }
+            });
           },
           child: Stack(
             children: [

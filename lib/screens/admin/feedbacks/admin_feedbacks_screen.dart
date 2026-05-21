@@ -44,24 +44,54 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
 
   Future<void> _fetchFeedbacks() async {
     try {
-      final res = await Supabase.instance.client
-          .from('feedbacks')
-          .select('*, students(name), companies(name)')
-          .order('created_at', ascending: false);
-          
-      final mapped = (res as List).map((f) {
-        return FeedbackModel(
-          id: f['id'].toString(),
-          studentName: f['students']?['name'] ?? 'Unknown Student',
-          companyName: f['companies']?['name'] ?? 'Unknown Company',
-          type: f['type'] ?? 'Suggestion',
-          comment: f['comment'] ?? '',
-          date: DateTime.tryParse(f['created_at'].toString()) ?? DateTime.now(),
-        );
-      }).toList();
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser == null) {
+        final now = DateTime.now();
+        _allFeedbacks = [
+          FeedbackModel(
+            id: 'fb-1',
+            studentName: 'Alex Guest',
+            companyName: 'TechCorp Solutions',
+            type: 'Compliment',
+            comment: 'The mentorship program has been exceptionally well-structured and I have learned a lot about full-stack engineering.',
+            date: now.subtract(const Duration(hours: 2)),
+          ),
+          FeedbackModel(
+            id: 'fb-2',
+            studentName: 'Sarah Chen',
+            companyName: 'Google',
+            type: 'Compliment',
+            comment: 'Thoroughly enjoying my internship. The tooling and team support are second to none!',
+            date: now.subtract(const Duration(days: 1, hours: 3)),
+          ),
+          FeedbackModel(
+            id: 'fb-3',
+            studentName: 'Michael Vance',
+            companyName: 'Meta',
+            type: 'Suggestion',
+            comment: 'Would love to see more internal learning modules made available early in the internship.',
+            date: now.subtract(const Duration(days: 2, hours: 5)),
+          ),
+        ];
+      } else {
+        final res = await client
+            .from('feedbacks')
+            .select('*, students(name), companies(name)')
+            .order('created_at', ascending: false);
+            
+        final mapped = (res as List).map((f) {
+          return FeedbackModel(
+            id: f['id'].toString(),
+            studentName: f['students']?['name'] ?? 'Unknown Student',
+            companyName: f['companies']?['name'] ?? 'Unknown Company',
+            type: f['type'] ?? 'Suggestion',
+            comment: f['comment'] ?? '',
+            date: DateTime.tryParse(f['created_at'].toString()) ?? DateTime.now(),
+          );
+        }).toList();
 
-      _allFeedbacks = mapped;
-
+        _allFeedbacks = mapped;
+      }
     } catch (e) {
       debugPrint('No feedbacks table or error fetching: $e');
       // If table doesnt exist or errors out, keep list empty as requested

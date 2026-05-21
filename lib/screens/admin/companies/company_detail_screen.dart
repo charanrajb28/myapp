@@ -40,7 +40,7 @@ class CompanyDetailScreen extends StatefulWidget {
 
 class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   int _tabIndex = 0;
-  static const _tabs = ['Overview', 'Past Internships', 'Open Roles', 'Documents'];
+  static const _tabs = ['Overview', 'Open Roles', 'Ongoing Roles', 'Past Roles', 'Documents'];
   
   bool _isLoading = true;
   CompanyDetailArgs? _dynamicCompany;
@@ -66,7 +66,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
           
       final rolesRes = await supabase
           .from('internships')
-          .select('*')
+          .select('*, applications(*, students(*))')
           .eq('company_id', widget.company.id);
 
       if (mounted) {
@@ -113,6 +113,190 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error toggling blacklist: $e');
+    }
+  }
+
+  Future<void> _sendNotificationToRoleApplicants(Map<String, dynamic> role) async {
+    final apps = role['applications'] as List? ?? [];
+    final validApps = apps.where((app) {
+      final status = app['status']?.toString() ?? '';
+      return status != 'Rejected' && status != 'Removed';
+    }).toList();
+
+    final userIds = validApps
+        .map((app) {
+          final student = app['students'];
+          if (student is Map) {
+            return student['user_id']?.toString() ?? '';
+          }
+          return '';
+        })
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (userIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active applicants found to notify.'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    String selectedType = 'general';
+
+    final shouldSend = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.send_rounded, color: Color(0xFF0F172A)),
+                  SizedBox(width: 10),
+                  Text('Notify Applicants', style: TextStyle(fontWeight: FontWeight.w800)),
+                ],
+              ),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Broadcast a notification to ${userIds.length} active applicant${userIds.length == 1 ? "" : "s"} for "${role['role'] ?? 'this role'}".',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Notification Title',
+                        hintText: 'e.g. Schedule Update',
+                        border: OutlineInputBorder(),
+                        floatingLabelBehavior: FloatingLabelBehavior.always,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedType,
+                      decoration: const InputDecoration(
+                        labelText: 'Notification Type',
+                        border: OutlineInputBorder(),
+                        floatingLabelBehavior: FloatingLabelBehavior.always,
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'general', child: Text('General')),
+                        DropdownMenuItem(value: 'announcement', child: Text('Announcement')),
+                        DropdownMenuItem(value: 'interview', child: Text('Interview')),
+                        DropdownMenuItem(value: 'message', child: Text('Message')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedType = value);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: messageController,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Message Content',
+                        hintText: 'Type your message details here...',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(),
+                        floatingLabelBehavior: FloatingLabelBehavior.always,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (titleController.text.trim().isEmpty ||
+                        messageController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Title and message content are required.'),
+                          backgroundColor: Color(0xFFDC2626),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Broadcast', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (shouldSend != true) {
+      titleController.dispose();
+      messageController.dispose();
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+    
+    try {
+      final client = Supabase.instance.client;
+      await Future.wait(
+        userIds.map(
+          (userId) => client.from('student_notifications').insert({
+            'user_id': userId,
+            'title': titleController.text.trim(),
+            'message': messageController.text.trim(),
+            'notification_type': selectedType,
+            'is_read': false,
+          }),
+        ),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully sent notification to all ${userIds.length} applicants!'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send notification: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      titleController.dispose();
+      messageController.dispose();
     }
   }
 
@@ -186,11 +370,44 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
 
   Widget _buildTabContent(CompanyDetailArgs c, bool isMobile) {
     switch (_tabIndex) {
-      case 0: return _OverviewTab(c: c, isMobile: isMobile);
-      case 1: return _PastRolesTab(pastRoles: _pastRoles);
-      case 2: return _RolesTab(roles: _openRoles);
-      case 3: return _DocsTab(docs: _docs);
-      default: return const SizedBox();
+      case 0:
+        return _OverviewTab(c: c, isMobile: isMobile);
+      case 1:
+        final interviewingRoles = _openRoles.where((r) {
+          final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+          return status == 'INTERVIEWING';
+        }).toList();
+        return _RolesTab(
+          roles: interviewingRoles,
+          statusName: 'Open',
+          emptyIcon: Icons.lock_open_rounded,
+        );
+      case 2:
+        final activeRoles = _openRoles.where((r) {
+          final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+          return status == 'ACTIVE';
+        }).toList();
+        return _RolesTab(
+          roles: activeRoles,
+          statusName: 'Ongoing',
+          emptyIcon: Icons.autorenew_rounded,
+          showNotifyButton: true,
+          onNotify: _sendNotificationToRoleApplicants,
+        );
+      case 3:
+        final closedRoles = _openRoles.where((r) {
+          final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+          return status == 'CLOSED';
+        }).toList();
+        return _RolesTab(
+          roles: closedRoles,
+          statusName: 'Past',
+          emptyIcon: Icons.inventory_2_outlined,
+        );
+      case 4:
+        return _DocsTab(docs: _docs);
+      default:
+        return const SizedBox();
     }
   }
 }
@@ -627,214 +844,263 @@ class _InfoRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────
-class _PastRolesTab extends StatelessWidget {
-  final List<Map<String, dynamic>> pastRoles;
-  const _PastRolesTab({required this.pastRoles});
+class _RolesTab extends StatelessWidget {
+  final List<Map<String, dynamic>> roles;
+  final String statusName;
+  final IconData emptyIcon;
+  final bool showNotifyButton;
+  final void Function(Map<String, dynamic>)? onNotify;
 
-  // Mock data for detail screen
-  static const _applicants = [
-    [
-      {'name': 'Priya Sharma',  'id': 'STU-001', 'dept': 'Computer Science', 'status': 'Accepted'},
-      {'name': 'Nisha Patel',   'id': 'STU-003', 'dept': 'Information Tech', 'status': 'Accepted'},
-      {'name': 'Rohan Das',     'id': 'STU-004', 'dept': 'Electrical Eng.',  'status': 'Accepted'},
-    ],
-  ];
-  static const _descriptions = [
-    'This was a successful internship program where students worked on core backend services and scalable REST APIs. Delivered major impact.',
-    'Interns focused on data modeling and created internal dashboard tools for the analytics team. Helped improve decision making.',
-  ];
-  static const _skills = [['Node.js', 'SQL', 'Git'], ['Python', 'Pandas', 'Tableau']];
+  const _RolesTab({
+    super.key,
+    required this.roles,
+    required this.statusName,
+    required this.emptyIcon,
+    this.showNotifyButton = false,
+    this.onNotify,
+  });
+
+  Color _parseColor(String? hex) {
+    if (hex == null || hex.isEmpty) return const Color(0xFF6366F1);
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return const Color(0xFF6366F1);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Past Internship Roles (${pastRoles.length})'),
-        ...List.generate(pastRoles.length, (i) {
-          final role = pastRoles[i];
-          final filled  = int.parse(role['filled']!);
-          final slots   = int.parse(role['slots']!);
-          final allFilled = filled == slots;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
+        _sectionTitle('$statusName Positions (${roles.length})'),
+        const SizedBox(height: 12),
+        if (roles.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => RoleDetailScreen(
-                      title: role['title']!,
-                      type: role['type']!,
-                      deadline: 'N/A (Closed)',
-                      slots: role['slots']!,
-                      startDate: role['period']!,
-                      duration: 'Completed',
-                      description: _descriptions[i % _descriptions.length],
-                      skills: _skills[i % _skills.length],
-                      applicants: _applicants[0], // Handful of accepted mock students
-                    ),
-                  ));
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  emptyIcon,
+                  size: 48,
+                  color: const Color(0xFF94A3B8),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No $statusName Positions',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    fontSize: 14,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'No listings under this category for this partner.',
+                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          ...List.generate(roles.length, (i) {
+            final role = roles[i];
+            final brandColor = _parseColor(role['brand_color'] ?? '#6366F1');
+            final apps = role['applications'] as List? ?? [];
+            final validApps = apps.where((app) {
+              final status = app['status']?.toString() ?? '';
+              return status != 'Rejected' && status != 'Removed';
+            }).toList();
+            final applicantCount = validApps.length;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: IntrinsicHeight(
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Accent brand color border on left
+                      Container(
+                        width: 5,
+                        color: brandColor,
+                      ),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(role['title']!,
-                              style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 14),
-                              overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 8),
-                            Row(children: [
-                              _chip(role['type']!, const Color(0xFFF1F5F9), const Color(0xFF475569)),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.event_note_outlined, size: 12, color: Color(0xFF94A3B8)),
-                              const SizedBox(width: 4),
-                              Flexible(child: Text(role['period']!, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis)),
-                            ]),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => RoleDetailScreen(
+                                    title: role['role'] ?? 'Intern Role',
+                                    type: 'Full-time',
+                                    deadline: role['deadline'] ?? 'TBD',
+                                    slots: role['total_slots']?.toString() ?? '0',
+                                    startDate: 'May 1, 2025',
+                                    duration: '6 Months',
+                                    description: role['description'] ?? 'No description provided.',
+                                    skills: const ['General Skillset'],
+                                    applicants: const [],
+                                  ),
+                                )),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                                  child: Row(
+                                    children: [
+                                      // Left side logo icon representation
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: brandColor.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(
+                                          Icons.work_rounded,
+                                          color: brandColor,
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              role['role'] ?? 'Intern Role',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF0F172A),
+                                                fontSize: 14,
+                                                letterSpacing: -0.2,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              children: [
+                                                _chip('Full-time', const Color(0xFFF1F5F9), const Color(0xFF475569)),
+                                                const SizedBox(width: 10),
+                                                const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF94A3B8)),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: Text(
+                                                    role['deadline'] ?? 'No Deadline',
+                                                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          _chip(
+                                            '${role['total_slots']} slots',
+                                            brandColor.withValues(alpha: 0.08),
+                                            brandColor,
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (showNotifyButton) ...[
+                              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.people_outline_rounded, size: 16, color: brandColor),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '$applicantCount Active Applicant${applicantCount == 1 ? "" : "s"}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: applicantCount > 0 ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: applicantCount > 0 ? () => onNotify?.call(role) : null,
+                                      icon: const Icon(Icons.send_rounded, size: 14),
+                                      label: const Text('Notify Applicants', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: brandColor,
+                                        disabledForegroundColor: const Color(0xFFCBD5E1),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          side: BorderSide(
+                                            color: applicantCount > 0 ? brandColor.withValues(alpha: 0.2) : const Color(0xFFE2E8F0),
+                                          ),
+                                        ),
+                                        backgroundColor: applicantCount > 0 ? brandColor.withValues(alpha: 0.04) : Colors.transparent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: allFilled ? const Color(0xFFF0FDF4) : const Color(0xFFFFF7ED),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: allFilled ? const Color(0xFFBBF7D0) : const Color(0xFFFED7AA)),
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(
-                                allFilled ? Icons.check_circle_outline : Icons.hourglass_bottom_rounded,
-                                size: 12,
-                                color: allFilled ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
-                              ),
-                              const SizedBox(width: 5),
-                              Text('$filled/$slots filled',
-                                style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w700,
-                                  color: allFilled ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
-                                )),
-                            ]),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
                     ],
                   ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
       ],
     );
   }
 
   Widget _chip(String label, Color bg, Color fg) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────
-class _RolesTab extends StatelessWidget {
-  final List<Map<String, dynamic>> roles;
-  const _RolesTab({required this.roles});
-
-  @override
-  Widget build(BuildContext context) {
-    if (roles.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(40),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: const Center(child: Text('No open roles found for this company.')),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+        ),
       );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('Open Positions (${roles.length})'),
-        ...List.generate(roles.length, (i) {
-          final role = roles[i];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => RoleDetailScreen(
-                    title: role['role'] ?? 'Intern Role',
-                    type: 'Full-time',
-                    deadline: role['deadline'] ?? 'TBD',
-                    slots: role['total_slots']?.toString() ?? '0',
-                    startDate: 'May 1, 2025',
-                    duration: '6 Months',
-                    description: role['description'] ?? 'No description provided.',
-                    skills: const ['General Skillset'],
-                    applicants: const [],
-                  ),
-                )),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(children: [
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(role['role'] ?? 'Intern Role',
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 14),
-                        overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        _chip('Full-time', const Color(0xFFF1F5F9), const Color(0xFF475569)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF94A3B8)),
-                        const SizedBox(width: 4),
-                        Flexible(child: Text(role['deadline'] ?? 'No Deadline',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                          overflow: TextOverflow.ellipsis)),
-                      ]),
-                    ])),
-                    const SizedBox(width: 10),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      _chip('${role['total_slots']} slots', const Color(0xFFEFF6FF), const Color(0xFF1D4ED8)),
-                    ]),
-                    const SizedBox(width: 10),
-                    const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1)),
-                  ]),
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _chip(String label, Color bg, Color fg) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
-  );
 }
 
 

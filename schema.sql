@@ -294,12 +294,56 @@ FOR UPDATE TO authenticated USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
 
 DROP POLICY IF EXISTS "Admins can manage notifications" ON student_notifications;
-CREATE POLICY "Admins can manage notifications" ON student_notifications
-FOR ALL TO authenticated USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+DROP POLICY IF EXISTS "Admins can select all notifications" ON student_notifications;
+DROP POLICY IF EXISTS "Admins can insert notifications" ON student_notifications;
+DROP POLICY IF EXISTS "Admins can update all notifications" ON student_notifications;
+DROP POLICY IF EXISTS "Admins can delete notifications" ON student_notifications;
+
+CREATE POLICY "Admins can select all notifications" ON student_notifications
+FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users
+    WHERE public.users.id = auth.uid()
+      AND public.users.role::text = 'admin'
+  )
+);
+
+CREATE POLICY "Admins can insert notifications" ON student_notifications
+FOR INSERT TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users
+    WHERE public.users.id = auth.uid()
+      AND public.users.role::text = 'admin'
+  )
+);
+
+CREATE POLICY "Admins can update all notifications" ON student_notifications
+FOR UPDATE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users
+    WHERE public.users.id = auth.uid()
+      AND public.users.role::text = 'admin'
+  )
 )
 WITH CHECK (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  EXISTS (
+    SELECT 1 FROM public.users
+    WHERE public.users.id = auth.uid()
+      AND public.users.role::text = 'admin'
+  )
+);
+
+CREATE POLICY "Admins can delete notifications" ON student_notifications
+FOR DELETE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.users
+    WHERE public.users.id = auth.uid()
+      AND public.users.role::text = 'admin'
+  )
 );
 
 DROP POLICY IF EXISTS "Students can create own feedback" ON feedbacks;
@@ -582,3 +626,34 @@ CREATE TRIGGER on_auth_user_created
 --   "check_out_at": "2026-04-06T17:10:00Z",
 --   "notes": ""
 -- }
+
+-- ── Admin: DELETE policy on public.users ──────────────────────────────────────
+DROP POLICY IF EXISTS "Admins can delete users" ON users;
+CREATE POLICY "Admins can delete users" ON users
+FOR DELETE TO authenticated
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
+
+-- ── RPC: admin_delete_user ────────────────────────────────────────────────────
+-- Deletes a user from auth.users (requires service-role-level access).
+-- Runs as SECURITY DEFINER so any authenticated admin can trigger it.
+-- The ON DELETE CASCADE on auth.users → public.users → students handles cleanup.
+CREATE OR REPLACE FUNCTION public.admin_delete_user(target_user_id UUID)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Only allow admins to call this function
+  IF (SELECT role FROM public.users WHERE id = auth.uid()) != 'admin' THEN
+    RAISE EXCEPTION 'Unauthorized: only admins can delete users';
+  END IF;
+
+  -- Delete from auth.users — cascades to public.users → students, applications, etc.
+  DELETE FROM auth.users WHERE id = target_user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_delete_user(UUID) TO authenticated;

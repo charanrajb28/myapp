@@ -119,7 +119,7 @@ class RedAlertsScreen extends StatelessWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  separatorBuilder: (_, index) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final item = items[index];
                     return _StudentAlertRow(item: item);
@@ -134,7 +134,73 @@ class RedAlertsScreen extends StatelessWidget {
   }
 
   Future<List<Map<String, dynamic>>> _fetchLowProgressClosedApplications() async {
-    final response = await Supabase.instance.client
+    final client = Supabase.instance.client;
+    if (client.auth.currentUser == null) {
+      return [
+        {
+          'id': 'alert-1',
+          'status': 'Removed',
+          'progress': 0.1,
+          'start_date': '2026-05-01',
+          'end_date': '2026-05-10',
+          'created_at': '2026-05-01T08:00:00Z',
+          'students': {
+            'id': 'stu-1',
+            'name': 'James Miller',
+            'department': 'Computer Science',
+            'semester': '6th Semester',
+          },
+          'internships': {
+            'role': 'Backend Intern',
+            'companies': {
+              'name': 'Stripe',
+            }
+          }
+        },
+        {
+          'id': 'alert-2',
+          'status': 'Removed',
+          'progress': 0.15,
+          'start_date': '2026-05-02',
+          'end_date': '2026-05-12',
+          'created_at': '2026-05-02T09:00:00Z',
+          'students': {
+            'id': 'stu-2',
+            'name': 'Emily Watson',
+            'department': 'Data Science',
+            'semester': '8th Semester',
+          },
+          'internships': {
+            'role': 'Data Analyst Intern',
+            'companies': {
+              'name': 'Meta',
+            }
+          }
+        },
+        {
+          'id': 'alert-3',
+          'status': 'Completed',
+          'progress': 0.25,
+          'start_date': '2026-04-15',
+          'end_date': '2026-05-15',
+          'created_at': '2026-04-15T10:00:00Z',
+          'students': {
+            'id': 'stu-3',
+            'name': 'Lucas Fletcher',
+            'department': 'Information Technology',
+            'semester': '7th Semester',
+          },
+          'internships': {
+            'role': 'Security Analyst Intern',
+            'companies': {
+              'name': 'Google',
+            }
+          }
+        }
+      ];
+    }
+
+    final response = await client
         .from('applications')
         .select(
           'id, status, progress, start_date, end_date, created_at, '
@@ -486,28 +552,5 @@ class _AlertCard extends StatelessWidget {
     final value = (name ?? '').trim();
     if (value.isEmpty) return 'S';
     return value[0].toUpperCase();
-  }
-
-  String _dateLabel(String? raw) {
-    final value = raw?.trim() ?? '';
-    if (value.isEmpty) return 'Closed date N/A';
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null) return value;
-    final day = parsed.day.toString().padLeft(2, '0');
-    final month = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ][parsed.month - 1];
-    return 'Closed $day $month ${parsed.year}';
   }
 }

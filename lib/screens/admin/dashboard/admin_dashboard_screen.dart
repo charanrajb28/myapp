@@ -28,24 +28,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final client = Supabase.instance.client;
 
+      if (client.auth.currentUser == null) {
+        if (mounted) {
+          setState(() {
+            _totalStudents = 142;
+            _partnerCompanies = 28;
+            _activeInternships = 35;
+            _redAlerts = 3;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
       // Fetch total students
       final studentsRes = await client.from('students').select('id').count(CountOption.exact);
-      final studentsCount = studentsRes.count ?? 0;
+      final studentsCount = studentsRes.count;
 
       // Fetch partner companies
       final companiesRes = await client.from('companies').select('id').count(CountOption.exact);
-      final companiesCount = companiesRes.count ?? 0;
+      final companiesCount = companiesRes.count;
 
       // Fetch active internships
       final internshipsRes = await client.from('applications').select('id').eq('status', 'Active').count(CountOption.exact);
-      final internshipsCount = internshipsRes.count ?? 0;
+      final internshipsCount = internshipsRes.count;
 
       final redAlertsRes = await client
           .from('applications')
           .select('id')
           .inFilter('status', ['Removed', 'Completed'])
           .count(CountOption.exact);
-      final redAlertsCount = redAlertsRes.count ?? 0;
+      final redAlertsCount = redAlertsRes.count;
 
       if (mounted) {
         setState(() {
@@ -209,19 +222,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return;
       }
 
-      final payload = userIds
-          .map(
-            (userId) => {
-              'user_id': userId,
-              'title': title,
-              'message': message,
-              'notification_type': type,
-              'is_read': false,
-            },
-          )
-          .toList();
-
-      await client.from('student_notifications').insert(payload);
+      await Future.wait(
+        userIds.map(
+          (userId) => client.from('student_notifications').insert({
+            'user_id': userId,
+            'title': title,
+            'message': message,
+            'notification_type': type,
+            'is_read': false,
+          }),
+        ),
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -598,12 +609,39 @@ class _ActionTile extends StatelessWidget {
 class _FeedbackList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final client = Supabase.instance.client;
+    final isGuest = client.auth.currentUser == null;
+
     return FutureBuilder(
-      future: Supabase.instance.client
-          .from('feedbacks')
-          .select('*, students(name), companies(name)')
-          .order('created_at', ascending: false)
-          .limit(3),
+      future: isGuest
+          ? Future.value([
+              {
+                'created_at': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+                'students': {'name': 'Alex Guest'},
+                'companies': {'name': 'TechCorp Solutions'},
+                'type': 'Compliment',
+                'comment': 'The mentorship program has been exceptionally well-structured and I have learned a lot about full-stack engineering.',
+              },
+              {
+                'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+                'students': {'name': 'Sarah Chen'},
+                'companies': {'name': 'Google'},
+                'type': 'Compliment',
+                'comment': 'Thoroughly enjoying my internship. The tooling and team support are second to none!',
+              },
+              {
+                'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+                'students': {'name': 'Michael Vance'},
+                'companies': {'name': 'Meta'},
+                'type': 'Suggestion',
+                'comment': 'Would love to see more internal learning modules made available early in the internship.',
+              },
+            ])
+          : client
+              .from('feedbacks')
+              .select('*, students(name), companies(name)')
+              .order('created_at', ascending: false)
+              .limit(3),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(

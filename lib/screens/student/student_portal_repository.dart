@@ -16,7 +16,19 @@ class StudentPortalRepository {
   Future<StudentProfileData> fetchProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: Guest login bypass
+      return const StudentProfileData(
+        name: 'Alex Guest (Dev Mode)',
+        college: 'Stanford University',
+        department: 'Computer Science',
+        semester: '8th Semester',
+        enrollmentId: 'SU-2022-8742',
+        email: 'alex.guest@stanford.edu',
+        graduationYear: '2026',
+        gpa: '3.94 / 4.0',
+        phone: '+1 (555) 019-2834',
+        avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150',
+      );
     }
 
       final profile = await _client
@@ -50,7 +62,71 @@ class StudentPortalRepository {
   Future<List<StudentInternship>> fetchStudentInternships() async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: Guest login bypass
+      return [
+        StudentInternship(
+          applicationId: 'mock-app-1',
+          id: 'mock-intern-1',
+          company: 'TechCorp Solutions',
+          role: 'Frontend Developer Intern',
+          department: 'Engineering',
+          location: 'San Francisco, CA (Hybrid)',
+          startDate: '01 Jun 2026',
+          endDate: '31 Aug 2026',
+          deadline: '15 May 2026',
+          progress: 0.65,
+          daysLeft: 90,
+          status: 'Active',
+          internshipStatus: 'ONGOING',
+          brandColor: const Color(0xFF6366F1), // Indigo
+          logoInitial: 'T',
+          stipend: '\$4,500 / month',
+          mentorName: 'Sarah Jenkins',
+          mentorEmail: 'sarah.j@techcorp.com',
+          offerLetterId: 'TC-2026-9921',
+          about: 'Leading implementation of core UI components using standard responsive web design.',
+          alerts: const [
+            {
+              'title': 'Midterm evaluation due',
+              'message': 'Please submit your self-assessment by the end of next week.',
+              'type': 'warning',
+            }
+          ],
+          checkins: [
+            {
+              'checkin_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+              'status': 'Present',
+              'check_in_at': DateTime.now().toUtc().toIso8601String(),
+              'check_out_at': null,
+              'notes': 'Dev guest session',
+            }
+          ],
+        ),
+        StudentInternship(
+          applicationId: 'mock-app-2',
+          id: 'mock-intern-2',
+          company: 'Innovate AI',
+          role: 'Machine Learning Research Intern',
+          department: 'R&D',
+          location: 'Remote',
+          startDate: '15 Sep 2026',
+          endDate: '15 Dec 2026',
+          deadline: '01 Aug 2026',
+          progress: 0.0,
+          daysLeft: 180,
+          status: 'Accepted',
+          internshipStatus: 'UPCOMING',
+          brandColor: const Color(0xFF10B981), // Emerald
+          logoInitial: 'I',
+          stipend: '\$5,200 / month',
+          mentorName: 'Dr. Alan Turing',
+          mentorEmail: 'alan.turing@innovate.ai',
+          offerLetterId: 'IAI-2026-4822',
+          about: 'Working on fine-tuning state-of-the-art transformer architectures for edge devices.',
+          alerts: const [],
+          checkins: const [],
+        ),
+      ];
     }
 
     final student = await _client
@@ -87,7 +163,8 @@ class StudentPortalRepository {
   Future<bool> applyForInternship(InternshipOpportunity opportunity) async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: Simulate successful application in guest mode
+      return true;
     }
 
     final student = await _client
@@ -127,28 +204,103 @@ class StudentPortalRepository {
 
   Future<List<InternshipOpportunity>> fetchAvailableInternships() async {
     final user = _client.auth.currentUser;
+    if (user == null) {
+      // DEV-ONLY: Guest login bypass
+      return const [
+        InternshipOpportunity(
+          id: 'mock-opp-1',
+          company: 'Google',
+          role: 'Software Engineering Intern',
+          industry: 'Technology',
+          location: 'Mountain View, CA (On-site)',
+          stipend: '\$8,000 / month',
+          duration: '3 Months',
+          deadline: '31 Aug 2026',
+          brandColor: Color(0xFFEA4335), // Google Red
+          logoInitial: 'G',
+          about: 'Join the team building the future of mobile and web applications. You will be working directly on production services.',
+          isApplied: false,
+          requirements: [
+            'Pursuing MS/PhD or BS in Computer Science or related engineering field.',
+            'Experience with Java, C++, Python, or Go.',
+            'Solid foundational knowledge in algorithms and systems design.'
+          ],
+          responsibilities: [
+            'Write clean, robust, well-tested code for web/mobile apps.',
+            'Collaborate with developers, product managers, and designers.',
+            'Analyze and optimize service and client-side performance.'
+          ],
+        ),
+        InternshipOpportunity(
+          id: 'mock-opp-2',
+          company: 'Stripe',
+          role: 'Product Design Intern',
+          industry: 'Fintech',
+          location: 'San Francisco, CA (Hybrid)',
+          stipend: '\$6,500 / month',
+          duration: '4 Months',
+          deadline: '15 Sep 2026',
+          brandColor: Color(0xFF635BFF), // Stripe Purple
+          logoInitial: 'S',
+          about: 'Stripe is looking for a design intern to work with the dashboard and consumer product experiences team.',
+          isApplied: false,
+          requirements: [
+            'Portfolio showcasing UI/UX interaction designs and visual polish.',
+            'Proficiency in Figma and design prototyping tools.',
+            'Familiarity with standard design systems (e.g., Material, Apple Human Interface).'
+          ],
+          responsibilities: [
+            'Design features and flows for the Stripe dashboard.',
+            'Conduct user interviews and gather qualitative data.',
+            'Work closely with engineers to ensure pixel-perfect deployment.'
+          ],
+        ),
+        InternshipOpportunity(
+          id: 'mock-opp-3',
+          company: 'Meta',
+          role: 'AR/VR Software Intern',
+          industry: 'Metaverse / Social',
+          location: 'Seattle, WA',
+          stipend: '\$7,500 / month',
+          duration: '3 Months',
+          deadline: '01 Nov 2026',
+          brandColor: Color(0xFF0668E1), // Meta Blue
+          logoInitial: 'M',
+          about: 'Develop future immersive platforms on the Quest ecosystem. Help define how millions interact in VR/AR environments.',
+          isApplied: false,
+          requirements: [
+            'Experience in C++, C#, or Unity/Unreal engine.',
+            'Strong 3D math and computer graphics understanding.',
+            'Passion for virtualization and augmented platforms.'
+          ],
+          responsibilities: [
+            'Build immersive prototypes in Unity/C#.',
+            'Optimize rendering performance on mobile VR hardware.',
+            'Design modular frameworks for spatial interactions.'
+          ],
+        ),
+      ];
+    }
     Set<String> appliedInternshipIds = {};
 
-    if (user != null) {
-      final student = await _client
-          .from('students')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle()
+    final student = await _client
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .timeout(const Duration(seconds: 15));
+
+    if (student != null) {
+      final appliedResponse = await _client
+          .from('applications')
+          .select('internship_id')
+          .eq('student_id', student['id'])
           .timeout(const Duration(seconds: 15));
 
-      if (student != null) {
-        final appliedResponse = await _client
-            .from('applications')
-            .select('internship_id')
-            .eq('student_id', student['id'])
-            .timeout(const Duration(seconds: 15));
-
-        appliedInternshipIds = (appliedResponse as List)
-            .map((item) => item['internship_id']?.toString() ?? '')
-            .where((id) => id.isNotEmpty)
-            .toSet();
-      }
+      appliedInternshipIds = (appliedResponse as List)
+          .map((item) => item['internship_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
     }
 
     final response = await _client
@@ -173,7 +325,33 @@ class StudentPortalRepository {
   Future<List<StudentNotification>> fetchStudentNotifications() async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      return const [];
+      // DEV-ONLY: Guest login bypass
+      return [
+        const StudentNotification(
+          id: 'mock-notif-1',
+          title: 'Offer Letter Received!',
+          message: 'TechCorp Solutions has issued your official internship offer letter. Please review and sign it.',
+          timeLabel: '2 hours ago',
+          type: StudentNotificationType.interview,
+          isRead: false,
+        ),
+        const StudentNotification(
+          id: 'mock-notif-2',
+          title: 'Weekly Check-in Pending',
+          message: 'Don\'t forget to complete your weekly check-in before Friday afternoon.',
+          timeLabel: '1 day ago',
+          type: StudentNotificationType.academic,
+          isRead: false,
+        ),
+        const StudentNotification(
+          id: 'mock-notif-3',
+          title: 'Profile Verified',
+          message: 'Your enrollment details have been verified by the university administrator.',
+          timeLabel: '3 days ago',
+          type: StudentNotificationType.security,
+          isRead: true,
+        ),
+      ];
     }
 
     try {
@@ -184,9 +362,19 @@ class StudentPortalRepository {
           .order('created_at', ascending: false)
           .timeout(const Duration(seconds: 8));
 
-      return (response as List)
-          .map((item) => _mapNotification(item as Map<String, dynamic>))
-          .toList();
+      final responseList = response as List;
+      final notifications = <StudentNotification>[];
+      for (final item in responseList) {
+        try {
+          if (item is Map) {
+            final mapped = _mapNotification(Map<String, dynamic>.from(item));
+            notifications.add(mapped);
+          }
+        } catch (e, stack) {
+          debugPrint('Error mapping notification item $item: $e\n$stack');
+        }
+      }
+      return notifications;
     } on PostgrestException catch (e) {
       debugPrint('Notification query failed: $e');
       return const [];
@@ -197,6 +385,7 @@ class StudentPortalRepository {
   }
 
   Future<void> markNotificationRead(String id) async {
+    if (_client.auth.currentUser == null) return; // DEV-ONLY: guest bypass
     await _client
         .from('student_notifications')
         .update({'is_read': true})
@@ -222,6 +411,22 @@ class StudentPortalRepository {
     required String applicationId,
     required bool isCheckout,
   }) async {
+    if (_client.auth.currentUser == null) {
+      // DEV-ONLY: Guest login bypass
+      final today = DateTime.now();
+      final todayLabel = DateFormat('yyyy-MM-dd').format(today);
+      final nowIso = today.toUtc().toIso8601String();
+      return [
+        {
+          'checkin_date': todayLabel,
+          'status': 'Present',
+          'check_in_at': isCheckout ? null : nowIso,
+          'check_out_at': isCheckout ? nowIso : null,
+          'notes': 'Dev guest session',
+        }
+      ];
+    }
+
     final response = await _client
         .from('applications')
         .select('checkins')
@@ -268,7 +473,25 @@ class StudentPortalRepository {
   Future<List<StudentDocumentItem>> fetchStudentDocuments() async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: Guest login bypass
+      return [
+        StudentDocumentItem(
+          id: 'mock-doc-1',
+          title: 'Resume_Alex_CS.pdf',
+          publicUrl: 'https://drive.google.com/file/d/mock-resume-id/view?usp=sharing',
+          sourceType: 'google_drive',
+          isResume: true,
+          createdAt: DateTime.now().subtract(const Duration(days: 10)),
+        ),
+        StudentDocumentItem(
+          id: 'mock-doc-2',
+          title: 'University_Transcript_Official.pdf',
+          publicUrl: 'https://drive.google.com/file/d/mock-transcript-id/view?usp=sharing',
+          sourceType: 'google_drive',
+          isResume: false,
+          createdAt: DateTime.now().subtract(const Duration(days: 5)),
+        ),
+      ];
     }
 
     final student = await _client
@@ -314,7 +537,8 @@ class StudentPortalRepository {
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: guest bypass
+      return;
     }
 
     final normalizedUrl = _normalizeDriveUrl(publicUrl);
@@ -397,7 +621,8 @@ class StudentPortalRepository {
   Future<void> deleteStudentDocument(StudentDocumentItem document) async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: guest bypass
+      return;
     }
 
     final student = await _client
@@ -453,7 +678,8 @@ class StudentPortalRepository {
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) {
-      throw Exception('User not logged in');
+      // DEV-ONLY: guest bypass
+      return;
     }
 
     final updates = <String, dynamic>{

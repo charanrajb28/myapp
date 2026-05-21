@@ -28,7 +28,24 @@ class _CompanyProfileScreenState extends State<CompanyProfileScreen> {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        // DEV-ONLY: Guest login bypass
+        if (mounted) {
+          setState(() {
+            _companyData = {
+              'name': 'TechCorp Solutions (Dev Mode)',
+              'industry': 'Software & AI Systems',
+              'description': 'TechCorp Solutions is a leading engineering enterprise specialized in highly robust web and mobile architectures, AI tooling, and premium digital solutions.',
+              'location': 'San Francisco, CA',
+              'partner_since': '2022',
+              'logo_url': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+              'banner_url': 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1000',
+            };
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
       final res = await supabase
           .from('companies')

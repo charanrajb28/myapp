@@ -35,7 +35,43 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user == null) {
-        if (mounted) setState(() => _isLoading = false);
+        // DEV-ONLY: Guest login bypass
+        if (mounted) {
+          setState(() {
+            _companyName = 'TechCorp Solutions (Dev Mode)';
+            _companyLogoUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150';
+            _recruitmentPool = '42';
+            _interviewing = '8';
+            _hired = '14';
+            _activePostings = [
+              {
+                'id': 'mock-posting-1',
+                'role': 'Frontend Developer Intern',
+                'status': 'INTERVIEWING',
+                'created_at': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+                'applicants': '18',
+                'color': const Color(0xFF6366F1),
+              },
+              {
+                'id': 'mock-posting-2',
+                'role': 'Product Manager Intern',
+                'status': 'INTERVIEWING',
+                'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+                'applicants': '12',
+                'color': const Color(0xFFEC4899),
+              },
+              {
+                'id': 'mock-posting-3',
+                'role': 'Data Analyst Intern',
+                'status': 'INTERVIEWING',
+                'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+                'applicants': '12',
+                'color': const Color(0xFFF59E0B),
+              },
+            ];
+            _isLoading = false;
+          });
+        }
         return;
       }
 

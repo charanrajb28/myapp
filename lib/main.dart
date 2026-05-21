@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth/forgot_password_screen.dart';
@@ -20,7 +21,11 @@ void main() async {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
   );
 
-  runApp(const MyApp());
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -549,7 +554,7 @@ class _LoginPageState extends State<LoginPage>
                                       
                                   final role = userData['role'];
                                   
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   
                                   if (role == 'admin') {
                                     Navigator.of(context).pushReplacement(
@@ -566,7 +571,7 @@ class _LoginPageState extends State<LoginPage>
                                   }
                                 }
                               } catch (e) {
-                                if (mounted) {
+                                if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(e.toString()),
@@ -699,73 +704,152 @@ class _LoginPageState extends State<LoginPage>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.offline_bolt_rounded, size: 16, color: Color(0xFF92400E)),
+                                SizedBox(width: 6),
+                                Text(
+                                  '🛠️  DEV TOOLS & OFFLINE BYPASS',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF92400E),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
                             const Text(
-                              '⚠️  Dev only — select portal to test frontend',
+                              'SELECT TEST ROLE:',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 9,
                                 color: Color(0xFF92400E),
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _devRoleChip('Student', Icons.school_rounded, textPrimary),
+                                const SizedBox(width: 8),
+                                _devRoleChip('Company', Icons.business_center_rounded, textPrimary),
+                                const SizedBox(width: 8),
+                                _devRoleChip('Admin', Icons.admin_panel_settings_rounded, textPrimary),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  if (_devRole == 'Student') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (context) => const StudentShell(),
+                                      ),
+                                    );
+                                  } else if (_devRole == 'Company') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (context) => const CompanyShell(),
+                                      ),
+                                    );
+                                  } else if (_devRole == 'Admin') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (context) => const AdminShell(
+                                          child: AdminDashboardScreen(),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.bolt_rounded, color: Colors.white),
+                                label: const Text(
+                                  'Instant Guest Login (Bypass Auth)',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFD97706), // premium amber-600
+                                  foregroundColor: Colors.white,
+                                  elevation: 2,
+                                  shadowColor: const Color(0xFFD97706).withValues(alpha: 0.3),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                setState(() => _isLoading = true);
-                                final client = Supabase.instance.client;
-                                try {
-                                  // 1. Wipe public tables via RPC function (If created)
+                            const Divider(color: Color(0xFFFBBF24), thickness: 0.5),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 38,
+                              child: OutlinedButton.icon(
+                                onPressed: _isLoading ? null : () async {
+                                  setState(() => _isLoading = true);
+                                  final client = Supabase.instance.client;
                                   try {
-                                    await client.rpc('reset_demo_db');
-                                  } catch (e) {
-                                    debugPrint('RPC Reset failed (Function might not exist yet): $e');
-                                    // Fallback if the user hasn't run the SQL yet
-                                    await client.from('applications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                                    await client.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                                    await client.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                    // 1. Wipe public tables via RPC function (If created)
+                                    try {
+                                      await client.rpc('reset_demo_db');
+                                    } catch (e) {
+                                      debugPrint('RPC Reset failed (Function might not exist yet): $e');
+                                      // Fallback if the user hasn't run the SQL yet
+                                      await client.from('applications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                      await client.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                      await client.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                                    }
+
+                                    // 2. Create Fresh Demo Auth Accounts with Isolated Client
+                                    // We use a temporary client to batch create WITHOUT logging the current user out.
+                                    final inviteClient = SupabaseClient(
+                                      'https://nfurwspybtiaycqntzev.supabase.co',
+                                      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+                                      authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+                                    );
+
+                                    await inviteClient.auth.signUp(
+                                      email: 'admin@scholarbridge.com',
+                                      password: 'adminpassword123',
+                                      data: {'role': 'admin', 'name': 'System Admin'},
+                                    );
+                                    await inviteClient.auth.signUp(
+                                      email: 'student@college.edu',
+                                      password: 'studentpassword123',
+                                      data: {'role': 'student', 'name': 'Alex Student', 'semester': '6th Semester'},
+                                    );
+                                    await inviteClient.auth.signUp(
+                                      email: 'hr@techcorp.com',
+                                      password: 'companypassword123',
+                                      data: {'role': 'company', 'name': 'TechCorp HR'},
+                                    );
+
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Database Reset & Demo Users Created!')));
+                                    }
+                                  } catch(e) {
+                                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Note: Some Auth users might already exist. Proceed to login.')));
+                                  } finally {
+                                    if (mounted) setState(() => _isLoading = false);
                                   }
-
-                                  // 2. Create Fresh Demo Auth Accounts with Isolated Client
-                                  // We use a temporary client to batch create WITHOUT logging the current user out.
-                                  final inviteClient = SupabaseClient(
-                                    'https://nfurwspybtiaycqntzev.supabase.co',
-                                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-                                    authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
-                                  );
-
-                                  await inviteClient.auth.signUp(
-                                    email: 'admin@scholarbridge.com',
-                                    password: 'adminpassword123',
-                                    data: {'role': 'admin', 'name': 'System Admin'},
-                                  );
-                                  await inviteClient.auth.signUp(
-                                    email: 'student@college.edu',
-                                    password: 'studentpassword123',
-                                    data: {'role': 'student', 'name': 'Alex Student', 'semester': '6th Semester'},
-                                  );
-                                  await inviteClient.auth.signUp(
-                                    email: 'hr@techcorp.com',
-                                    password: 'companypassword123',
-                                    data: {'role': 'company', 'name': 'TechCorp HR'},
-                                  );
-
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Database Reset & Demo Users Created!')));
-                                  }
-                                } catch(e) {
-                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Note: Some Auth users might already exist. Proceed to login.')));
-                                } finally {
-                                  if (mounted) setState(() => _isLoading = false);
-                                }
-                              },
-                              icon: _isLoading 
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF92400E)))
-                                : const Icon(Icons.bolt_rounded),
-                              label: const Text('Wipe DB & Generate Demo Credentials'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFDE68A), // amber-200
-                                foregroundColor: const Color(0xFF92400E), // amber-900
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                },
+                                icon: _isLoading 
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF92400E)))
+                                  : const Icon(Icons.settings_backup_restore_rounded, size: 16),
+                                label: const Text('Wipe DB & Generate Online Credentials', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF92400E),
+                                  side: const BorderSide(color: Color(0xFFFBBF24)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
                               ),
                             ),
                           ],

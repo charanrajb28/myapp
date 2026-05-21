@@ -1,77 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 
 import '../../../models/student_notification.dart';
-import '../student_portal_repository.dart';
+import '../../../providers/student_notifications_provider.dart';
 
-class StudentNotificationsScreen extends StatefulWidget {
+class StudentNotificationsScreen extends ConsumerStatefulWidget {
   const StudentNotificationsScreen({super.key});
 
   @override
-  State<StudentNotificationsScreen> createState() =>
+  ConsumerState<StudentNotificationsScreen> createState() =>
       _StudentNotificationsScreenState();
 }
 
-class _StudentNotificationsScreenState extends State<StudentNotificationsScreen> {
-  final _repository = StudentPortalRepository();
-  bool _isLoading = true;
-  List<StudentNotification> _notifications = [];
-
-  @override
-  void reassemble() {
-    super.reassemble();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadNotifications();
-      }
-    });
-  }
-
+class _StudentNotificationsScreenState extends ConsumerState<StudentNotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNotifications();
-  }
-
-  Future<void> _loadNotifications() async {
-    if (mounted) {
-      setState(() => _isLoading = true);
-    }
-    try {
-      final notifications = await _repository
-          .fetchStudentNotifications()
-          .timeout(const Duration(seconds: 10));
-      if (!mounted) return;
-      setState(() {
-        _notifications = notifications;
-        _isLoading = false;
-      });
-    } on TimeoutException {
-      if (!mounted) return;
-      setState(() {
-        _notifications = [];
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to load notifications: $e'),
-          backgroundColor: const Color(0xFFDC2626),
-        ),
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(studentNotificationsProvider.notifier).loadNotifications();
+    });
   }
 
   Future<void> _markAllAsRead() async {
     try {
-      await _repository.markAllNotificationsRead();
-      if (!mounted) return;
-      setState(() {
-        _notifications =
-            _notifications.map((n) => n.copyWith(isRead: true)).toList();
-      });
+      await ref.read(studentNotificationsProvider.notifier).markAllAsRead();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -86,15 +39,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
   Future<void> _markRead(StudentNotification item) async {
     if (item.isRead) return;
     try {
-      await _repository.markNotificationRead(item.id);
-      if (!mounted) return;
-      setState(() {
-        _notifications = _notifications
-            .map((notification) => notification.id == item.id
-                ? notification.copyWith(isRead: true)
-                : notification)
-            .toList();
-      });
+      await ref.read(studentNotificationsProvider.notifier).markAsRead(item.id);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,6 +53,10 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final notificationState = ref.watch(studentNotificationsProvider);
+    final notifications = notificationState.notifications;
+    final isLoading = notificationState.isLoading;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -121,7 +70,7 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
         ),
         actions: [
           IconButton(
-            onPressed: _notifications.isEmpty ? null : _markAllAsRead,
+            onPressed: notifications.isEmpty ? null : _markAllAsRead,
             icon: const Icon(Icons.done_all_rounded, color: Color(0xFF64748B)),
             tooltip: 'Mark all as read',
           ),
@@ -135,30 +84,46 @@ class _StudentNotificationsScreenState extends State<StudentNotificationsScreen>
           child: Container(color: const Color(0xFFE2E8F0), height: 1),
         ),
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _notifications.isEmpty
-              ? const _NotificationsEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _notifications.length,
-                  itemBuilder: (context, index) {
-                    final item = _notifications[index];
-                    return _NotificationCard(
-                      item: item,
-                      onTap: () async {
-                        await _markRead(item);
-                        if (!context.mounted) return;
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                _NotificationDetailScreen(item: item),
+          : RefreshIndicator(
+              onRefresh: () => ref
+                  .read(studentNotificationsProvider.notifier)
+                  .loadNotifications(),
+              child: notifications.isEmpty
+                  ? LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
                           ),
+                          child: const _NotificationsEmptyState(),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: notifications.length,
+                      itemBuilder: (context, index) {
+                        final item = notifications[index];
+                        return _NotificationCard(
+                          item: item,
+                          onTap: () async {
+                            await _markRead(item);
+                            if (!context.mounted) return;
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    _NotificationDetailScreen(item: item),
+                              ),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+            ),
     );
   }
 }
