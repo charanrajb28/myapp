@@ -72,6 +72,11 @@ class SessionExpiryHandler {
         ),
       );
     } finally {
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {
+        // ignore sign out errors
+      }
       navigator.pushNamedAndRemoveUntil('/login', (route) => false);
       _isShowingDialog = false;
     }

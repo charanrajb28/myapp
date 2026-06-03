@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/internship.dart';
 import '../../models/student_notification.dart';
+import '../../utils/session_expiry_handler.dart';
 
 class StudentPortalRepository {
   final SupabaseClient _client;
@@ -302,6 +303,9 @@ class StudentPortalRepository {
       return notifications;
     } on PostgrestException catch (e) {
       debugPrint('Notification query failed: $e');
+      if (SessionExpiryHandler.isSessionExpiredError(e)) {
+        SessionExpiryHandler.showAndRedirect();
+      }
       return const [];
     } on TimeoutException catch (e) {
       debugPrint('Notification query timed out: $e');
@@ -448,6 +452,9 @@ class StudentPortalRepository {
           .toList();
     } on PostgrestException catch (e) {
       debugPrint('Student documents query failed, falling back to legacy fields: $e');
+      if (SessionExpiryHandler.isSessionExpiredError(e)) {
+        SessionExpiryHandler.showAndRedirect();
+      }
       return _legacyDocumentsFromStudent(student);
     } on TimeoutException catch (e) {
       debugPrint('Student documents query timed out, falling back to legacy fields: $e');
@@ -502,6 +509,9 @@ class StudentPortalRepository {
       }).timeout(const Duration(seconds: 15));
     } on PostgrestException catch (e) {
       debugPrint('Student documents insert failed, using legacy fields only: $e');
+      if (SessionExpiryHandler.isSessionExpiredError(e)) {
+        SessionExpiryHandler.showAndRedirect();
+      }
     }
 
     final legacyDocs = _documentObjects(student['document_urls']);
@@ -571,6 +581,9 @@ class StudentPortalRepository {
             .timeout(const Duration(seconds: 15));
       } on PostgrestException catch (e) {
         debugPrint('Student documents delete failed, continuing legacy cleanup: $e');
+        if (SessionExpiryHandler.isSessionExpiredError(e)) {
+          SessionExpiryHandler.showAndRedirect();
+        }
       }
     }
 

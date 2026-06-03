@@ -187,11 +187,19 @@ CREATE POLICY "Admins can update all users" ON users FOR UPDATE TO authenticated
   (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
 );
 
+DROP POLICY IF EXISTS "Users can insert own row" ON users;
+CREATE POLICY "Users can insert own row" ON users FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = id);
+
 DROP POLICY IF EXISTS "Users can update own profile" ON users;
 CREATE POLICY "Users can update own profile" ON users FOR UPDATE TO authenticated USING (auth.uid() = id);
 
 DROP POLICY IF EXISTS "Students are viewable by everyone" ON students;
 CREATE POLICY "Students are viewable by everyone" ON students FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Students can insert own profile" ON students;
+CREATE POLICY "Students can insert own profile" ON students FOR INSERT TO authenticated
+WITH CHECK (user_id = auth.uid());
 
 DROP POLICY IF EXISTS "Admins can manage students" ON students;
 CREATE POLICY "Admins can manage students" ON students FOR ALL TO authenticated USING (

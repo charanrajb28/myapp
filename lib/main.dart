@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/student_signup_screen.dart';
 import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
@@ -28,6 +29,10 @@ void main() async {
   );
 }
 
+/// Set to true while a sign-up / sign-in screen is handling its own
+/// navigation, so the global auth listener doesn't interfere.
+bool suppressAuthRedirect = false;
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -48,13 +53,16 @@ class _MyAppState extends State<MyApp> {
       final session = data.session;
       final event = data.event;
 
-      if (session != null) {
-        return;
-      }
+      // If a screen is actively managing navigation (e.g. signup / login),
+      // let it handle routing itself.
+      if (suppressAuthRedirect) return;
 
-      if (event == AuthChangeEvent.initialSession ||
-          event == AuthChangeEvent.signedOut ||
-          event == AuthChangeEvent.userDeleted) {
+      // Active session — nothing to do here; screens handle their own routing.
+      if (session != null) return;
+
+      // Only redirect to login on explicit sign-out.
+      // (AuthChangeEvent.userDeleted is deprecated and never fired.)
+      if (event == AuthChangeEvent.signedOut) {
         _redirectToLogin();
       }
     });
@@ -96,6 +104,7 @@ class _MyAppState extends State<MyApp> {
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/login': (context) => const LoginPage(),
         '/logout': (context) => const LogoutScreen(),
+        '/signup': (context) => const StudentSignUpScreen(),
       },
     );
   }
@@ -284,6 +293,44 @@ class _LoginPageState extends State<LoginPage>
       parent: _devAnimController,
       curve: Curves.easeInOut,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkExistingSession();
+    });
+  }
+
+  Future<void> _checkExistingSession() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      setState(() => _isLoading = true);
+      try {
+        final userData = await Supabase.instance.client
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+            
+        final role = userData['role'];
+        if (!mounted) return;
+        
+        if (role == 'admin') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
+          );
+        } else if (role == 'student') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const StudentShell()),
+          );
+        } else if (role == 'company') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const CompanyShell()),
+          );
+        }
+      } catch (e) {
+        // Stay on login page if auto-login fails (e.g. JWT expired)
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -615,14 +662,36 @@ class _LoginPageState extends State<LoginPage>
                   const SizedBox(height: 32),
 
                   // ── Register link ─────────────────────────────────────
-                  Text(
-                    'Credentials are issued by the administrator.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'New student?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamed('/signup');
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Create an account',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 20),
