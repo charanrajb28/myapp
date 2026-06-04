@@ -120,12 +120,21 @@ class _LogoutScreenState extends State<LogoutScreen> {
   @override
   void initState() {
     super.initState();
-    // Simulate a sign-out process
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-      }
-    });
+    _performLogout();
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (e) {
+      debugPrint('Logout error: $e');
+    }
+    
+    await Future.delayed(const Duration(seconds: 1)); // Show the cool animation for a second
+    
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
   }
 
   @override
