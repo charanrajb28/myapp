@@ -963,6 +963,8 @@ class _RolesTab extends StatelessWidget {
                                     duration: '6 Months',
                                     description: role['about'] ?? 'No description provided.',
                                     responsibilities: List<String>.from(role['responsibilities'] ?? []),
+                                    activeDays: List<String>.from(role['active_days'] ?? []),
+                                    notes: role['notes']?.toString() ?? '',
                                     applicants: (role['applications'] as List? ?? []).map((app) {
                                       final student = app['students'] as Map<String, dynamic>? ?? {};
                                       return {

@@ -28,6 +28,13 @@ const List<StudentInternship> kStudentInternships = [
     offerLetterId: 'TF-2024-INT-0092',
     about:
         'Builds enterprise-grade cloud software used by over 2 million professionals worldwide.',
+    responsibilities: const [
+      'Assist in writing scalable backend APIs',
+      'Optimize database queries',
+      'Participate in daily stand-ups and code reviews',
+    ],
+    activeDays: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    notes: 'Please bring your own laptop. Lunch will be provided on Fridays.',
   ),
   StudentInternship(
     applicationId: 'APP-INT-2023-007',
@@ -51,6 +58,13 @@ const List<StudentInternship> kStudentInternships = [
     offerLetterId: 'NX-2025-INT-0012',
     about:
         'Design and build the future of automated logistics and industrial bots.',
+    responsibilities: const [
+      'Design mechanical components using CAD',
+      'Perform stress testing on robotic arms',
+      'Collaborate with the firmware team',
+    ],
+    activeDays: const ['Mon', 'Wed', 'Fri'],
+    notes: 'Requires physical presence at the hardware lab.',
   ),
 ];
 
@@ -76,6 +90,8 @@ const List<InternshipOpportunity> kAvailableInternships = [
       'Knowledge of TensorFlow or PyTorch',
       'Pursuing degree in CS or related field',
     ],
+    activeDays: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    notes: 'Access to remote GPU cluster will be provided.',
   ),
   InternshipOpportunity(
     id: 'OPP-102',
@@ -97,6 +113,8 @@ const List<InternshipOpportunity> kAvailableInternships = [
       'Understanding of kinematics and dynamics',
       'Hands-on experience with hardware',
     ],
+    activeDays: const ['Mon', 'Wed', 'Fri'],
+    notes: 'Requires physical presence at the hardware lab.',
   ),
   InternshipOpportunity(
     id: 'OPP-103',

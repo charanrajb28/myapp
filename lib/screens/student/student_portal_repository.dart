@@ -150,7 +150,7 @@ class StudentPortalRepository {
           'alerts, checkins, '
           'mentor_email, offer_letter_id, internships('
           'id, role, industry, location, stipend, duration, deadline, '
-          'brand_color, logo_initial, about, status, companies(name))',
+          'brand_color, logo_initial, about, status, active_days, notes, companies(name))',
         )
         .eq('student_id', studentId)
         .order('created_at', ascending: false)
@@ -233,7 +233,7 @@ class StudentPortalRepository {
         .from('internships')
         .select('id, role, industry, location, stipend, duration, deadline, '
             'brand_color, logo_initial, about, requirements, responsibilities, '
-            'companies(name)')
+            'active_days, notes, companies(name)')
         .eq('status', 'INTERVIEWING')
         .order('created_at', ascending: false)
         .timeout(const Duration(seconds: 15));
@@ -681,6 +681,9 @@ class StudentPortalRepository {
       mentorEmail: item['mentor_email']?.toString() ?? 'Not assigned',
       offerLetterId: item['offer_letter_id']?.toString() ?? 'Not issued',
       about: internship['about']?.toString() ?? 'No description available.',
+      responsibilities: List<String>.from(internship['responsibilities'] ?? []),
+      activeDays: List<String>.from(internship['active_days'] ?? []),
+      notes: internship['notes']?.toString() ?? '',
       alerts: _jsonObjectList(item['alerts']),
       checkins: _jsonObjectList(item['checkins']),
     );
@@ -709,6 +712,8 @@ class StudentPortalRepository {
       isApplied: appliedInternshipIds.contains(internshipId),
       requirements: _stringList(item['requirements']),
       responsibilities: _stringList(item['responsibilities']),
+      activeDays: _stringList(item['active_days']),
+      notes: item['notes']?.toString() ?? '',
     );
   }
 

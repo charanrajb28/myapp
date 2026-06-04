@@ -85,6 +85,14 @@ ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 ALTER TABLE public.companies
 ADD COLUMN IF NOT EXISTS banner_url TEXT;
 
+-- Active working days for each internship posting
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS active_days TEXT[] DEFAULT '{}'::TEXT[];
+
+-- Notes / internal memo for each posting
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+
 -- 5. Create internships table (internship opportunities)
 CREATE TABLE IF NOT EXISTS internships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

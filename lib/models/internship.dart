@@ -21,6 +21,9 @@ class StudentInternship {
   final String mentorEmail;
   final String offerLetterId;
   final String about;
+  final List<String> responsibilities;
+  final List<String> activeDays;
+  final String notes;
   final List<Map<String, dynamic>> alerts;
   final List<Map<String, dynamic>> checkins;
 
@@ -45,6 +48,9 @@ class StudentInternship {
     required this.mentorEmail,
     required this.offerLetterId,
     required this.about,
+    this.responsibilities = const [],
+    this.activeDays = const [],
+    this.notes = '',
     this.alerts = const [],
     this.checkins = const [],
   });
@@ -64,6 +70,8 @@ class InternshipOpportunity {
   final String about;
   final List<String> requirements;
   final List<String> responsibilities;
+  final List<String> activeDays;
+  final String notes;
   final bool? isApplied;
 
   const InternshipOpportunity({
@@ -79,6 +87,8 @@ class InternshipOpportunity {
     required this.logoInitial,
     required this.about,
     this.isApplied = false,
+    this.activeDays = const [],
+    this.notes = '',
     this.requirements = const [
       'Currently pursuing B.Tech/B.E in CS or related fields',
       'Strong understanding of Data Structures and Algorithms',
