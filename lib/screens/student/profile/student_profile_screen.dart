@@ -218,11 +218,13 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   Widget _buildAcademicCard(StudentProfileData? profile) {
     return _sectionCard(
       children: [
+        _infoTile('College', profile?.college ?? 'Not set'),
+        _divider(),
         _infoTile('Department', profile?.department ?? 'Not set'),
         _divider(),
-        _infoTile('Enrollment ID', profile?.enrollmentId ?? 'Not set'),
+        _infoTile('Semester', profile?.semester ?? 'Not set'),
         _divider(),
-        _infoTile('College', profile?.college ?? 'Not set'),
+        _infoTile('Enrollment ID', profile?.enrollmentId ?? 'Not set'),
         _divider(),
         _infoTile('Graduation Year', profile?.graduationYear ?? 'Not set'),
         _divider(),
@@ -238,7 +240,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         _divider(),
         _infoTile('Phone', profile?.phone ?? 'Not set'),
         _divider(),
-        _infoTile('Semester', profile?.semester ?? 'Not set'),
+        _infoTile('Parent Contact', profile?.parentContact ?? 'Not set'),
+        _divider(),
+        _infoTile('Parent Email', profile?.parentEmail ?? 'Not set'),
       ],
     );
   }

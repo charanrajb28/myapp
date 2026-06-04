@@ -29,6 +29,8 @@ class StudentPortalRepository {
         gpa: '3.94 / 4.0',
         phone: '+1 (555) 019-2834',
         avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150',
+        parentContact: '+1 (555) 999-1234',
+        parentEmail: 'parent@example.com',
       );
     }
 
@@ -36,7 +38,8 @@ class StudentPortalRepository {
           .from('students')
           .select(
             'name, college, department, semester, enrollment_id, '
-            'contact_email, graduation_year, gpa, phone_number, avatar_url',
+            'contact_email, graduation_year, gpa, phone_number, avatar_url, '
+            'parent_contact, parent_email',
           )
         .eq('user_id', user.id)
         .maybeSingle()
@@ -54,6 +57,8 @@ class StudentPortalRepository {
         gpa: 'Not set',
         phone: 'Not set',
         avatarUrl: '',
+        parentContact: 'Not set',
+        parentEmail: 'Not set',
       );
     }
 
@@ -1032,6 +1037,8 @@ class StudentProfileData {
   final String gpa;
   final String phone;
   final String avatarUrl;
+  final String parentContact;
+  final String parentEmail;
 
   const StudentProfileData({
     required this.name,
@@ -1044,6 +1051,8 @@ class StudentProfileData {
     required this.gpa,
     required this.phone,
     required this.avatarUrl,
+    required this.parentContact,
+    required this.parentEmail,
   });
 
   factory StudentProfileData.fromMap(Map<String, dynamic> map) {
@@ -1058,6 +1067,8 @@ class StudentProfileData {
       gpa: map['gpa']?.toString() ?? 'Not set',
       phone: map['phone_number']?.toString() ?? 'Not set',
       avatarUrl: map['avatar_url']?.toString() ?? '',
+      parentContact: map['parent_contact']?.toString() ?? 'Not set',
+      parentEmail: map['parent_email']?.toString() ?? 'Not set',
     );
   }
 
