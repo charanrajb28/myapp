@@ -1,14 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Handles JWT token expiry transparently by refreshing the session silently.
+/// The user is never logged out due to token expiry — only an explicit
+/// [signOut] call (triggered by the user) causes a redirect to login.
 class SessionExpiryHandler {
-  static GlobalKey<NavigatorState>? _navigatorKey;
-  static bool _isShowingDialog = false;
-
-  static void configure(GlobalKey<NavigatorState> navigatorKey) {
-    _navigatorKey = navigatorKey;
-  }
-
   static bool isSessionExpiredError(Object error) {
     if (error is PostgrestException) {
       return error.code == 'PGRST303' ||
@@ -23,62 +19,18 @@ class SessionExpiryHandler {
     return text.contains('jwt expired') || text.contains('pgrst303');
   }
 
-  static Future<void> showAndRedirect() async {
-    final navigator = _navigatorKey?.currentState;
-    final context = _navigatorKey?.currentContext;
-    if (navigator == null || context == null || _isShowingDialog) {
-      return;
-    }
-
-    _isShowingDialog = true;
+  /// Silently refreshes the Supabase session when a JWT-expired error is
+  /// detected. Returns `true` if the refresh succeeded (caller can retry
+  /// their request), or `false` if the session cannot be renewed (e.g. the
+  /// refresh token itself is invalid / user has been deleted).
+  static Future<bool> tryRefreshSession() async {
     try {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: const Text(
-            'Session Expired',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          content: const Text(
-            'Session expired. Please log in again.',
-            style: TextStyle(
-              color: Color(0xFF475569),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'OK',
-                style: TextStyle(
-                  color: Color(0xFF2563EB),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      try {
-        await Supabase.instance.client.auth.signOut();
-      } catch (_) {
-        // ignore sign out errors
-      }
-      navigator.pushNamedAndRemoveUntil('/login', (route) => false);
-      _isShowingDialog = false;
+      final response =
+          await Supabase.instance.client.auth.refreshSession();
+      return response.session != null;
+    } catch (e) {
+      debugPrint('[SessionExpiryHandler] Silent refresh failed: $e');
+      return false;
     }
   }
 }

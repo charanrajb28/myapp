@@ -304,7 +304,8 @@ class StudentPortalRepository {
     } on PostgrestException catch (e) {
       debugPrint('Notification query failed: $e');
       if (SessionExpiryHandler.isSessionExpiredError(e)) {
-        SessionExpiryHandler.showAndRedirect();
+        // Token expired — refresh silently; next load will use the new token.
+        SessionExpiryHandler.tryRefreshSession();
       }
       return const [];
     } on TimeoutException catch (e) {
@@ -453,7 +454,8 @@ class StudentPortalRepository {
     } on PostgrestException catch (e) {
       debugPrint('Student documents query failed, falling back to legacy fields: $e');
       if (SessionExpiryHandler.isSessionExpiredError(e)) {
-        SessionExpiryHandler.showAndRedirect();
+        // Token expired — refresh silently; next load will use the new token.
+        SessionExpiryHandler.tryRefreshSession();
       }
       return _legacyDocumentsFromStudent(student);
     } on TimeoutException catch (e) {
@@ -510,7 +512,9 @@ class StudentPortalRepository {
     } on PostgrestException catch (e) {
       debugPrint('Student documents insert failed, using legacy fields only: $e');
       if (SessionExpiryHandler.isSessionExpiredError(e)) {
-        SessionExpiryHandler.showAndRedirect();
+        // Token expired — refresh silently; next load will use the new token.
+        SessionExpiryHandler.tryRefreshSession();
+        return;
       }
     }
 
@@ -582,7 +586,8 @@ class StudentPortalRepository {
       } on PostgrestException catch (e) {
         debugPrint('Student documents delete failed, continuing legacy cleanup: $e');
         if (SessionExpiryHandler.isSessionExpiredError(e)) {
-          SessionExpiryHandler.showAndRedirect();
+          // Token expired — refresh silently; next load will use the new token.
+          SessionExpiryHandler.tryRefreshSession();
         }
       }
     }
