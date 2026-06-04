@@ -86,272 +86,150 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
   Widget build(BuildContext context) {
     final o = widget.opportunity;
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined, color: Color(0xFF64748B)),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.bookmark_outline_rounded, color: Color(0xFF64748B)),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─── Header Part ───
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 80, height: 80,
-                    decoration: BoxDecoration(
-                      color: o.brandColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        o.logoInitial,
-                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: o.brandColor),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    o.role,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    o.company,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF3B82F6)),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // ─── Quick Metadata Row ───
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFF1F5F9)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _metaItem(Icons.location_on_rounded, 'Location', o.location),
-                  _metaItem(Icons.payments_rounded, 'Stipend', o.stipend),
-                  _metaItem(Icons.schedule_rounded, 'Duration', o.duration),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 40),
-            
-            // ─── Content Sections ───
-            _sectionTitle('About the Internship'),
-            const SizedBox(height: 12),
-            Text(
-              o.about,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.6, fontWeight: FontWeight.w500),
-            ),
-            
-            const SizedBox(height: 32),
-            _sectionTitle('Task List'),
-            const SizedBox(height: 14),
-            if (o.responsibilities.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: const Text('No tasks specified.',
-                    style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
-              )
-            else
-              Container(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 220,
+            pinned: true,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            leading: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 4)),
+                  ],
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: o.responsibilities.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 24, height: 24,
-                            decoration: BoxDecoration(
-                              color: o.brandColor.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(7),
-                              border: Border.all(color: o.brandColor.withValues(alpha: 0.25)),
-                            ),
-                            child: Center(
-                              child: Text('${index + 1}',
-                                  style: TextStyle(color: o.brandColor, fontSize: 9, fontWeight: FontWeight.w900)),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(o.responsibilities[index],
-                                style: const TextStyle(color: Color(0xFF334155), fontSize: 13, fontWeight: FontWeight.w500, height: 1.5)),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                child: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1E293B), size: 18),
               ),
-
-            const SizedBox(height: 32),
-            _sectionTitle('Notes'),
-            const SizedBox(height: 14),
-            if (o.notes.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: const Icon(Icons.bookmark_outline_rounded, color: Color(0xFF1E293B), size: 18),
                 ),
-                child: const Text('No notes available.',
-                    style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
-              )
-            else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                onPressed: () {},
+              ),
+              const SizedBox(width: 8),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
+                  gradient: LinearGradient(
+                    colors: [
+                      o.brandColor.withValues(alpha: 0.15),
+                      o.brandColor.withValues(alpha: 0.02),
+                      const Color(0xFFF8FAFC)
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Container(
-                      width: 30, height: 30,
+                      width: 88, height: 88,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: o.brandColor.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 8))
+                        ],
+                        border: Border.all(color: Colors.white, width: 4),
                       ),
-                      child: const Icon(Icons.sticky_note_2_rounded, color: Color(0xFFD97706), size: 16),
+                      child: Center(
+                        child: Text(
+                          o.logoInitial,
+                          style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: o.brandColor),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(o.notes,
-                          style: const TextStyle(color: Color(0xFF92400E), fontSize: 13, fontWeight: FontWeight.w500, height: 1.6)),
-                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-            
-            const SizedBox(height: 32),
-            _sectionTitle('Days Active in the Week'),
-            const SizedBox(height: 14),
-            if (o.activeDays.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: const Text('No active days scheduled.',
-                    style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13)),
-              )
-            else
-              Builder(builder: (context) {
-                const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                final sortedDays = allDays.where((d) => o.activeDays.contains(d)).toList();
-
-                String daysSummary = '';
-                if (sortedDays.length == 7) {
-                  daysSummary = 'All days — 7 days/week';
-                } else if (sortedDays.length == 5 && !o.activeDays.contains('Sat') && !o.activeDays.contains('Sun')) {
-                  daysSummary = 'Monday to Friday — 5 days/week';
-                } else {
-                  daysSummary = '${sortedDays.join(', ')} — ${sortedDays.length} day${sortedDays.length == 1 ? '' : 's'}/week';
-                }
-
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          o.role,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5, height: 1.2),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          o.company,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: o.brandColor, letterSpacing: 0.2),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
+                  const SizedBox(height: 32),
+                  Row(
                     children: [
-                      Row(
-                        children: allDays.map((day) {
-                          final isActive = o.activeDays.contains(day);
-                          final isWeekend = day == 'Sat' || day == 'Sun';
-                          return Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 2),
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              decoration: BoxDecoration(
-                                color: isActive ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isActive ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  day.substring(0, isWeekend ? 3 : 1),
-                                  style: TextStyle(color: isActive ? Colors.white : const Color(0xFFCBD5E1), fontSize: 10, fontWeight: FontWeight.w900),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(color: Color(0xFFF1F5F9), height: 1),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Icon(Icons.schedule_rounded, size: 13, color: const Color(0xFF10B981)),
-                          const SizedBox(width: 6),
-                          Text(daysSummary, style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
+                      Expanded(child: _buildInfoCard(Icons.location_on_rounded, 'Location', o.location, const Color(0xFF3B82F6))),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildInfoCard(Icons.payments_rounded, 'Stipend', o.stipend, const Color(0xFF10B981))),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildInfoCard(Icons.schedule_rounded, 'Duration', o.duration, const Color(0xFFF59E0B))),
                     ],
                   ),
-                );
-              }),
-            const SizedBox(height: 32), 
-            const SizedBox(height: 120), // Bottom padding for fixed button space
-          ],
-
-        ),
+                  const SizedBox(height: 32),
+                  _buildSectionCard(
+                    title: 'About the Internship',
+                    icon: Icons.info_outline_rounded,
+                    child: Text(
+                      o.about,
+                      style: const TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.6, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSectionCard(
+                    title: 'Task List',
+                    icon: Icons.task_alt_rounded,
+                    child: _buildTasksList(o),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSectionCard(
+                    title: 'Important Notes',
+                    icon: Icons.sticky_note_2_outlined,
+                    child: _buildNotesList(o),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSectionCard(
+                    title: 'Active Days',
+                    icon: Icons.calendar_month_rounded,
+                    child: _buildActiveDaysList(o),
+                  ),
+                  const SizedBox(height: 120),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(24),
@@ -370,7 +248,7 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
               style: ElevatedButton.styleFrom(
                 backgroundColor: _isApplied ? const Color(0xFF10B981) : const Color(0xFF0F172A),
                 disabledBackgroundColor: _isApplied ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),
               child: _isApplying 
@@ -393,29 +271,161 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
     );
   }
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.3),
+  Widget _buildInfoCard(IconData icon, String title, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(height: 12),
+          Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(value, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
+        ],
+      ),
     );
   }
 
-  Widget _bulletPoint(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+  Widget _buildSectionCard({required String title, required IconData icon, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: const Color(0xFF0F172A)),
+              ),
+              const SizedBox(width: 14),
+              Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.3)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTasksList(InternshipOpportunity o) {
+    if (o.responsibilities.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Text('No tasks specified.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500)),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: o.responsibilities.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              width: 24, height: 24,
+              decoration: BoxDecoration(
+                color: o.brandColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text('${index + 1}', style: TextStyle(color: o.brandColor, fontSize: 11, fontWeight: FontWeight.w900)),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(o.responsibilities[index], style: const TextStyle(color: Color(0xFF475569), fontSize: 14, fontWeight: FontWeight.w500, height: 1.5)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildNotesList(InternshipOpportunity o) {
+    if (o.notes.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Text('No notes available.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500)),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 6),
-            width: 5, height: 5,
-            decoration: const BoxDecoration(color: Color(0xFFCBD5E1), shape: BoxShape.circle),
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 18),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5, fontWeight: FontWeight.w500),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(o.notes, style: const TextStyle(color: Color(0xFF92400E), fontSize: 14, fontWeight: FontWeight.w600, height: 1.5)),
             ),
           ),
         ],
@@ -423,14 +433,73 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
     );
   }
 
-  Widget _metaItem(IconData icon, String label, String value) {
+  Widget _buildActiveDaysList(InternshipOpportunity o) {
+    if (o.activeDays.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Text('No active days scheduled.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500)),
+      );
+    }
+
+    const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final sortedDays = allDays.where((d) => o.activeDays.contains(d)).toList();
+
+    String daysSummary = '';
+    if (sortedDays.length == 7) {
+      daysSummary = 'All days — 7 days/week';
+    } else if (sortedDays.length == 5 && !o.activeDays.contains('Sat') && !o.activeDays.contains('Sun')) {
+      daysSummary = 'Monday to Friday — 5 days/week';
+    } else {
+      daysSummary = '${sortedDays.join(', ')} — ${sortedDays.length} day${sortedDays.length == 1 ? '' : 's'}/week';
+    }
+
     return Column(
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF64748B)),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700)),
-        const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w800)),
+        Row(
+          children: allDays.map((day) {
+            final isActive = o.activeDays.contains(day);
+            final isWeekend = day == 'Sat' || day == 'Sun';
+            return Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isActive ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: isActive ? [BoxShadow(color: const Color(0xFF10B981).withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
+                ),
+                child: Center(
+                  child: Text(
+                    day.substring(0, isWeekend ? 3 : 1),
+                    style: TextStyle(color: isActive ? Colors.white : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF15803D)),
+              const SizedBox(width: 10),
+              Text(daysSummary, style: const TextStyle(color: Color(0xFF15803D), fontSize: 13, fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
       ],
     );
   }

@@ -37,6 +37,15 @@ class _CompanyShellState extends State<CompanyShell> {
   void setIndex(int index) {
     if (_currentIndex == index) return;
     setState(() => _currentIndex = index);
+    
+    if (_pageController.hasClients && _pageController.page?.round() != index) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+    
     _refreshForIndex(index);
   }
 
@@ -68,14 +77,7 @@ class _CompanyShellState extends State<CompanyShell> {
         selectedIndex: _currentIndex,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        onDestinationSelected: (index) {
-          setIndex(index);
-          _pageController.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        },
+        onDestinationSelected: setIndex,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.analytics_outlined),

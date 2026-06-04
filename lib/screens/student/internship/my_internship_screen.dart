@@ -189,9 +189,14 @@ class _MyInternshipScreenState extends ConsumerState<MyInternshipScreen> {
 
   String _normalizedStatus(String status) => status.trim().toLowerCase();
 
+  List<StudentInternship> get _applied => _studentInternships.where((i) {
+        final status = _normalizedStatus(i.status);
+        return status == 'applied';
+      }).toList();
+
   List<StudentInternship> get _ongoing => _studentInternships.where((i) {
         final status = _normalizedStatus(i.status);
-        return status == 'applied' || status == 'accepted' || status == 'active';
+        return status == 'accepted' || status == 'active';
       }).toList();
 
 
@@ -270,6 +275,7 @@ class _MyInternshipScreenState extends ConsumerState<MyInternshipScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => _MyApplicationsPage(
+              applied: _applied,
               ongoing: _ongoing,
               history: _history,
             ),
@@ -646,8 +652,10 @@ class _MyInternshipScreenState extends ConsumerState<MyInternshipScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final opportunity = _filteredInternships[index];
+                      final matchingInternship = _studentInternships.where((i) => i.id == opportunity.id).firstOrNull;
                       return _OpportunityListItem(
                         opportunity: opportunity,
+                        applicationStatus: matchingInternship?.status,
                         onApplicationChanged: _loadInternshipData,
                       );
                     },
@@ -1105,10 +1113,12 @@ class _InternshipCard extends StatelessWidget {
 }
 
 class _MyApplicationsPage extends StatefulWidget {
+  final List<StudentInternship> applied;
   final List<StudentInternship> ongoing;
   final List<StudentInternship> history;
 
   const _MyApplicationsPage({
+    required this.applied,
     required this.ongoing,
     required this.history,
   });
@@ -1123,7 +1133,7 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> with SingleTic
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -1168,8 +1178,8 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> with SingleTic
                 children: [
                   Expanded(
                     child: _applicationsToggle(
-                      label: 'ONGOING',
-                      count: widget.ongoing.length,
+                      label: 'APPLIED',
+                      count: widget.applied.length,
                       selected: _tabController.index == 0,
                       onTap: () => _tabController.animateTo(0),
                     ),
@@ -1177,10 +1187,19 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> with SingleTic
                   const SizedBox(width: 8),
                   Expanded(
                     child: _applicationsToggle(
-                      label: 'HISTORY',
-                      count: widget.history.length,
+                      label: 'ONGOING',
+                      count: widget.ongoing.length,
                       selected: _tabController.index == 1,
                       onTap: () => _tabController.animateTo(1),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _applicationsToggle(
+                      label: 'HISTORY',
+                      count: widget.history.length,
+                      selected: _tabController.index == 2,
+                      onTap: () => _tabController.animateTo(2),
                     ),
                   ),
                 ],
@@ -1192,6 +1211,10 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> with SingleTic
               controller: _tabController,
               physics: const BouncingScrollPhysics(),
               children: [
+                _ApplicationsListView(
+                  list: widget.applied,
+                  emptyMsg: 'No applied applications available',
+                ),
                 _ApplicationsListView(
                   list: widget.ongoing,
                   emptyMsg: 'No ongoing applications available',
@@ -1406,7 +1429,7 @@ class InternshipDetailScreen extends StatelessWidget {
                             color: Colors.white24,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text('ACTIVE INTERNSHIP', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                          child: Text('${internship.status.toUpperCase()} INTERNSHIP', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -2296,10 +2319,12 @@ class _FeaturedCard extends StatelessWidget {
 class _OpportunityListItem extends StatelessWidget {
   final InternshipOpportunity opportunity;
   final Future<void> Function() onApplicationChanged;
+  final String? applicationStatus;
 
   const _OpportunityListItem({
     required this.opportunity,
     required this.onApplicationChanged,
+    this.applicationStatus,
   });
 
   @override
@@ -2324,21 +2349,14 @@ class _OpportunityListItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           child: Ink(
             decoration: BoxDecoration(
+              color: Colors.white,
               borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                colors: [
-                  accent.withValues(alpha: 0.10),
-                  Colors.white,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
               border: Border.all(
-                color: accent.withValues(alpha: 0.14),
+                color: const Color(0xFFE2E8F0),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: accent.withValues(alpha: 0.10),
+                  color: accent.withValues(alpha: 0.08),
                   blurRadius: 24,
                   offset: const Offset(0, 10),
                 ),
@@ -2408,18 +2426,79 @@ class _OpportunityListItem extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.75),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.chevron_right_rounded,
-                                color: Color(0xFF94A3B8),
-                                size: 18,
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final String normalizedStatus = applicationStatus?.trim().toLowerCase() ?? '';
+                                Color statusColor = Colors.transparent;
+                                String statusLabel = '';
+
+                                if (normalizedStatus.isNotEmpty) {
+                                  switch (normalizedStatus) {
+                                    case 'applied':
+                                      statusColor = const Color(0xFFF59E0B);
+                                      statusLabel = 'Applied';
+                                      break;
+                                    case 'accepted':
+                                      statusColor = const Color(0xFF2563EB);
+                                      statusLabel = 'Accepted';
+                                      break;
+                                    case 'active':
+                                      statusColor = const Color(0xFF10B981);
+                                      statusLabel = 'Active';
+                                      break;
+                                    case 'completed':
+                                      statusColor = const Color(0xFF3B82F6);
+                                      statusLabel = 'Completed';
+                                      break;
+                                    case 'rejected':
+                                      statusColor = const Color(0xFFEF4444);
+                                      statusLabel = 'Rejected';
+                                      break;
+                                    case 'removed':
+                                      statusColor = const Color(0xFF7C3AED);
+                                      statusLabel = 'Removed';
+                                      break;
+                                    default:
+                                      statusColor = const Color(0xFF64748B);
+                                      statusLabel = applicationStatus!;
+                                  }
+                                } else if (opportunity.isApplied == true) {
+                                  statusColor = const Color(0xFFF59E0B);
+                                  statusLabel = 'Applied';
+                                }
+
+                                if (statusLabel.isNotEmpty) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      statusLabel.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        color: statusColor,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Color(0xFF94A3B8),
+                                    size: 18,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -2428,8 +2507,6 @@ class _OpportunityListItem extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            if (opportunity.isApplied == true)
-                              _statusBadge('Applied', const Color(0xFF10B981)),
                             _infoPill(
                               Icons.location_on_rounded,
                               opportunity.location,

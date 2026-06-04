@@ -40,6 +40,15 @@ class StudentShellState extends ConsumerState<StudentShell> {
   void setIndex(int index) {
     if (_currentIndex == index) return;
     setState(() => _currentIndex = index);
+
+    if (_pageController.hasClients && _pageController.page?.round() != index) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+
     if (index == 1) {
       ref.read(studentInternshipsProvider.notifier).loadInternships();
     } else if (index == 3) {
@@ -71,14 +80,7 @@ class StudentShellState extends ConsumerState<StudentShell> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         indicatorColor: const Color(0xFF0F172A).withValues(alpha: 0.08),
-        onDestinationSelected: (index) {
-          setIndex(index);
-          _pageController.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        },
+        onDestinationSelected: setIndex,
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
