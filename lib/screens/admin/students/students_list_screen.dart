@@ -3,6 +3,7 @@ import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -221,15 +222,19 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
           );
         }
       } else {
-        final directory = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-        final filePath = '${directory.path}/student_directory_${DateTime.now().millisecondsSinceEpoch}.csv';
-        final file = io.File(filePath);
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: 'student_directory_${DateTime.now().millisecondsSinceEpoch}.csv',
+        );
+
+        if (result == null) return;
+
+        final file = io.File(result.path);
         await file.writeAsString(csv, encoding: utf8);
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Records saved to: $filePath'),
+              content: Text('Records saved to: ${result.path}'),
               backgroundColor: const Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(16),

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'posting_details_screen.dart';
@@ -571,10 +572,18 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
         throw Exception('QR service returned ${response.statusCode}');
       }
 
-      final directory = Directory.systemTemp;
       final fileName =
           'job_qr_${(widget.posting['role']?.toString() ?? 'job').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_')}.png';
-      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+
+      final FileSaveLocation? result = await getSaveLocation(
+        suggestedName: fileName,
+      );
+
+      if (result == null) {
+        return;
+      }
+
+      final file = File(result.path);
       await file.writeAsBytes(response.bodyBytes);
 
       if (!mounted) return;
