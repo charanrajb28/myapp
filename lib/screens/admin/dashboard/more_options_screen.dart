@@ -1,5 +1,9 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'dart:io' as io;
+import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:file_selector/file_selector.dart';
 import 'semester_promotion_screen.dart';
 
 class MoreOptionsScreen extends StatefulWidget {
@@ -23,10 +27,22 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
         title: const Text('Export Data',
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A))),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          _ExportOption(icon: Icons.people_alt_rounded,   color: const Color(0xFF3B82F6), label: 'Student Records'),
-          _ExportOption(icon: Icons.domain_rounded,        color: const Color(0xFF8B5CF6), label: 'Company & Roles'),
-          _ExportOption(icon: Icons.work_rounded,          color: const Color(0xFF10B981), label: 'Internship Reports'),
-          _ExportOption(icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444), label: 'Alert Logs'),
+          _ExportOption(
+            icon: Icons.people_alt_rounded, color: const Color(0xFF3B82F6), label: 'Student Records',
+            onExport: () { Navigator.pop(ctx); _exportCSV('students'); },
+          ),
+          _ExportOption(
+            icon: Icons.domain_rounded, color: const Color(0xFF8B5CF6), label: 'Company & Roles',
+            onExport: () { Navigator.pop(ctx); _exportCSV('companies'); },
+          ),
+          _ExportOption(
+            icon: Icons.work_rounded, color: const Color(0xFF10B981), label: 'Internship Reports',
+            onExport: () { Navigator.pop(ctx); _exportCSV('internships'); },
+          ),
+          _ExportOption(
+            icon: Icons.warning_amber_rounded, color: const Color(0xFFEF4444), label: 'Alert Logs',
+            onExport: () { Navigator.pop(ctx); _exportCSV('alerts'); },
+          ),
         ]),
         actions: [
           TextButton(
@@ -36,6 +52,71 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _exportCSV(String type) async {
+    try {
+      _showSuccessSnack('Fetching data for export...');
+      final client = Supabase.instance.client;
+      final StringBuffer sb = StringBuffer();
+      String fileName = '';
+
+      if (type == 'students') {
+        fileName = 'student_records_${DateTime.now().millisecondsSinceEpoch}.csv';
+        final data = await client.from('students').select('*');
+        sb.writeln('Enrollment ID,Name,College,Department,Semester,Email,Phone,Parent Contact,Parent Email,GPA,Graduation Year,Blacklisted');
+        for (final row in data) {
+          final email = row['contact_email']?.toString() ?? '';
+          sb.writeln('"${row['enrollment_id'] ?? ''}","${row['name'] ?? ''}","${row['college'] ?? ''}","${row['department'] ?? ''}","${row['semester'] ?? ''}","$email","${row['phone_number'] ?? ''}","${row['parent_contact'] ?? ''}","${row['parent_email'] ?? ''}","${row['gpa'] ?? ''}","${row['graduation_year'] ?? ''}","${row['is_blacklisted'] == true ? 'Yes' : 'No'}"');
+        }
+      } else if (type == 'companies') {
+        fileName = 'company_records_${DateTime.now().millisecondsSinceEpoch}.csv';
+        final data = await client.from('companies').select('*');
+        sb.writeln('Name,Industry,Location,Website,Contact Email,Phone,Partner Since,Blacklisted');
+        for (final row in data) {
+          final email = row['contact_email']?.toString() ?? '';
+          sb.writeln('"${row['name'] ?? ''}","${row['industry'] ?? ''}","${row['location'] ?? ''}","${row['website'] ?? ''}","$email","${row['phone'] ?? ''}","${row['partner_since'] ?? ''}","${row['is_blacklisted'] == true ? 'Yes' : 'No'}"');
+        }
+      } else if (type == 'internships') {
+        fileName = 'internship_reports_${DateTime.now().millisecondsSinceEpoch}.csv';
+        final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, companies(name))');
+        sb.writeln('Student Name,Enrollment ID,Company,Role,Status,Progress %,Start Date,End Date,Mentor Name');
+        for (final row in data) {
+          final student = row['students'] as Map? ?? {};
+          final internship = row['internships'] as Map? ?? {};
+          final company = internship['companies'] as Map? ?? {};
+          final progressPercent = (((row['progress'] as num?) ?? 0) * 100).round();
+          sb.writeln('"${student['name'] ?? ''}","${student['enrollment_id'] ?? ''}","${company['name'] ?? ''}","${internship['role'] ?? ''}","${row['status'] ?? ''}","$progressPercent","${row['start_date'] ?? ''}","${row['end_date'] ?? ''}","${row['mentor_name'] ?? ''}"');
+        }
+      } else if (type == 'alerts') {
+        fileName = 'alert_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
+        final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, companies(name))').inFilter('status', ['Removed', 'Completed']).order('progress', ascending: true);
+        sb.writeln('Alert Reason,Student Name,Enrollment ID,Company,Role,Status,Progress %,End Date');
+        for (final row in data) {
+          final student = row['students'] as Map? ?? {};
+          final internship = row['internships'] as Map? ?? {};
+          final company = internship['companies'] as Map? ?? {};
+          final progressPercent = (((row['progress'] as num?) ?? 0) * 100).round();
+          sb.writeln('"Low Progress Alert","${student['name'] ?? ''}","${student['enrollment_id'] ?? ''}","${company['name'] ?? ''}","${internship['role'] ?? ''}","${row['status'] ?? ''}","$progressPercent","${row['end_date'] ?? ''}"');
+        }
+      }
+
+      final FileSaveLocation? result = await getSaveLocation(
+        suggestedName: fileName,
+      );
+
+      if (result == null) return;
+
+      final file = io.File(result.path);
+      await file.writeAsString(sb.toString(), encoding: utf8);
+      _showSuccessSnack('Exported successfully to ${result.path}');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to export: $e'),
+        backgroundColor: Colors.redAccent,
+      ));
+    }
   }
 
   void _showSuccessSnack(String msg) {
@@ -403,7 +484,8 @@ class _ExportOption extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String label;
-  const _ExportOption({required this.icon, required this.color, required this.label});
+  final VoidCallback onExport;
+  const _ExportOption({required this.icon, required this.color, required this.label, required this.onExport});
 
   @override
   Widget build(BuildContext context) {
@@ -416,7 +498,7 @@ class _ExportOption extends StatelessWidget {
       ),
       title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
       trailing: OutlinedButton(
-        onPressed: () {},
+        onPressed: onExport,
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: color),
           foregroundColor: color,

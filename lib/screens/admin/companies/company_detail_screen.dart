@@ -41,6 +41,7 @@ class CompanyDetailScreen extends StatefulWidget {
 class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   int _tabIndex = 0;
   static const _tabs = ['Overview', 'Open Roles', 'Ongoing Roles', 'Past Roles', 'Documents'];
+  late final PageController _pageController;
   
   bool _isLoading = true;
   CompanyDetailArgs? _dynamicCompany;
@@ -51,7 +52,14 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _tabIndex);
     _fetchCompanyData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchCompanyData() async {
@@ -343,25 +351,32 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 680;
-          return SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _HeroCard(c: c, isMobile: isMobile, isLoading: _isLoading),
-                const SizedBox(height: 20),
-                _TabRow(tabs: _tabs, activeIndex: _tabIndex,
-                    onTap: (i) => setState(() => _tabIndex = i)),
-                const SizedBox(height: 20),
-                _isLoading 
-                  ? const Center(child: Padding(
-                      padding: EdgeInsets.all(40),
-                      child: CircularProgressIndicator(color: Color(0xFF0F172A)),
-                    ))
-                  : _buildTabContent(c, isMobile),
-                const SizedBox(height: 48),
-              ],
-            ),
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, isMobile ? 16.0 : 24.0, isMobile ? 16.0 : 24.0, 0),
+                  child: Column(
+                    children: [
+                      _HeroCard(c: c, isMobile: isMobile, isLoading: _isLoading),
+                      const SizedBox(height: 20),
+                      _TabRow(
+                        tabs: _tabs, 
+                        activeIndex: _tabIndex,
+                        onTap: (i) {
+                          setState(() => _tabIndex = i);
+                          _pageController.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                        }
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            body: _isLoading 
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A)))
+              : _buildTabContent(c, isMobile),
           );
         },
       ),
@@ -369,46 +384,61 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   }
 
   Widget _buildTabContent(CompanyDetailArgs c, bool isMobile) {
-    switch (_tabIndex) {
-      case 0:
-        return _OverviewTab(c: c, isMobile: isMobile);
-      case 1:
-        final interviewingRoles = _openRoles.where((r) {
-          final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
-          return status == 'INTERVIEWING';
-        }).toList();
-        return _RolesTab(
-          roles: interviewingRoles,
-          statusName: 'Open',
-          emptyIcon: Icons.lock_open_rounded,
-        );
-      case 2:
-        final activeRoles = _openRoles.where((r) {
-          final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
-          return status == 'ACTIVE';
-        }).toList();
-        return _RolesTab(
-          roles: activeRoles,
-          statusName: 'Ongoing',
-          emptyIcon: Icons.autorenew_rounded,
-          showNotifyButton: true,
-          onNotify: _sendNotificationToRoleApplicants,
-        );
-      case 3:
-        final closedRoles = _openRoles.where((r) {
-          final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
-          return status == 'CLOSED';
-        }).toList();
-        return _RolesTab(
-          roles: closedRoles,
-          statusName: 'Past',
-          emptyIcon: Icons.inventory_2_outlined,
-        );
-      case 4:
-        return _DocsTab(docs: _docs);
-      default:
-        return const SizedBox();
-    }
+    final interviewingRoles = _openRoles.where((r) {
+      final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+      return status == 'INTERVIEWING';
+    }).toList();
+    
+    final activeRoles = _openRoles.where((r) {
+      final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+      return status == 'ACTIVE';
+    }).toList();
+
+    final closedRoles = _openRoles.where((r) {
+      final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+      return status == 'CLOSED';
+    }).toList();
+
+    return PageView(
+      controller: _pageController,
+      onPageChanged: (i) => setState(() => _tabIndex = i),
+      children: [
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
+          child: _OverviewTab(c: c, isMobile: isMobile),
+        ),
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
+          child: _RolesTab(
+            roles: interviewingRoles,
+            statusName: 'Open',
+            emptyIcon: Icons.lock_open_rounded,
+          ),
+        ),
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
+          child: _RolesTab(
+            roles: activeRoles,
+            statusName: 'Ongoing',
+            emptyIcon: Icons.autorenew_rounded,
+            showNotifyButton: true,
+            onNotify: _sendNotificationToRoleApplicants,
+          ),
+        ),
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
+          child: _RolesTab(
+            roles: closedRoles,
+            statusName: 'Past',
+            emptyIcon: Icons.inventory_2_outlined,
+          ),
+        ),
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
+          child: _DocsTab(docs: _docs),
+        ),
+      ],
+    );
   }
 }
 
