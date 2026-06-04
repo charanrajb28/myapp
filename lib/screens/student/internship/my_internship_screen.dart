@@ -1117,16 +1117,26 @@ class _MyApplicationsPage extends StatefulWidget {
   State<_MyApplicationsPage> createState() => _MyApplicationsPageState();
 }
 
-class _MyApplicationsPageState extends State<_MyApplicationsPage> {
-  int _selectedView = 0;
+class _MyApplicationsPageState extends State<_MyApplicationsPage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final list = _selectedView == 0 ? widget.ongoing : widget.history;
-    final emptyMsg = _selectedView == 0
-        ? 'No ongoing applications available'
-        : 'No application history available';
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -1160,8 +1170,8 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> {
                     child: _applicationsToggle(
                       label: 'ONGOING',
                       count: widget.ongoing.length,
-                      selected: _selectedView == 0,
-                      onTap: () => setState(() => _selectedView = 0),
+                      selected: _tabController.index == 0,
+                      onTap: () => _tabController.animateTo(0),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1169,8 +1179,8 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> {
                     child: _applicationsToggle(
                       label: 'HISTORY',
                       count: widget.history.length,
-                      selected: _selectedView == 1,
-                      onTap: () => setState(() => _selectedView = 1),
+                      selected: _tabController.index == 1,
+                      onTap: () => _tabController.animateTo(1),
                     ),
                   ),
                 ],
@@ -1178,9 +1188,19 @@ class _MyApplicationsPageState extends State<_MyApplicationsPage> {
             ),
           ),
           Expanded(
-            child: _ApplicationsListView(
-              list: list,
-              emptyMsg: emptyMsg,
+            child: TabBarView(
+              controller: _tabController,
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _ApplicationsListView(
+                  list: widget.ongoing,
+                  emptyMsg: 'No ongoing applications available',
+                ),
+                _ApplicationsListView(
+                  list: widget.history,
+                  emptyMsg: 'No application history available',
+                ),
+              ],
             ),
           ),
         ],

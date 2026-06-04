@@ -18,7 +18,6 @@ class ManagePostingsScreen extends StatefulWidget {
 class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _allPostings = [];
-  int _tabIndex = 0;
 
   @override
   void initState() {
@@ -237,90 +236,92 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
           children: [
             Positioned.fill(child: _DotGrid()),
             SafeArea(
-              child: CustomScrollView(
+              child: NestedScrollView(
                 physics: const BouncingScrollPhysics(),
-                slivers: [
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                  const SliverPadding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    sliver: SliverToBoxAdapter(child: _JobsHeader()),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                  
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    sliver: SliverToBoxAdapter(
-                      child: TabBar(
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        indicatorColor: const Color(0xFF6366F1),
-                        indicatorWeight: 4,
-                        labelColor: const Color(0xFF0F172A),
-                        labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
-                        unselectedLabelColor: const Color(0xFF94A3B8),
-                        dividerColor: Colors.transparent,
-                        onTap: (index) => setState(() => _tabIndex = index),
-                        tabs: const [
-                          Tab(text: 'INTERVIEWING'),
-                          Tab(text: 'ACTIVE JOBS'),
-                          Tab(text: 'CLOSED JOBS'),
-                        ],
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                    const SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      sliver: SliverToBoxAdapter(child: _JobsHeader()),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                    
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      sliver: SliverToBoxAdapter(
+                        child: TabBar(
+                          isScrollable: true,
+                          tabAlignment: TabAlignment.start,
+                          indicatorColor: const Color(0xFF6366F1),
+                          indicatorWeight: 4,
+                          labelColor: const Color(0xFF0F172A),
+                          labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1),
+                          unselectedLabelColor: const Color(0xFF94A3B8),
+                          dividerColor: Colors.transparent,
+                          tabs: const [
+                            Tab(text: 'INTERVIEWING'),
+                            Tab(text: 'ACTIVE JOBS'),
+                            Tab(text: 'CLOSED JOBS'),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-                   _isLoading 
-                   ? const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 100), child: CircularProgressIndicator())))
-                   : Builder(
-                    builder: (context) {
-                      final filterStatus = ['INTERVIEWING', 'ACTIVE', 'CLOSED'][_tabIndex];
-                      final filteredList = _allPostings.where((p) => p['status'] == filterStatus).toList();
-
-                      if (filteredList.isEmpty) {
-                        return const SliverToBoxAdapter(
-                          child: Center(
-                            child: Padding(
-                              padding: EdgeInsets.only(top: 60),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8), size: 48),
-                                  SizedBox(height: 20),
-                                  Text('NO JOBS FOUND', style: TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                                  SizedBox(height: 8),
-                                  Text('No listings available in this category.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w500)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      return SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) => _JobIndustrialCard(
-                              posting: filteredList[index],
-                              onTap: () => _showPostDetail(context, filteredList[index]),
-                              onStatusChange: (newStatus) => _updateStatus(filteredList[index]['id'], newStatus),
-                              onDiscard: () => _discardPosting(filteredList[index]['id']),
-                              onShareQr: () => _showQRDialog(context, filteredList[index]),
-                            ),
-                            childCount: filteredList.length,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 120)),
-                ],
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ];
+                },
+                body: _isLoading 
+                   ? const Center(child: CircularProgressIndicator())
+                   : TabBarView(
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          _buildListForStatus('INTERVIEWING'),
+                          _buildListForStatus('ACTIVE'),
+                          _buildListForStatus('CLOSED'),
+                        ],
+                      ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildListForStatus(String filterStatus) {
+    final filteredList = _allPostings.where((p) => p['status'] == filterStatus).toList();
+
+    if (filteredList.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 60),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8), size: 48),
+              SizedBox(height: 20),
+              Text('NO JOBS FOUND', style: TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              SizedBox(height: 8),
+              Text('No listings available in this category.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(left: 24, right: 24, bottom: 120),
+      physics: const BouncingScrollPhysics(),
+      itemCount: filteredList.length,
+      itemBuilder: (context, index) {
+        return _JobIndustrialCard(
+          posting: filteredList[index],
+          onTap: () => _showPostDetail(context, filteredList[index]),
+          onStatusChange: (newStatus) => _updateStatus(filteredList[index]['id'], newStatus),
+          onDiscard: () => _discardPosting(filteredList[index]['id']),
+          onShareQr: () => _showQRDialog(context, filteredList[index]),
+        );
+      },
     );
   }
 

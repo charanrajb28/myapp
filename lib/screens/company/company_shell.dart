@@ -15,12 +15,27 @@ class CompanyShell extends StatefulWidget {
 
 class _CompanyShellState extends State<CompanyShell> {
   int _currentIndex = 0;
+  late final PageController _pageController;
+
   final GlobalKey<State<CompanyDashboardScreen>> _dashboardKey =
       GlobalKey<State<CompanyDashboardScreen>>();
   final GlobalKey<State<CompanyProfileScreen>> _profileKey =
       GlobalKey<State<CompanyProfileScreen>>();
 
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void setIndex(int index) {
+    if (_currentIndex == index) return;
     setState(() => _currentIndex = index);
     _refreshForIndex(index);
   }
@@ -44,15 +59,23 @@ class _CompanyShellState extends State<CompanyShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: setIndex,
         children: screens,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        onDestinationSelected: setIndex,
+        onDestinationSelected: (index) {
+          setIndex(index);
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.analytics_outlined),

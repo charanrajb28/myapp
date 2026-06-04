@@ -23,8 +23,22 @@ class StudentShell extends ConsumerStatefulWidget {
 
 class StudentShellState extends ConsumerState<StudentShell> {
   int _currentIndex = 0;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   void setIndex(int index) {
+    if (_currentIndex == index) return;
     setState(() => _currentIndex = index);
     if (index == 1) {
       ref.read(studentInternshipsProvider.notifier).loadInternships();
@@ -41,15 +55,15 @@ class StudentShellState extends ConsumerState<StudentShell> {
     StudentProfileScreen(),
   ];
 
-
   @override
   Widget build(BuildContext context) {
     final notificationState = ref.watch(studentNotificationsProvider);
     final unreadCount = notificationState.notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: setIndex,
         children: _screens,
       ),
       bottomNavigationBar: NavigationBar(
@@ -59,6 +73,11 @@ class StudentShellState extends ConsumerState<StudentShell> {
         indicatorColor: const Color(0xFF0F172A).withValues(alpha: 0.08),
         onDestinationSelected: (index) {
           setIndex(index);
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
         },
         destinations: [
           const NavigationDestination(

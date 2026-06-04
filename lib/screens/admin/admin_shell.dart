@@ -16,49 +16,52 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _currentIndex = 0;
+  late final PageController _pageController;
 
-  // Ideally, these routes and indices would be managed by go_router.
-  // For the standalone UI phase, we'll map the indices here mockingly.
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _setIndex(int index) {
+    if (_currentIndex == index) return;
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Current stand-in for full router: map index to screen widget
-    Widget currentScreen;
-    switch (_currentIndex) {
-      case 0:
-        currentScreen = widget.child; // The dashboard passed from main
-        break;
-      case 1:
-        currentScreen = const StudentsListScreen();
-        break;
-      case 2:
-        currentScreen = const CompaniesListScreen();
-        break;
-      case 3:
-        currentScreen = const RedAlertsScreen();
-        break;
-      case 4:
-        currentScreen = const MoreOptionsScreen();
-        break;
-      default:
-        currentScreen = Scaffold(
-          body: Center(
-            child: Text('Screen $_currentIndex not built yet'),
-          ),
-        );
-    }
+    final screens = [
+      widget.child,
+      const StudentsListScreen(),
+      const CompaniesListScreen(),
+      const RedAlertsScreen(),
+      const MoreOptionsScreen(),
+    ];
 
     return Scaffold(
-      body: currentScreen,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _setIndex,
+        children: screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-            // In a real app with go_router, we would navigate based on index:
-            // if (index == 0) context.go('/admin/dashboard');
-            // ...
-          });
+          _setIndex(index);
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
         },
         destinations: const [
           NavigationDestination(
