@@ -356,11 +356,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                         const SizedBox(height: 12),
                         _ActionTile(
-                          title: 'Review Student Reports',
-                          subtitle: 'Check weekly & monthly journal submissions',
-                          icon: Icons.analytics_rounded,
+                          title: 'Student Feedbacks',
+                          subtitle: 'Check feedbacks from students',
+                          icon: Icons.feedback_rounded,
                           color: const Color(0xFF6366F1),
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AdminFeedbacksScreen()),
+                            );
+                          },
                         ),
                       ],
                     ),
