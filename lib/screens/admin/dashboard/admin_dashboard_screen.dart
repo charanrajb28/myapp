@@ -353,14 +353,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           color: const Color(0xFF0EA5E9),
                           onTap: () {},
                         ),
-                        const SizedBox(height: 12),
-                        _ActionTile(
-                          title: 'Issue Certificates',
-                          subtitle: 'Approve and send final completion certificates',
-                          icon: Icons.workspace_premium_rounded,
-                          color: const Color(0xFFF59E0B),
-                          onTap: () {},
-                        ),
+
                         const SizedBox(height: 12),
                         _ActionTile(
                           title: 'Review Student Reports',
