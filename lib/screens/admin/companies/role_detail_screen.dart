@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../feedbacks/admin_form_builder_screen.dart';
 
 
-class RoleDetailScreen extends StatelessWidget {
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class RoleDetailScreen extends StatefulWidget {
   final String id;
   final String title;
   final String type;
@@ -32,20 +34,115 @@ class RoleDetailScreen extends StatelessWidget {
     required this.applicants,
   });
 
+  @override
+  State<RoleDetailScreen> createState() => _RoleDetailScreenState();
+}
+
+class _RoleDetailScreenState extends State<RoleDetailScreen> {
+  bool _hasForm = false;
+  bool _isLoadingForm = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForm();
+  }
+
+  Future<void> _checkForm() async {
+    if (widget.id.isEmpty) {
+      if (mounted) setState(() => _isLoadingForm = false);
+      return;
+    }
+    if (mounted) setState(() => _isLoadingForm = true);
+    try {
+      final res = await Supabase.instance.client
+          .from('internships')
+          .select('feedback_form_schema')
+          .eq('id', widget.id)
+          .single();
+      final schema = res['feedback_form_schema'];
+      if (mounted) {
+        setState(() {
+          _hasForm = schema != null && (schema as List).isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking form: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingForm = false);
+    }
+  }
+
+  void _clearForm() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Form?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+        content: const Text('This will delete all custom questions for this form. Are you sure?'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _isLoadingForm = true);
+              try {
+                await Supabase.instance.client
+                    .from('internships')
+                    .update({'feedback_form_schema': []})
+                    .eq('id', widget.id);
+                setState(() => _hasForm = false);
+              } catch (e) {
+                debugPrint('Error clearing form: $e');
+              } finally {
+                if (mounted) setState(() => _isLoadingForm = false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            child: const Text('Clear Form'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Derive counts from applicants
-  int get _accepted     => applicants.where((a) => a['status'] == 'Accepted').length;
-  int get _underReview  => applicants.where((a) => a['status'] == 'Under Review').length;
-  int get _applied      => applicants.where((a) => a['status'] == 'Applied').length;
-  int get _rejected     => applicants.where((a) => a['status'] == 'Rejected').length;
+  int get _accepted     => widget.applicants.where((a) => a['status'] == 'Accepted').length;
+  int get _underReview  => widget.applicants.where((a) => a['status'] == 'Under Review').length;
+  int get _applied      => widget.applicants.where((a) => a['status'] == 'Applied').length;
+  int get _rejected     => widget.applicants.where((a) => a['status'] == 'Rejected').length;
+
+  Widget _buildSectionCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: child,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF1F5F9), // Softer background to make white cards pop
       appBar: AppBar(
-        title: const Text('Role Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+        title: const Text('Role Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
@@ -58,286 +155,303 @@ class RoleDetailScreen extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: Stack(
-        children: [
-          // Background split (light gray top, white bottom)
-          Positioned(
-            top: 0, left: 0, right: 0, height: 260,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFFF8FAFC),
-                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Title Header ──
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D4ED8).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(type.toUpperCase(), 
-                      style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(title,
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.8, height: 1.1),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // ── Meta Strip (Sleek cards) ──
-                  Row(
-                    children: [
-                      Expanded(child: _MetaBox(icon: Icons.play_circle_fill, label: 'Starts', value: startDate, color: const Color(0xFF0EA5E9))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _MetaBox(icon: Icons.timelapse_rounded, label: 'Duration', value: duration, color: const Color(0xFF8B5CF6))),
-                    ]
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _MetaBox(icon: Icons.event_rounded, label: 'Deadline', value: deadline, color: const Color(0xFFF43F5E))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _MetaBox(icon: Icons.people_alt_rounded, label: 'Openings', value: '$slots slots', color: const Color(0xFF10B981))),
-                    ]
-                  ),
-                  
-                  const SizedBox(height: 48),
-
-                  // ── About ──
-                  const Text('About the Role', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
-                  const SizedBox(height: 12),
-                  Text(description,
-                    style: const TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.7, fontWeight: FontWeight.w400)),
-                  
-                  if (responsibilities.isNotEmpty) ...[
-                    const SizedBox(height: 36),
-                    const Text('Task List', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
-                    const SizedBox(height: 14),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header Card ──
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: responsibilities.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Text(widget.type.toUpperCase(), 
+                        style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(widget.title,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.5, height: 1.2),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: _MetaBox(icon: Icons.play_circle_fill, label: 'Starts', value: widget.startDate, color: const Color(0xFF0EA5E9))),
+                        const SizedBox(width: 12),
+                        Expanded(child: _MetaBox(icon: Icons.timer_rounded, label: 'Duration', value: widget.duration, color: const Color(0xFF8B5CF6))),
+                        const SizedBox(width: 12),
+                        Expanded(child: _MetaBox(icon: Icons.event_busy_rounded, label: 'Deadline', value: widget.deadline, color: const Color(0xFFF43F5E))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // ── Details Card (About, Responsibilities, Task List) ──
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('About the Role', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                    const SizedBox(height: 14),
+                    Text(widget.description,
+                      style: const TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.6, fontWeight: FontWeight.w400),
+                    ),
+                    
+                    if (widget.responsibilities.isNotEmpty) ...[
+                      const SizedBox(height: 32),
+                      const Divider(color: Color(0xFFF1F5F9), height: 1),
+                      const SizedBox(height: 24),
+                      const Text('Responsibilities', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                      const SizedBox(height: 16),
+                      ...widget.responsibilities.map((r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  width: 24, height: 24,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1D4ED8).withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(7),
-                                    border: Border.all(color: const Color(0xFF1D4ED8).withValues(alpha: 0.25)),
-                                  ),
-                                  child: Center(
-                                    child: Text('${index + 1}',
-                                        style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 9, fontWeight: FontWeight.w900)),
-                                  ),
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF10B981)),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(responsibilities[index],
-                                      style: const TextStyle(color: Color(0xFF334155), fontSize: 13, fontWeight: FontWeight.w500, height: 1.5)),
+                                  child: Text(r, style: const TextStyle(fontSize: 15, color: Color(0xFF334155), height: 1.5)),
                                 ),
                               ],
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                          )),
+                    ],
 
-                  if (notes.isNotEmpty) ...[
-                    const SizedBox(height: 36),
-                    const Text('Notes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
+                    if (widget.notes.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(color: Color(0xFFF1F5F9), height: 1),
+                      const SizedBox(height: 24),
+                      const Text('Task List', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                      const SizedBox(height: 14),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 30, height: 30,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.sticky_note_2_rounded, color: Color(0xFFD97706), size: 16),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(widget.notes,
+                                    style: const TextStyle(color: Color(0xFF92400E), fontSize: 13, fontWeight: FontWeight.w500, height: 1.6)),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // ── Active Days Card ──
+              if (widget.activeDays.isNotEmpty)
+                _buildSectionCard(
+                  child: Builder(builder: (context) {
+                    const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    final sortedDays = allDays.where((d) => widget.activeDays.contains(d)).toList();
+
+                    String daysSummary = '';
+                    if (sortedDays.length == 7) {
+                      daysSummary = 'All days — 7 days/week';
+                    } else if (sortedDays.length == 5 && !widget.activeDays.contains('Sat') && !widget.activeDays.contains('Sun')) {
+                      daysSummary = 'Monday to Friday — 5 days/week';
+                    } else {
+                      daysSummary = '${sortedDays.join(', ')} — ${sortedDays.length} day${sortedDays.length == 1 ? '' : 's'}/week';
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Days Active in the Week', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: allDays.map((day) {
+                                  final isActive = widget.activeDays.contains(day);
+                                  final isWeekend = day == 'Sat' || day == 'Sun';
+                                  return Expanded(
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.1) : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          day.substring(0, isWeekend ? 3 : 1),
+                                          style: TextStyle(color: isActive ? const Color(0xFF047857) : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w800),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(color: Color(0xFFE2E8F0), height: 1),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF10B981)),
+                                  const SizedBox(width: 6),
+                                  Text(daysSummary, style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+
+              // ── Feedback Configuration Card ──
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Feedback Form', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                        ),
+                        if (widget.id.isNotEmpty)
+                          _isLoadingForm 
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Row(
+                                children: [
+                                  if (_hasForm) ...[
+                                    OutlinedButton.icon(
+                                      onPressed: _clearForm,
+                                      icon: const Icon(Icons.delete_outline, size: 16),
+                                      label: const Text('Clear'),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFFEF4444),
+                                        side: const BorderSide(color: Color(0xFFFECACA)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => AdminFormBuilderScreen(internshipId: widget.id),
+                                        ),
+                                      ).then((_) => _checkForm());
+                                    },
+                                    icon: Icon(_hasForm ? Icons.edit_document : Icons.add_circle_outline, size: 16),
+                                    label: Text(_hasForm ? 'Configure' : 'Create'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _hasForm ? const Color(0xFF1D4ED8) : const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ]
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Create custom feedback questions for students to answer when their internship completes.',
+                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                  ],
+                ),
+              ),
+
+              // ── Applicants Card ──
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Applicants', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
+                          child: Text('Total ${widget.applicants.length}',
+                            style: const TextStyle(color: Color(0xFF475569), fontSize: 13, fontWeight: FontWeight.w700)),
+                        ),
+                      ]
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Summary pills (scrollable horizontally if needed)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 30, height: 30,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.sticky_note_2_rounded, color: Color(0xFFD97706), size: 16),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(notes,
-                                style: const TextStyle(color: Color(0xFF92400E), fontSize: 13, fontWeight: FontWeight.w500, height: 1.6)),
-                          ),
+                          if (_accepted > 0) _summaryPill('$_accepted Accepted', const Color(0xFF16A34A), const Color(0xFFF0FDF4), const Color(0xFFBBF7D0)),
+                          if (_underReview > 0) _summaryPill('$_underReview Reviewing', const Color(0xFF2563EB), const Color(0xFFEFF6FF), const Color(0xFFBFDBFE)),
+                          if (_applied > 0) _summaryPill('$_applied New', const Color(0xFFEA580C), const Color(0xFFFFF7ED), const Color(0xFFFED7AA)),
+                          if (_rejected > 0) _summaryPill('$_rejected Rejected', const Color(0xFFDC2626), const Color(0xFFFEF2F2), const Color(0xFFFECACA)),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    // applicant list
+                    if (widget.applicants.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Text('No applicants yet.', style: TextStyle(color: Color(0xFF94A3B8))),
+                        ),
+                      )
+                    else
+                      ...widget.applicants.map((a) => _ApplicantRow(applicant: a)),
                   ],
-
-                  if (activeDays.isNotEmpty) ...[
-                    const SizedBox(height: 36),
-                    const Text('Days Active in the Week', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
-                    const SizedBox(height: 14),
-                    Builder(builder: (context) {
-                      const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                      final sortedDays = allDays.where((d) => activeDays.contains(d)).toList();
-
-                      String daysSummary = '';
-                      if (sortedDays.length == 7) {
-                        daysSummary = 'All days — 7 days/week';
-                      } else if (sortedDays.length == 5 && !activeDays.contains('Sat') && !activeDays.contains('Sun')) {
-                        daysSummary = 'Monday to Friday — 5 days/week';
-                      } else {
-                        daysSummary = '${sortedDays.join(', ')} — ${sortedDays.length} day${sortedDays.length == 1 ? '' : 's'}/week';
-                      }
-
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: allDays.map((day) {
-                                final isActive = activeDays.contains(day);
-                                final isWeekend = day == 'Sat' || day == 'Sun';
-                                return Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                                    padding: const EdgeInsets.symmetric(vertical: 9),
-                                    decoration: BoxDecoration(
-                                      color: isActive ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: isActive ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        day.substring(0, isWeekend ? 3 : 1),
-                                        style: TextStyle(color: isActive ? Colors.white : const Color(0xFFCBD5E1), fontSize: 10, fontWeight: FontWeight.w900),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                            const SizedBox(height: 12),
-                            const Divider(color: Color(0xFFF1F5F9), height: 1),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF10B981)),
-                                const SizedBox(width: 6),
-                                Text(daysSummary, style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w700)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-
-                  const SizedBox(height: 36),
-
-                  // ── Feedback Configuration ──
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('Feedback Form', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
-                      ),
-                      if (id.isNotEmpty)
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AdminFormBuilderScreen(internshipId: id),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.edit_document, size: 16),
-                          label: const Text('Configure'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D4ED8),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                    ]
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('Create custom feedback questions for students to answer when their internship completes.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-                  const SizedBox(height: 48),
-
-                  // ── Applicants Section ──
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('Applicants', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), letterSpacing: -0.5)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(20)),
-                        child: Text('Total ${applicants.length}',
-                          style: const TextStyle(color: Color(0xFF475569), fontSize: 13, fontWeight: FontWeight.w700)),
-                      ),
-                    ]
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Summary pills (scrollable horizontally if needed)
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: [
-                        if (_accepted > 0) _summaryPill('$_accepted Accepted', const Color(0xFF16A34A), const Color(0xFFF0FDF4), const Color(0xFFBBF7D0)),
-                        if (_underReview > 0) _summaryPill('$_underReview Reviewing', const Color(0xFF2563EB), const Color(0xFFEFF6FF), const Color(0xFFBFDBFE)),
-                        if (_applied > 0) _summaryPill('$_applied New', const Color(0xFFEA580C), const Color(0xFFFFF7ED), const Color(0xFFFED7AA)),
-                        if (_rejected > 0) _summaryPill('$_rejected Rejected', const Color(0xFFDC2626), const Color(0xFFFEF2F2), const Color(0xFFFECACA)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // applicant list
-                  ...applicants.map((a) => _ApplicantRow(applicant: a)),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -363,25 +477,34 @@ class _MetaBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: color),
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+                child: Icon(icon, size: 12, color: color),
+              ),
               const SizedBox(width: 6),
-              Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+              Expanded(
+                child: Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(value, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+          Text(value, 
+            style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

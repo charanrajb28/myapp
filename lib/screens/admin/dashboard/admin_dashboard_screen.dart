@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
+import '../feedbacks/admin_generated_forms_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -364,6 +365,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => const AdminFeedbacksScreen()),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _ActionTile(
+                          title: 'Generated Forms & Responses',
+                          subtitle: 'View forms and export responses to Excel',
+                          icon: Icons.list_alt_rounded,
+                          color: const Color(0xFF10B981),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AdminGeneratedFormsScreen()),
                             );
                           },
                         ),

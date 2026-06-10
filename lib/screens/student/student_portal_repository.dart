@@ -148,21 +148,39 @@ class StudentPortalRepository {
 
     final studentId = student['id'];
 
+    // Fetch submitted feedbacks for this student
+    Set<String> feedbackSubmittedCompanyIds = {};
+    try {
+      final feedbackResponse = await _client
+          .from('feedbacks')
+          .select('company_id')
+          .eq('student_id', studentId)
+          .eq('type', 'Final Feedback')
+          .timeout(const Duration(seconds: 15));
+          
+      feedbackSubmittedCompanyIds = (feedbackResponse as List)
+          .map((f) => f['company_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+    } catch (e) {
+      debugPrint('Error fetching feedbacks: $e');
+    }
+
     final response = await _client
         .from('applications')
         .select(
           'id, status, progress, start_date, end_date, mentor_name, '
           'alerts, checkins, '
           'mentor_email, offer_letter_id, internships('
-          'id, role, industry, location, stipend, duration, deadline, '
-          'brand_color, logo_initial, about, status, active_days, notes, feedback_form_schema, companies(name))',
+          'id, company_id, role, industry, location, stipend, duration, deadline, '
+          'brand_color, logo_initial, about, status, active_days, notes, feedback_form_schema, companies(id, name))',
         )
         .eq('student_id', studentId)
         .order('created_at', ascending: false)
         .timeout(const Duration(seconds: 15));
 
     return (response as List)
-        .map((item) => _mapStudentInternship(item as Map<String, dynamic>))
+        .map((item) => _mapStudentInternship(item as Map<String, dynamic>, feedbackSubmittedCompanyIds))
         .toList();
   }
 
@@ -652,7 +670,7 @@ class StudentPortalRepository {
         .timeout(const Duration(seconds: 15));
   }
 
-  StudentInternship _mapStudentInternship(Map<String, dynamic> item) {
+  StudentInternship _mapStudentInternship(Map<String, dynamic> item, Set<String> feedbackSubmittedCompanyIds) {
     final internship = (item['internships'] as Map<String, dynamic>?) ?? {};
     final status = item['status']?.toString() ?? 'Applied';
     final startDate = item['start_date']?.toString();
@@ -661,10 +679,12 @@ class StudentPortalRepository {
       startDateRaw: startDate,
       durationRaw: internship['duration'],
     );
+    final internshipId = internship['id']?.toString() ?? item['id'].toString();
+    final companyId = internship['company_id']?.toString() ?? '';
 
     return StudentInternship(
       applicationId: item['id']?.toString() ?? '',
-      id: internship['id']?.toString() ?? item['id'].toString(),
+      id: internshipId,
       company: internship['companies']?['name']?.toString() ?? 'Company',
       role: internship['role']?.toString() ?? 'Intern',
       department: internship['industry']?.toString() ?? 'General',
@@ -692,6 +712,7 @@ class StudentPortalRepository {
       alerts: _jsonObjectList(item['alerts']),
       checkins: _jsonObjectList(item['checkins']),
       feedbackFormSchema: internship['feedback_form_schema'] as List?,
+      hasSubmittedFinalFeedback: feedbackSubmittedCompanyIds.contains(companyId),
     );
   }
 

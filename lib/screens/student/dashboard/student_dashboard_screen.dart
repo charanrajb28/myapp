@@ -52,7 +52,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final homeVisible = _internships
-        .where((i) => i.status == 'Active' || i.status == 'Removed')
+        .where((i) => 
+            i.status == 'Active' || 
+            i.status == 'Removed' || 
+            (i.status == 'Completed' && !i.hasSubmittedFinalFeedback))
         .toList();
 
     return Scaffold(

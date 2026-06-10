@@ -27,6 +27,7 @@ class StudentInternship {
   final List<Map<String, dynamic>> alerts;
   final List<Map<String, dynamic>> checkins;
   final List<dynamic>? feedbackFormSchema;
+  final bool hasSubmittedFinalFeedback;
 
   const StudentInternship({
     required this.applicationId,
@@ -55,6 +56,7 @@ class StudentInternship {
     this.alerts = const [],
     this.checkins = const [],
     this.feedbackFormSchema,
+    this.hasSubmittedFinalFeedback = false,
   });
 }
 
