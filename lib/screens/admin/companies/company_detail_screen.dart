@@ -985,6 +985,7 @@ class _RolesTab extends StatelessWidget {
                               child: InkWell(
                                 onTap: () => Navigator.push(context, MaterialPageRoute(
                                   builder: (_) => RoleDetailScreen(
+                                    id: role['id']?.toString() ?? '',
                                     title: role['role'] ?? 'Intern Role',
                                     type: 'Full-time',
                                     deadline: role['deadline'] ?? 'TBD',

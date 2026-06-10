@@ -26,6 +26,7 @@ class StudentInternship {
   final String notes;
   final List<Map<String, dynamic>> alerts;
   final List<Map<String, dynamic>> checkins;
+  final List<dynamic>? feedbackFormSchema;
 
   const StudentInternship({
     required this.applicationId,
@@ -53,6 +54,7 @@ class StudentInternship {
     this.notes = '',
     this.alerts = const [],
     this.checkins = const [],
+    this.feedbackFormSchema,
   });
 }
 

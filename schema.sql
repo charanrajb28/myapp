@@ -93,6 +93,10 @@ ADD COLUMN IF NOT EXISTS active_days TEXT[] DEFAULT '{}'::TEXT[];
 ALTER TABLE public.internships
 ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
 
+-- Custom feedback form schema for completed roles
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS feedback_form_schema JSONB DEFAULT '[]'::jsonb;
+
 -- 5. Create internships table (internship opportunities)
 CREATE TABLE IF NOT EXISTS internships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,8 +164,12 @@ CREATE TABLE IF NOT EXISTS feedbacks (
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   type VARCHAR(50) NOT NULL DEFAULT 'Suggestion',
   comment TEXT NOT NULL,
+  form_responses JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.feedbacks
+ADD COLUMN IF NOT EXISTS form_responses JSONB;
 
 CREATE TABLE IF NOT EXISTS student_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

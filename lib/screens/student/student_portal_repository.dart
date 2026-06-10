@@ -155,7 +155,7 @@ class StudentPortalRepository {
           'alerts, checkins, '
           'mentor_email, offer_letter_id, internships('
           'id, role, industry, location, stipend, duration, deadline, '
-          'brand_color, logo_initial, about, status, active_days, notes, companies(name))',
+          'brand_color, logo_initial, about, status, active_days, notes, feedback_form_schema, companies(name))',
         )
         .eq('student_id', studentId)
         .order('created_at', ascending: false)
@@ -691,6 +691,7 @@ class StudentPortalRepository {
       notes: internship['notes']?.toString() ?? '',
       alerts: _jsonObjectList(item['alerts']),
       checkins: _jsonObjectList(item['checkins']),
+      feedbackFormSchema: internship['feedback_form_schema'] as List?,
     );
   }
 

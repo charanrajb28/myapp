@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../feedbacks/admin_form_builder_screen.dart';
+
 
 class RoleDetailScreen extends StatelessWidget {
+  final String id;
   final String title;
   final String type;
   final String deadline;
@@ -15,6 +18,7 @@ class RoleDetailScreen extends StatelessWidget {
 
   const RoleDetailScreen({
     super.key,
+    required this.id,
     required this.title,
     required this.type,
     required this.deadline,
@@ -261,6 +265,39 @@ class RoleDetailScreen extends StatelessWidget {
                     }),
                   ],
 
+                  const SizedBox(height: 36),
+
+                  // ── Feedback Configuration ──
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Feedback Form', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3)),
+                      ),
+                      if (id.isNotEmpty)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AdminFormBuilderScreen(internshipId: id),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.edit_document, size: 16),
+                          label: const Text('Configure'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1D4ED8),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                    ]
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Create custom feedback questions for students to answer when their internship completes.',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                   const SizedBox(height: 48),
 
                   // ── Applicants Section ──

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/internship.dart';
 import '../feedback/send_feedback_screen.dart';
+import '../feedback/student_dynamic_feedback_screen.dart';
 import '../internship/my_internship_screen.dart';
 import '../internship/student_internship_alerts_screen.dart';
 import '../student_portal_repository.dart';
@@ -321,12 +322,30 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
                   );
                 },
               ),
-              _StatGridCard(
-                title: 'Remaining',
-                value: '${currentIntern.daysLeft}D',
-                icon: Icons.hourglass_bottom_rounded,
-                color: const Color(0xFFF59E0B),
-              ),
+              if (currentIntern.status == 'Completed' || currentIntern.daysLeft <= 0)
+                _StatGridCard(
+                  title: 'Final Feedback',
+                  value: 'Submit',
+                  icon: Icons.rate_review_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StudentDynamicFeedbackScreen(
+                          internship: currentIntern,
+                        ),
+                      ),
+                    );
+                  },
+                )
+              else
+                _StatGridCard(
+                  title: 'Remaining',
+                  value: '${currentIntern.daysLeft}D',
+                  icon: Icons.hourglass_bottom_rounded,
+                  color: const Color(0xFFF59E0B),
+                ),
               _StatGridCard(
                 title: 'Feedback',
                 value: 'Send',
