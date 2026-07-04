@@ -5,7 +5,9 @@ import '../feedbacks/admin_feedbacks_screen.dart';
 import '../feedbacks/admin_generated_forms_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key});
+  final void Function(int tabIndex)? onNavigateToTab;
+
+  const AdminDashboardScreen({super.key, this.onNavigateToTab});
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -298,8 +300,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       spacing: 14,
                       runSpacing: 14,
                       children: [
-                        _StatCard(title: 'Total Students', value: _totalStudents.toString(), icon: Icons.people_alt_rounded, color: const Color(0xFF3B82F6), constraints: constraints),
-                        _StatCard(title: 'Partner Companies', value: _partnerCompanies.toString(), icon: Icons.domain_rounded, color: const Color(0xFF8B5CF6), constraints: constraints),
+                        _StatCard(
+                          title: 'Total Students',
+                          value: _totalStudents.toString(),
+                          icon: Icons.people_alt_rounded,
+                          color: const Color(0xFF3B82F6),
+                          constraints: constraints,
+                          onTap: widget.onNavigateToTab != null
+                              ? () => widget.onNavigateToTab!(1)
+                              : null,
+                        ),
+                        _StatCard(
+                          title: 'Partner Companies',
+                          value: _partnerCompanies.toString(),
+                          icon: Icons.domain_rounded,
+                          color: const Color(0xFF8B5CF6),
+                          constraints: constraints,
+                          onTap: widget.onNavigateToTab != null
+                              ? () => widget.onNavigateToTab!(2)
+                              : null,
+                        ),
                         _StatCard(title: 'Active Internships', value: _activeInternships.toString(), icon: Icons.work_outline_rounded, color: const Color(0xFF10B981), constraints: constraints),
                         _StatCard(
                           title: 'Red Alerts',

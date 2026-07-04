@@ -4,12 +4,20 @@ import 'students/students_list_screen.dart';
 import 'companies/companies_list_screen.dart';
 import 'alerts/red_alerts_screen.dart';
 import 'dashboard/more_options_screen.dart';
+import 'dashboard/admin_dashboard_screen.dart';
 import '../../utils/device_session_helper.dart';
 
 class AdminShell extends StatefulWidget {
   final Widget child;
 
   const AdminShell({super.key, required this.child});
+
+  // Index constants for easy reference
+  static const int indexOverview = 0;
+  static const int indexStudents = 1;
+  static const int indexCompanies = 2;
+  static const int indexAlerts = 3;
+  static const int indexMore = 4;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -41,10 +49,23 @@ class _AdminShellState extends State<AdminShell> {
     });
   }
 
+  void _navigateToTab(int index) {
+    _setIndex(index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final dashboard = widget.child is AdminDashboardScreen
+        ? AdminDashboardScreen(onNavigateToTab: _navigateToTab)
+        : widget.child;
+
     final screens = [
-      widget.child,
+      dashboard,
       const StudentsListScreen(),
       const CompaniesListScreen(),
       const RedAlertsScreen(),
@@ -60,12 +81,7 @@ class _AdminShellState extends State<AdminShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
-          _setIndex(index);
-          _pageController.animateToPage(
-            index,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
+          _navigateToTab(index);
         },
         destinations: const [
           NavigationDestination(

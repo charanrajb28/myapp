@@ -33,7 +33,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final TextEditingController _adminSmtpPasswordController =
       TextEditingController(text: MailConfig.senderAppPassword);
 
-  String _selectedDepartment = 'Computer Science';
+  String _selectedDepartment = 'B.Com LSCM';
   String _selectedSemester = '6th Semester';
   String _selectedGender = 'Male';
   bool _sendInvite = true;
@@ -54,7 +54,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       _gpaController.text = s['gpa']?.toString() ?? '';
       _expectedGradController.text = s['graduation_year']?.toString() ?? '';
       _emailController.text = s['contact_email']?.toString() ?? '';
-      _selectedDepartment = s['department'] ?? 'Computer Science';
+      _selectedDepartment = s['department'] ?? 'B.Com LSCM';
       _selectedSemester = s['semester'] ?? '6th Semester';
       // Passwords are not fetched for security
       _sendInvite = false; 
@@ -304,7 +304,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                             _buildDropdownField(
                               label: 'Department / Major',
                               value: _selectedDepartment,
-                              items: ['Computer Science', 'Information Tech', 'Electrical Eng', 'Mechanical Eng', 'Data Science'],
+                              items: ['B.Com LSCM', 'B.Com AF', 'BCA', 'BBA'],
                               onChanged: (val) => setState(() => _selectedDepartment = val!),
                             ),
                           ]),

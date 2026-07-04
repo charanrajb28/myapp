@@ -34,7 +34,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen>
   // ── Step 2: Personal Contact ────────────────────────────────────────────
   final _phoneController = TextEditingController();
   String _selectedSemester = '1st Semester';
-  String _selectedDepartment = 'B.Com Regular';
+  String _selectedDepartment = 'B.Com LSCM';
 
   static const _college = 'Sheshadripuram College';
 
@@ -51,11 +51,10 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen>
   ];
 
   final List<String> _departments = [
-    'B.Com Regular',
-    'B.Com A and F',
     'B.Com LSCM',
-    'BBA',
+    'B.Com AF',
     'BCA',
+    'BBA',
   ];
 
   final List<GlobalKey<FormState>> _formKeys = [

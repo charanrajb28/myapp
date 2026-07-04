@@ -28,12 +28,10 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
   bool? _filterBlacklisted; // null = All, false = Active, true = Blacklisted
 
   final List<String> _defaultDepartments = [
-    'Computer Science',
-    'Data Science',
-    'Information Technology',
-    'Electronics & Communication',
-    'Mechanical Engineering',
-    'Civil Engineering',
+    'B.Com LSCM',
+    'B.Com AF',
+    'BCA',
+    'BBA',
   ];
 
   final List<String> _defaultSemesters = [

@@ -1160,7 +1160,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 24),
-          _buildInfoRow(Icons.school_outlined, 'Degree Program', 'B.Tech - $department'),
+          _buildInfoRow(Icons.school_outlined, 'Degree Program', department),
           const SizedBox(height: 16),
           _buildInfoRow(Icons.history_edu_outlined, 'Current Status', 'Enrolled'),
           const SizedBox(height: 16),
