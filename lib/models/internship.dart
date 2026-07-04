@@ -77,6 +77,8 @@ class InternshipOpportunity {
   final List<String> activeDays;
   final String notes;
   final bool? isApplied;
+  final int applicationDurationDays;
+  final DateTime? createdAt;
 
   const InternshipOpportunity({
     required this.id,
@@ -93,6 +95,8 @@ class InternshipOpportunity {
     this.isApplied = false,
     this.activeDays = const [],
     this.notes = '',
+    this.applicationDurationDays = 7,
+    this.createdAt,
     this.requirements = const [
       'Currently pursuing B.Tech/B.E in CS or related fields',
       'Strong understanding of Data Structures and Algorithms',

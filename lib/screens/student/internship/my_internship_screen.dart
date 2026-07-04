@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/internship.dart';
@@ -2517,11 +2518,19 @@ class _OpportunityListItem extends StatelessWidget {
                               opportunity.stipend,
                               accent,
                             ),
-                            _infoPill(
-                              Icons.event_rounded,
-                              opportunity.deadline,
-                              accent,
-                            ),
+                            if (opportunity.createdAt != null)
+                              _CountdownTimerWidget(
+                                expiryDate: opportunity.createdAt!.add(
+                                  Duration(days: opportunity.applicationDurationDays),
+                                ),
+                                accentColor: accent,
+                              )
+                            else
+                              _infoPill(
+                                Icons.event_rounded,
+                                opportunity.deadline,
+                                accent,
+                              ),
                           ],
                         ),
                       ],
@@ -2828,3 +2837,116 @@ class _AttendanceCalendarCard extends StatelessWidget {
     );
   }
 }
+
+class _CountdownTimerWidget extends StatefulWidget {
+  final DateTime expiryDate;
+  final Color accentColor;
+
+  const _CountdownTimerWidget({
+    required this.expiryDate,
+    required this.accentColor,
+  });
+
+  @override
+  State<_CountdownTimerWidget> createState() => _CountdownTimerWidgetState();
+}
+
+class _CountdownTimerWidgetState extends State<_CountdownTimerWidget> {
+  Timer? _timer;
+  late Duration _timeRemaining;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateTimeRemaining();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _calculateTimeRemaining();
+        });
+      }
+    });
+  }
+
+  void _calculateTimeRemaining() {
+    _timeRemaining = widget.expiryDate.difference(DateTime.now());
+    if (_timeRemaining.isNegative) {
+      _timeRemaining = Duration.zero;
+      _timer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_timeRemaining == Duration.zero) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFFCA5A5)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.timer_off_rounded, size: 13, color: Color(0xFFEF4444)),
+            SizedBox(width: 6),
+            Text(
+              'Expired',
+              style: TextStyle(
+                fontSize: 11,
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final days = _timeRemaining.inDays;
+    final hours = _timeRemaining.inHours % 24;
+    final minutes = _timeRemaining.inMinutes % 60;
+    final seconds = _timeRemaining.inSeconds % 60;
+
+    String text;
+    if (days > 0) {
+      text = '${days}d ${hours}h left';
+    } else if (hours > 0) {
+      text = '${hours}h ${minutes}m left';
+    } else {
+      text = '${minutes}m ${seconds}s left';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: widget.accentColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: widget.accentColor.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.alarm_rounded, size: 13, color: widget.accentColor),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: widget.accentColor,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

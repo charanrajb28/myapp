@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dashboard/company_dashboard_screen.dart';
 import 'postings/manage_postings_screen.dart';
 import 'profile/company_profile_screen.dart';
+import '../../utils/device_session_helper.dart';
 
 class CompanyShell extends StatefulWidget {
   const CompanyShell({super.key});
@@ -16,6 +17,7 @@ class CompanyShell extends StatefulWidget {
 class _CompanyShellState extends State<CompanyShell> {
   int _currentIndex = 0;
   late final PageController _pageController;
+  late final SessionMonitor _sessionMonitor;
 
   final GlobalKey<State<CompanyDashboardScreen>> _dashboardKey =
       GlobalKey<State<CompanyDashboardScreen>>();
@@ -26,10 +28,12 @@ class _CompanyShellState extends State<CompanyShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
+    _sessionMonitor = SessionMonitor()..start(context);
   }
 
   @override
   void dispose() {
+    _sessionMonitor.stop();
     _pageController.dispose();
     super.dispose();
   }

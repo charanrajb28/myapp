@@ -7,6 +7,7 @@ import 'package:mailer/smtp_server.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../config/mail_config.dart';
+import '../../../utils/device_session_helper.dart';
 
 enum VerificationMode { password, otp }
 
@@ -39,11 +40,14 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
   String _email = 'Not available';
   String _createdAt = 'Not available';
   String _lastSignInAt = 'Not available';
+  List<Map<String, dynamic>> _loginSessions = [];
+  bool _isLoadingHistory = true;
 
   @override
   void initState() {
     super.initState();
     _loadAccountState();
+    _loadLoginHistory();
   }
 
   @override
@@ -66,6 +70,27 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
       _lastSignInAt = _formatDateTime(user?.lastSignInAt);
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadLoginHistory() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final res = await _supabase
+          .from('user_device_sessions')
+          .select()
+          .eq('user_id', user.id)
+          .order('logged_in_at', ascending: false)
+          .limit(10);
+      if (!mounted) return;
+      setState(() {
+        _loginSessions = List<Map<String, dynamic>>.from(res);
+        _isLoadingHistory = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingHistory = false);
+    }
   }
 
   Future<void> _handleVerification() async {
@@ -421,6 +446,132 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 24),
+          _buildLoginHistoryCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginHistoryCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.devices_rounded,
+                color: Color(0xFF2563EB),
+                size: 20,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Device Login History',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (_isLoadingHistory)
+            const Center(child: CircularProgressIndicator())
+          else if (_loginSessions.isEmpty)
+            const Text(
+              'No login history found.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _loginSessions.length,
+              separatorBuilder: (context, index) => const Divider(height: 20, thickness: 0.5),
+              itemBuilder: (context, index) {
+                final session = _loginSessions[index];
+                final isActive = session['is_active'] == true;
+                final deviceInfo = session['device_info'] ?? 'Unknown Device';
+                final loggedInAt = _formatDateTime(session['logged_in_at']);
+                final loggedOutAt = session['logged_out_at'] != null 
+                    ? _formatDateTime(session['logged_out_at']) 
+                    : null;
+                
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      isActive ? Icons.phone_android_rounded : Icons.desktop_mac_rounded,
+                      color: isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                deviceInfo,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              if (isActive) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD1FAE5),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'ACTIVE',
+                                    style: TextStyle(
+                                      color: Color(0xFF065F46),
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Logged in: $loggedInAt',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          if (loggedOutAt != null)
+                            Text(
+                              'Logged out: $loggedOutAt',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );

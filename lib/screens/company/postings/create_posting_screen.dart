@@ -17,6 +17,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   final durationController   = TextEditingController();
   final notesController      = TextEditingController();
   final _taskInputController = TextEditingController();
+  final activeDurationController = TextEditingController(text: '7');
 
   DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 30));
   bool isRemote  = true;
@@ -37,6 +38,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     durationController.dispose();
     notesController.dispose();
     _taskInputController.dispose();
+    activeDurationController.dispose();
     super.dispose();
   }
 
@@ -99,6 +101,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'responsibilities': _tasks,
         'notes'       : notesController.text.trim(),
         'active_days' : sortedDays,
+        'application_duration_days': int.tryParse(activeDurationController.text.trim()) ?? 7,
         'deadline'    : DateTime(
           _selectedDeadline.year,
           _selectedDeadline.month,
@@ -166,7 +169,14 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                           isNumeric: true, hint: 'e.g. 06')),
                 ]),
                 const SizedBox(height: 20),
-                _deadlineField(),
+                Row(children: [
+                  Expanded(
+                      child: _deadlineField()),
+                  const SizedBox(width: 16),
+                  Expanded(
+                      child: _industrialField('APP ACTIVE DURATION (DAYS)', activeDurationController,
+                          isNumeric: true, hint: 'e.g. 7')),
+                ]),
                 const SizedBox(height: 32),
 
                 // ── Work Location ───────────────────────────────────────

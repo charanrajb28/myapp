@@ -4,6 +4,7 @@ import 'students/students_list_screen.dart';
 import 'companies/companies_list_screen.dart';
 import 'alerts/red_alerts_screen.dart';
 import 'dashboard/more_options_screen.dart';
+import '../../utils/device_session_helper.dart';
 
 class AdminShell extends StatefulWidget {
   final Widget child;
@@ -17,15 +18,18 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   int _currentIndex = 0;
   late final PageController _pageController;
+  late final SessionMonitor _sessionMonitor;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
+    _sessionMonitor = SessionMonitor()..start(context);
   }
 
   @override
   void dispose() {
+    _sessionMonitor.stop();
     _pageController.dispose();
     super.dispose();
   }

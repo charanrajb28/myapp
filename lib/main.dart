@@ -10,6 +10,7 @@ import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
+import 'utils/device_session_helper.dart';
 
 
 void main() async {
@@ -125,6 +126,18 @@ class _LogoutScreenState extends State<LogoutScreen> {
 
   Future<void> _performLogout() async {
     try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final token = await getOrCreateDeviceToken();
+        await Supabase.instance.client
+            .from('user_device_sessions')
+            .update({
+              'is_active': false,
+              'logged_out_at': DateTime.now().toIso8601String(),
+            })
+            .eq('user_id', user.id)
+            .eq('device_token', token);
+      }
       await Supabase.instance.client.auth.signOut();
     } catch (e) {
       debugPrint('Logout error: $e');
@@ -289,6 +302,58 @@ class _LoginPageState extends State<LoginPage>
 
   late final AnimationController _devAnimController;
   late final Animation<double> _devPanelAnim;
+
+  Future<bool?> _showConflictDialog(BuildContext context, String otherDeviceName) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 10),
+              Text(
+                'Device Conflict',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          content: Text(
+            'Another device ($otherDeviceName) is currently logged in.\n\n'
+            'Would you like to log out from that device and log in here?',
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Log Out Other Device',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -600,29 +665,92 @@ class _LoginPageState extends State<LoginPage>
                                 
                                 final user = res.user;
                                 if (user != null) {
-                                  // Fetch role from public.users table
-                                  final userData = await Supabase.instance.client
-                                      .from('users')
-                                      .select('role')
-                                      .eq('id', user.id)
-                                      .single();
+                                  final deviceToken = await getOrCreateDeviceToken();
+                                  final deviceInfo = getDeviceInfo();
+                                  
+                                  // Check for active session(s)
+                                  final activeSessions = await Supabase.instance.client
+                                      .from('user_device_sessions')
+                                      .select()
+                                      .eq('user_id', user.id)
+                                      .eq('is_active', true);
                                       
-                                  final role = userData['role'];
-                                  
-                                  if (!context.mounted) return;
-                                  
-                                  if (role == 'admin') {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
-                                    );
-                                  } else if (role == 'student') {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(builder: (context) => const StudentShell()),
-                                    );
-                                  } else if (role == 'company') {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(builder: (context) => const CompanyShell()),
-                                    );
+                                  bool proceed = true;
+                                  if (activeSessions.isNotEmpty) {
+                                    final currentActiveToken = activeSessions.first['device_token'];
+                                    final currentActiveInfo = activeSessions.first['device_info'];
+                                    
+                                    if (currentActiveToken != deviceToken) {
+                                      // Device conflict! Ask to logout other device
+                                      if (!context.mounted) {
+                                        await Supabase.instance.client.auth.signOut();
+                                        return;
+                                      }
+                                      final shouldLogoutOther = await _showConflictDialog(context, currentActiveInfo);
+                                      if (shouldLogoutOther == true) {
+                                        // Mark previous sessions as inactive
+                                        await Supabase.instance.client
+                                            .from('user_device_sessions')
+                                            .update({
+                                              'is_active': false,
+                                              'logged_out_at': DateTime.now().toIso8601String(),
+                                            })
+                                            .eq('user_id', user.id)
+                                            .eq('is_active', true);
+                                            
+                                        // Log new session
+                                        await Supabase.instance.client
+                                            .from('user_device_sessions')
+                                            .insert({
+                                              'user_id': user.id,
+                                              'device_token': deviceToken,
+                                              'device_info': deviceInfo,
+                                              'is_active': true,
+                                              'logged_in_at': DateTime.now().toIso8601String(),
+                                            });
+                                      } else {
+                                        proceed = false;
+                                        await Supabase.instance.client.auth.signOut();
+                                      }
+                                    }
+                                  } else {
+                                    // Log new session
+                                    await Supabase.instance.client
+                                        .from('user_device_sessions')
+                                        .insert({
+                                          'user_id': user.id,
+                                          'device_token': deviceToken,
+                                          'device_info': deviceInfo,
+                                          'is_active': true,
+                                          'logged_in_at': DateTime.now().toIso8601String(),
+                                        });
+                                  }
+
+                                  if (proceed) {
+                                    // Fetch role from public.users table
+                                    final userData = await Supabase.instance.client
+                                        .from('users')
+                                        .select('role')
+                                        .eq('id', user.id)
+                                        .single();
+                                        
+                                    final role = userData['role'];
+                                    
+                                    if (!context.mounted) return;
+                                    
+                                    if (role == 'admin') {
+                                      Navigator.of(context).pushReplacement(
+                                        MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
+                                      );
+                                    } else if (role == 'student') {
+                                      Navigator.of(context).pushReplacement(
+                                        MaterialPageRoute(builder: (context) => const StudentShell()),
+                                      );
+                                    } else if (role == 'company') {
+                                      Navigator.of(context).pushReplacement(
+                                        MaterialPageRoute(builder: (context) => const CompanyShell()),
+                                      );
+                                    }
                                   }
                                 }
                               } catch (e) {

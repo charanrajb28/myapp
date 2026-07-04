@@ -97,6 +97,10 @@ ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
 ALTER TABLE public.internships
 ADD COLUMN IF NOT EXISTS feedback_form_schema JSONB DEFAULT '[]'::jsonb;
 
+-- Application active duration in days (e.g. 2 days, 5 days, etc.)
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS application_duration_days INTEGER DEFAULT 7;
+
 -- 5. Create internships table (internship opportunities)
 CREATE TABLE IF NOT EXISTS internships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -115,6 +119,7 @@ CREATE TABLE IF NOT EXISTS internships (
   status VARCHAR(50) DEFAULT 'INTERVIEWING',
   start_date DATE,
   end_date DATE,
+  application_duration_days INTEGER DEFAULT 7,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -681,3 +686,30 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.admin_delete_user(UUID) TO authenticated;
+
+-- ── User Device Sessions Table ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.user_device_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  device_token TEXT NOT NULL,
+  device_info TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  logged_in_at TIMESTAMPTZ DEFAULT NOW(),
+  logged_out_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.user_device_sessions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own device sessions" ON public.user_device_sessions;
+CREATE POLICY "Users can view own device sessions" ON public.user_device_sessions
+FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can insert own device sessions" ON public.user_device_sessions;
+CREATE POLICY "Users can insert own device sessions" ON public.user_device_sessions
+FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can update own device sessions" ON public.user_device_sessions;
+CREATE POLICY "Users can update own device sessions" ON public.user_device_sessions
+FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+

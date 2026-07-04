@@ -18,6 +18,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
   late TextEditingController notesController;
 
   final TextEditingController _taskInputController = TextEditingController();
+  late TextEditingController activeDurationController;
 
   late DateTime _selectedDeadline;
   bool isRemote  = true;
@@ -38,6 +39,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     stipendController  = TextEditingController(text: widget.posting['stipend']?.toString() ?? '');
     durationController = TextEditingController(text: widget.posting['duration']?.toString() ?? '');
     notesController    = TextEditingController(text: widget.posting['notes']?.toString() ?? '');
+    activeDurationController = TextEditingController(text: widget.posting['application_duration_days']?.toString() ?? '7');
 
     // Pre-populate tasks from responsibilities array
     final rawTasks = widget.posting['responsibilities'];
@@ -64,6 +66,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     durationController.dispose();
     notesController.dispose();
     _taskInputController.dispose();
+    activeDurationController.dispose();
     super.dispose();
   }
 
@@ -103,6 +106,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         'responsibilities': _tasks,
         'notes'           : notesController.text.trim(),
         'active_days'     : sortedDays,
+        'application_duration_days': int.tryParse(activeDurationController.text.trim()) ?? 7,
         'deadline'        : DateTime(
           _selectedDeadline.year,
           _selectedDeadline.month,
@@ -185,7 +189,11 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                   Expanded(child: _field('DURATION (MO)', durationController, isNumeric: true)),
                 ]),
                 const SizedBox(height: 20),
-                _deadlineField(),
+                Row(children: [
+                  Expanded(child: _deadlineField()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _field('APP ACTIVE DURATION (DAYS)', activeDurationController, isNumeric: true)),
+                ]),
                 const SizedBox(height: 32),
 
                 // ── Location ────────────────────────────────────────────

@@ -8,6 +8,7 @@ import 'internship/my_internship_screen.dart';
 import 'checkins/checkins_screen.dart';
 import 'notifications/student_notifications_screen.dart';
 import 'profile/student_profile_screen.dart';
+import '../../utils/device_session_helper.dart';
 
 
 class StudentShell extends ConsumerStatefulWidget {
@@ -24,15 +25,18 @@ class StudentShell extends ConsumerStatefulWidget {
 class StudentShellState extends ConsumerState<StudentShell> {
   int _currentIndex = 0;
   late final PageController _pageController;
+  late final SessionMonitor _sessionMonitor;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
+    _sessionMonitor = SessionMonitor()..start(context);
   }
 
   @override
   void dispose() {
+    _sessionMonitor.stop();
     _pageController.dispose();
     super.dispose();
   }
