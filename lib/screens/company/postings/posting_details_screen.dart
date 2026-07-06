@@ -12,6 +12,7 @@ import '../candidates/student_history_dialog.dart';
 import '../../../utils/qr_payload_security.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
   const PostingDetailsScreen({super.key, required this.posting});
@@ -818,7 +819,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                   }
                 ),
               ],
-              _buildCandidateActionButtons(jobStatus, status, app['id'], name),
+              _buildCandidateActionButtons(jobStatus, status, app, name),
             ],
           ),
         );
@@ -885,8 +886,9 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     );
   }
 
-  Widget _buildCandidateActionButtons(String jobStatus, String status, String applicationId, String name) {
+  Widget _buildCandidateActionButtons(String jobStatus, String status, Map<String, dynamic> app, String name) {
     jobStatus = jobStatus.toUpperCase();
+    final applicationId = app['id']?.toString() ?? '';
     
     if (jobStatus == 'INTERVIEWING') {
       if (status == 'Applied' || status == 'Under Review') {
@@ -960,6 +962,32 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
       if (status == 'Active') {
         return Row(
           children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentInfoScreen(
+                        studentName: name,
+                        progress: double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
+                        checkins: app['checkins'] as List? ?? [],
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.info_outline_rounded, size: 16),
+                label: const Text('VIEW INFO', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _showRemoveInternDialog(applicationId, name),
@@ -1680,4 +1708,547 @@ class _DotPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class StudentInfoScreen extends StatefulWidget {
+  final String studentName;
+  final double progress;
+  final List<dynamic> checkins;
+
+  const StudentInfoScreen({
+    super.key,
+    required this.studentName,
+    required this.progress,
+    required this.checkins,
+  });
+
+  @override
+  State<StudentInfoScreen> createState() => _StudentInfoScreenState();
+}
+
+class _StudentInfoScreenState extends State<StudentInfoScreen> {
+  late DateTime _selectedMonth;
+  late DateTime _activeSelectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMonth = DateTime.now();
+    _activeSelectedDate = DateTime.now();
+  }
+
+  Map<String, dynamic>? _getCheckinForDate(DateTime date) {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    for (final checkin in widget.checkins) {
+      if (checkin is Map) {
+        final checkinDate = checkin['checkin_date']?.toString();
+        if (checkinDate == dateStr) {
+          return Map<String, dynamic>.from(checkin);
+        }
+      }
+    }
+    return null;
+  }
+
+  String _formatTime(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return '--:--';
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      return DateFormat('hh:mm a').format(dt);
+    } catch (_) {
+      return isoString;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final monthName = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
+    final firstWeekday = DateTime(_selectedMonth.year, _selectedMonth.month, 1).weekday % 7; // 0 for Sunday
+
+    final cells = <Widget>[];
+
+    // Day labels
+    const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    for (final day in daysOfWeek) {
+      cells.add(
+        Center(
+          child: Text(
+            day,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Weekday padding
+    for (int i = 0; i < firstWeekday; i++) {
+      cells.add(const SizedBox.shrink());
+    }
+
+    // Days grid
+    for (int day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(_selectedMonth.year, _selectedMonth.month, day);
+      final checkin = _getCheckinForDate(date);
+      final isToday = DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final isSelected = DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(_activeSelectedDate);
+
+      Color bgColor = Colors.transparent;
+      Color textColor = const Color(0xFF0F172A);
+      IconData? icon;
+
+      if (checkin != null) {
+        final status = checkin['status']?.toString().toLowerCase() ?? '';
+        if (status == 'present') {
+          bgColor = const Color(0xFF10B981).withValues(alpha: 0.15);
+          textColor = const Color(0xFF059669);
+          icon = Icons.check_circle_rounded;
+        } else if (status == 'absent') {
+          bgColor = const Color(0xFFEF4444).withValues(alpha: 0.15);
+          textColor = const Color(0xFFDC2626);
+          icon = Icons.cancel_rounded;
+        } else {
+          bgColor = const Color(0xFFF59E0B).withValues(alpha: 0.15);
+          textColor = const Color(0xFFD97706);
+          icon = Icons.watch_later_rounded;
+        }
+      } else if (isToday) {
+        bgColor = const Color(0xFFF1F5F9);
+        textColor = const Color(0xFF0F172A);
+      }
+
+      cells.add(
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _activeSelectedDate = date;
+            });
+          },
+          child: Container(
+            margin: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF6366F1).withValues(alpha: 0.15) : bgColor,
+              borderRadius: BorderRadius.circular(10),
+              border: isSelected
+                  ? Border.all(color: const Color(0xFF6366F1), width: 1.5)
+                  : (isToday ? Border.all(color: const Color(0xFFCBD5E1), width: 1.5) : null),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Text(
+                  day.toString(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isToday || checkin != null || isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? const Color(0xFF6366F1) : textColor,
+                  ),
+                ),
+                if (icon != null)
+                  Positioned(
+                    right: 2,
+                    bottom: 2,
+                    child: Icon(
+                      icon,
+                      size: 8,
+                      color: isSelected ? const Color(0xFF6366F1) : textColor,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Safely normalize progress
+    double rawProgress = widget.progress;
+    if (rawProgress > 1.0) {
+      rawProgress = rawProgress / 100.0;
+    }
+    final progressValue = rawProgress;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text(
+          'STUDENT INFO',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white),
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Student Profile Header Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                    child: Text(
+                      widget.studentName.isNotEmpty ? widget.studentName[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        color: Color(0xFF6366F1),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.studentName,
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Active Intern',
+                          style: TextStyle(
+                            color: Color(0xFF10B981),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Progress Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'OVERALL PROGRESS',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF64748B),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Text(
+                        '${(progressValue * 100).round()}%',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: LinearProgressIndicator(
+                      value: progressValue,
+                      minHeight: 8,
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Calendar UI Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Month Navigator
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'ATTENDANCE LOG',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF64748B),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left_rounded, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+                              });
+                            },
+                          ),
+                          Text(
+                            monthName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                            onPressed: () {
+                              setState(() {
+                                _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Grid of Days
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                    ),
+                    itemCount: cells.length,
+                    itemBuilder: (context, index) => cells[index],
+                  ),
+                  const SizedBox(height: 16),
+                  // Legend
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _legendItem(const Color(0xFF10B981), 'Present'),
+                      const SizedBox(width: 16),
+                      _legendItem(const Color(0xFFEF4444), 'Absent'),
+                      const SizedBox(width: 16),
+                      _legendItem(const Color(0xFFF59E0B), 'Late/Leave'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Check-in Details card
+            Builder(
+              builder: (context) {
+                final selectedCheckin = _getCheckinForDate(_activeSelectedDate);
+                final dateLabel = DateFormat('EEEE, d MMMM yyyy').format(_activeSelectedDate);
+                
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dateLabel.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF64748B),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectedCheckin != null) ...[
+                        Row(
+                          children: [
+                            _timeTile(
+                              'CHECK-IN',
+                              _formatTime(selectedCheckin['check_in_at']?.toString()),
+                              Icons.login_rounded,
+                              const Color(0xFF10B981),
+                            ),
+                            const SizedBox(width: 16),
+                            _timeTile(
+                              'CHECK-OUT',
+                              _formatTime(selectedCheckin['check_out_at']?.toString()),
+                              Icons.logout_rounded,
+                              const Color(0xFFEF4444),
+                            ),
+                          ],
+                        ),
+                        if (selectedCheckin['notes']?.toString().trim().isNotEmpty == true) ...[
+                          const SizedBox(height: 16),
+                          const Divider(color: Color(0xFFE2E8F0)),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'NOTES',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            selectedCheckin['notes'].toString(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF334155),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ] else ...[
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Column(
+                              children: [
+                                Icon(Icons.info_outline_rounded, size: 32, color: Color(0xFFCBD5E1)),
+                                SizedBox(height: 8),
+                                Text(
+                                  'No check-in record for this date',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendItem(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _timeTile(String label, String time, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF64748B),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              time,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
