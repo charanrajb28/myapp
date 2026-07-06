@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 class ManagePostingsScreen extends StatefulWidget {
   const ManagePostingsScreen({super.key});
 
@@ -628,8 +629,17 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
           const SnackBar(content: Text('Download not supported on web preview'), backgroundColor: Colors.orange),
         );
       } else if (Platform.isAndroid || Platform.isIOS) {
-        final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/$fileName');
+        String? selectedDirectory;
+        try {
+          selectedDirectory = await FilePicker.platform.getDirectoryPath();
+        } catch (e) {
+          debugPrint('Directory picker error: $e');
+        }
+        if (selectedDirectory == null) {
+          // User cancelled
+          return;
+        }
+        final file = File('$selectedDirectory/$fileName');
         await file.writeAsBytes(bytes);
         if (mounted) {
           Navigator.of(context).pop();

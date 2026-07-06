@@ -11,6 +11,7 @@ import 'package:file_selector/file_selector.dart';
 import '../candidates/student_history_dialog.dart';
 import '../../../utils/qr_payload_security.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
   const PostingDetailsScreen({super.key, required this.posting});
@@ -1522,8 +1523,17 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           const SnackBar(content: Text('Download not supported on web preview'), backgroundColor: Colors.orange),
         );
       } else if (Platform.isAndroid || Platform.isIOS) {
-        final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/$fileName');
+        String? selectedDirectory;
+        try {
+          selectedDirectory = await FilePicker.platform.getDirectoryPath();
+        } catch (e) {
+          debugPrint('Directory picker error: $e');
+        }
+        if (selectedDirectory == null) {
+          // User cancelled
+          return;
+        }
+        final file = File('$selectedDirectory/$fileName');
         await file.writeAsBytes(bytes);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
