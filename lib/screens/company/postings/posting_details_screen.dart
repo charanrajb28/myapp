@@ -141,6 +141,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
             .from('applications')
             .update({
               'status': 'Completed',
+              'end_date': DateTime.now().toIso8601String().split('T')[0],
             })
             .eq('internship_id', _posting['id'])
             .eq('status', 'Active');
