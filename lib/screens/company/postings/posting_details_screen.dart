@@ -26,6 +26,9 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
   List<Map<String, dynamic>> _applicants = [];
   int _tabIndex = 0;
   late Map<String, dynamic> _posting;
+  bool _isBroadcastMode = false;
+  final Set<String> _selectedBroadcastAppIds = {};
+  late PageController _pageController;
 
   List<Map<String, dynamic>> get _displayedApplicants {
     final jobStatus = (_posting['status'] ?? 'INTERVIEWING').toString().toUpperCase();
@@ -42,7 +45,14 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
   void initState() {
     super.initState();
     _posting = Map<String, dynamic>.from(widget.posting);
+    _pageController = PageController(initialPage: _tabIndex);
     _fetchApplicants();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchApplicants() async {
@@ -143,6 +153,201 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _showBroadcastAlertDialog() async {
+    final titleController = TextEditingController();
+    final messageController = TextEditingController();
+    String type = 'warning';
+    bool sending = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.campaign_rounded, color: Color(0xFF6366F1), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'BROADCAST (${_selectedBroadcastAppIds.length} SELECTED)',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 28,
+                    width: 90,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: type,
+                        isExpanded: true,
+                        icon: const Icon(Icons.arrow_drop_down_rounded, size: 16, color: Color(0xFF64748B)),
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                        items: const [
+                          DropdownMenuItem(value: 'info', child: Text('Info')),
+                          DropdownMenuItem(value: 'warning', child: Text('Warning')),
+                          DropdownMenuItem(value: 'danger', child: Text('Danger')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => type = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        decoration: InputDecoration(
+                          labelText: 'Alert Title',
+                          labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: messageController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          labelText: 'Message details...',
+                          labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              actions: [
+                SizedBox(
+                  height: 36,
+                  child: TextButton(
+                    onPressed: sending ? null : () => Navigator.pop(context),
+                    child: const Text('CANCEL', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 11)),
+                  ),
+                ),
+                SizedBox(
+                  height: 36,
+                  child: ElevatedButton.icon(
+                    onPressed: sending
+                        ? null
+                        : () async {
+                            final title = titleController.text.trim();
+                            final message = messageController.text.trim();
+                            if (title.isEmpty || message.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enter both title and message'), backgroundColor: Color(0xFFEF4444)),
+                              );
+                              return;
+                            }
+
+                            setDialogState(() => sending = true);
+                            try {
+                              final supabase = Supabase.instance.client;
+                              for (final appId in _selectedBroadcastAppIds) {
+                                final res = await supabase
+                                    .from('applications')
+                                    .select('alerts')
+                                    .eq('id', appId)
+                                    .maybeSingle();
+
+                                List<dynamic> currentAlerts = [];
+                                if (res != null && res['alerts'] is List) {
+                                  currentAlerts = List.from(res['alerts']);
+                                }
+
+                                currentAlerts.add({
+                                  'title': title,
+                                  'message': message,
+                                  'type': type,
+                                  'created_at': DateTime.now().toUtc().toIso8601String(),
+                                });
+
+                                await supabase
+                                    .from('applications')
+                                    .update({'alerts': currentAlerts})
+                                    .eq('id', appId);
+                              }
+
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _isBroadcastMode = false;
+                                  _selectedBroadcastAppIds.clear();
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Broadcast sent successfully!'),
+                                    backgroundColor: Color(0xFF10B981),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to send broadcast: $e'),
+                                    backgroundColor: const Color(0xFFDC2626),
+                                  ),
+                                );
+                              }
+                            } finally {
+                              setDialogState(() => sending = false);
+                            }
+                          },
+                    icon: sending
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
+                          )
+                        : const Icon(Icons.send_rounded, size: 12),
+                    label: const Text('SEND BROADCAST', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showRemoveInternDialog(String applicationId, String candidateName) {
@@ -359,7 +564,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
   Widget _buildHeader(BuildContext context, Color color, String role) {
     final status = _posting['status'] ?? 'INTERVIEWING';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
@@ -592,27 +797,38 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _tabButton(0, 'APPLICANTS', _displayedApplicants.length.toString()),
-                const SizedBox(width: 16),
-                _tabButton(1, 'DESCRIPTION', null),
-                if (hasQrTab) ...[
-                  const SizedBox(width: 16),
-                  _tabButton(2, 'CHECK-IN QR', null),
-                ],
+          child: Row(
+            children: [
+              Expanded(
+                child: _tabButton(0, 'APPLICANTS', _displayedApplicants.length.toString()),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _tabButton(1, 'DESCRIPTION', null),
+              ),
+              if (hasQrTab) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _tabButton(2, 'CHECK-IN QR', null),
+                ),
               ],
-            ),
+            ],
           ),
         ),
         Expanded(
-          child: _tabIndex == 0
-              ? _buildApplicantsList(color)
-              : _tabIndex == 1
-                  ? _buildDescription(color)
-                  : _buildQrCodeTab(color),
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _tabIndex = index;
+              });
+            },
+            children: [
+              _buildApplicantsList(color),
+              _buildDescription(color),
+              if (hasQrTab) _buildQrCodeTab(color),
+            ],
+          ),
         ),
       ],
     );
@@ -621,7 +837,14 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
   Widget _tabButton(int index, String label, String? count) {
     final active = _tabIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _tabIndex = index),
+      onTap: () {
+        setState(() => _tabIndex = index);
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
@@ -688,142 +911,336 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     }
 
     final jobStatus = _posting['status'] ?? 'INTERVIEWING';
+    final activeInterns = list.where((app) => app['status']?.toString().toLowerCase() == 'active').toList();
+    final hasActiveInterns = activeInterns.isNotEmpty;
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        final app = list[index];
-        final student = app['students'] as Map<String, dynamic>?;
-        final name = student?['name'] ?? 'Candidate';
-        final status = app['status'] ?? 'Applied';
-        
-        final avatarColor = _getAvatarColor(name);
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: avatarColor.withValues(alpha: 0.1),
-                    child: Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        color: avatarColor,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            color: Color(0xFF0F172A),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        _buildApplicantStatusChip(status),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => StudentHistoryDialog(
-                          studentId: student?['id'] ?? '',
-                          studentName: name,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.visibility_rounded, color: Color(0xFF6366F1), size: 16),
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.all(8),
-                    ),
+    return Column(
+      children: [
+        if (hasActiveInterns) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _isBroadcastMode ? const Color(0xFFEEF2F6) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isBroadcastMode ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+                  width: _isBroadcastMode ? 1.5 : 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              if (status.toLowerCase() == 'active' || status.toLowerCase() == 'completed' || status.toLowerCase() == 'removed') ...[
-                Builder(
-                  builder: (context) {
-                    double rawProgress = double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0;
-                    if (rawProgress > 1.0) {
-                      rawProgress = rawProgress / 100.0;
-                    }
-                    final progressValue = rawProgress;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: _isBroadcastMode
+                  ? Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'INTERNSHIP PROGRESS',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF64748B),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Text(
-                              '${(progressValue * 100).round()}%',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          child: const Icon(Icons.campaign_rounded, color: Color(0xFF6366F1), size: 16),
                         ),
-                        const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
-                          child: LinearProgressIndicator(
-                            value: progressValue,
-                            minHeight: 6,
-                            backgroundColor: const Color(0xFFF1F5F9),
-                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Broadcast Alert',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_selectedBroadcastAppIds.length} interns selected',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          height: 32,
+                          width: 80,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                _isBroadcastMode = false;
+                                _selectedBroadcastAppIds.clear();
+                              });
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                              foregroundColor: const Color(0xFFEF4444),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text(
+                              'CANCEL',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 32,
+                          width: 80,
+                          child: ElevatedButton(
+                            onPressed: _selectedBroadcastAppIds.isEmpty ? null : _showBroadcastAlertDialog,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F172A),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text(
+                              'SEND',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
                       ],
-                    );
-                  }
-                ),
-              ],
-              _buildCandidateActionButtons(jobStatus, status, app, name),
-            ],
+                    )
+                  : Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          child: const Icon(Icons.campaign_rounded, color: Color(0xFF6366F1), size: 16),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Broadcast Alert',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Send updates to multiple interns at once',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          height: 32,
+                          width: 80,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _isBroadcastMode = true;
+                                _selectedBroadcastAppIds.clear();
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6366F1),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text(
+                              'START',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
           ),
-        );
-      },
+        ],
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(left: 24, right: 24, top: 4, bottom: 24),
+            itemCount: list.length,
+            itemBuilder: (context, index) {
+              final app = list[index];
+              final student = app['students'] as Map<String, dynamic>?;
+              final name = student?['name'] ?? 'Candidate';
+              final status = app['status'] ?? 'Applied';
+              final appId = app['id']?.toString() ?? '';
+              
+              final avatarColor = _getAvatarColor(name);
+              final isCandidateActive = status.toLowerCase() == 'active';
+              final isSelectedForBroadcast = _selectedBroadcastAppIds.contains(appId);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _isBroadcastMode && isCandidateActive && isSelectedForBroadcast
+                        ? const Color(0xFF6366F1)
+                        : const Color(0xFFE2E8F0),
+                    width: _isBroadcastMode && isCandidateActive && isSelectedForBroadcast ? 2.0 : 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    if (_isBroadcastMode && isCandidateActive) ...[
+                      Checkbox(
+                        value: isSelectedForBroadcast,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedBroadcastAppIds.add(appId);
+                            } else {
+                              _selectedBroadcastAppIds.remove(appId);
+                            }
+                          });
+                        },
+                        activeColor: const Color(0xFF6366F1),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: avatarColor.withValues(alpha: 0.1),
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: TextStyle(
+                                    color: avatarColor,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: Color(0xFF0F172A),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    _buildApplicantStatusChip(status),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => StudentHistoryDialog(
+                                      studentId: student?['id'] ?? '',
+                                      studentName: name,
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.visibility_rounded, color: Color(0xFF6366F1), size: 16),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.all(8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          if (status.toLowerCase() == 'active' || status.toLowerCase() == 'completed' || status.toLowerCase() == 'removed') ...[
+                            Builder(
+                              builder: (context) {
+                                double rawProgress = double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0;
+                                if (rawProgress > 1.0) {
+                                  rawProgress = rawProgress / 100.0;
+                                }
+                                final progressValue = rawProgress;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'INTERNSHIP PROGRESS',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF64748B),
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${(progressValue * 100).round()}%',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: LinearProgressIndicator(
+                                        value: progressValue,
+                                        minHeight: 6,
+                                        backgroundColor: const Color(0xFFF1F5F9),
+                                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                  ],
+                                );
+                              }
+                            ),
+                          ],
+                          _buildCandidateActionButtons(jobStatus, status, app, name),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
