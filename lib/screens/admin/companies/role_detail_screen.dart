@@ -553,6 +553,7 @@ class _ApplicantRow extends StatelessWidget {
                     studentName: name,
                     progress: double.tryParse(applicant['progress']?.toString() ?? '0') ?? 0.0,
                     checkins: applicant['checkins'] as List? ?? [],
+                    showSendAlert: false,
                   ),
                 ),
               );

@@ -2157,6 +2157,7 @@ class StudentInfoScreen extends StatefulWidget {
   final String studentName;
   final double progress;
   final List<dynamic> checkins;
+  final bool showSendAlert;
 
   const StudentInfoScreen({
     super.key,
@@ -2164,6 +2165,7 @@ class StudentInfoScreen extends StatefulWidget {
     required this.studentName,
     required this.progress,
     required this.checkins,
+    this.showSendAlert = true,
   });
 
   @override
@@ -2701,8 +2703,9 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
             const SizedBox(height: 20),
 
             // Send Alert Form Card
-            Container(
-              width: double.infinity,
+            if (widget.showSendAlert)
+              Container(
+                width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,

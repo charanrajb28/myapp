@@ -78,15 +78,36 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
           .eq('company_id', widget.company.id);
 
       if (mounted) {
+        int activeInterns = 0;
+        int totalPlacements = 0;
+        int openRoles = 0;
+
+        for (final role in rolesRes as List) {
+          final roleStatus = (role['status'] ?? 'INTERVIEWING').toString().toUpperCase();
+          if (roleStatus == 'INTERVIEWING') {
+            openRoles++;
+          }
+          final apps = role['applications'] as List? ?? [];
+          for (final app in apps) {
+            final status = app['status']?.toString();
+            if (status == 'Active') {
+              activeInterns++;
+            }
+            if (status == 'Active' || status == 'Completed' || status == 'Accepted') {
+              totalPlacements++;
+            }
+          }
+        }
+
         setState(() {
           _dynamicCompany = CompanyDetailArgs(
             id: companyRes['id'].toString(),
             name: companyRes['name'] ?? widget.company.name,
             industry: companyRes['industry'] ?? widget.company.industry,
             location: companyRes['location'] ?? widget.company.location,
-            activeInterns: widget.company.activeInterns, // Calculated or placeholder
-            totalPlacements: widget.company.totalPlacements,
-            openRoles: (rolesRes as List).length,
+            activeInterns: activeInterns,
+            totalPlacements: totalPlacements,
+            openRoles: openRoles,
             rating: widget.company.rating,
             status: 'Approved',
             logoColor: widget.company.logoColor,
@@ -570,7 +591,6 @@ class _HeroCard extends StatelessWidget {
         _StatChip(icon: Icons.people_alt_outlined, value: '${c.activeInterns}', label: 'Interns',         color: c.logoColor),
         _StatChip(icon: Icons.work_outline_rounded, value: '${c.openRoles}',    label: 'Open Roles',      color: const Color(0xFF8B5CF6)),
         _StatChip(icon: Icons.check_circle_outline, value: '${c.totalPlacements}', label: 'Placed',       color: const Color(0xFF10B981)),
-        _StatChip(icon: Icons.star_rounded,         value: c.rating > 0 ? '${c.rating}' : '—', label: 'Rating', color: const Color(0xFFEAB308)),
       ],
     );
   }
@@ -589,8 +609,6 @@ class _HeroCard extends StatelessWidget {
           Expanded(child: _HeroStat(icon: Icons.work_outline_rounded, value: '${c.openRoles}',    label: 'Open Roles',       color: const Color(0xFF8B5CF6))),
           _vLine(),
           Expanded(child: _HeroStat(icon: Icons.check_circle_outline, value: '${c.totalPlacements}', label: 'Total Placed',  color: const Color(0xFF10B981))),
-          _vLine(),
-          Expanded(child: _HeroStat(icon: Icons.star_rounded,         value: c.rating > 0 ? '${c.rating}' : 'N/A', label: 'Avg Rating', color: const Color(0xFFEAB308))),
         ],
       ),
     );
