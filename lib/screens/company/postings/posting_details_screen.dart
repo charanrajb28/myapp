@@ -1555,13 +1555,27 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to share QR code: $e'),
-            backgroundColor: const Color(0xFFDC2626),
-          ),
-        );
+      // Fallback: copy QR image link to clipboard if native share fails or is unsupported
+      try {
+        final url = 'https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&format=png&margin=12&data=${Uri.encodeComponent(_payload)}';
+        await Clipboard.setData(ClipboardData(text: url));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Native share unavailable. QR Image URL copied to clipboard!'),
+              backgroundColor: Color(0xFFF59E0B),
+            ),
+          );
+        }
+      } catch (clipError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to share or copy: $clipError'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
       }
     }
   }
