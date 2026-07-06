@@ -108,7 +108,28 @@ class QrPayloadSecurity {
       );
       final expectedHash = _hashHex(canonical);
       final expectedSig = _hmacHex(canonical);
-      return hash == expectedHash && sig == expectedSig;
+      if (hash == expectedHash && sig == expectedSig) {
+        return true;
+      }
+
+      // Try JSON-encoded canonical (backward-compat for older builds)
+      final canonicalJson = _canonicalPayloadJsonV2(
+        internshipId: internshipId,
+        role: role,
+        status: status,
+        issuerId: issuerId,
+        company: company,
+        startDate: startDate,
+        endDate: endDate,
+        date: date,
+        nonce: nonce,
+      );
+      final expectedHashJson = _hashHex(canonicalJson);
+      final expectedSigJson = _hmacHex(canonicalJson);
+      if (hash == expectedHashJson && sig == expectedSigJson) {
+        return true;
+      }
+      return false;
     }
 
     // v1 fallback
@@ -136,6 +157,33 @@ class QrPayloadSecurity {
     required String nonce,
   }) {
     return '2|internship_role_qr|$internshipId|$role|$status|$issuerId|$company|$startDate|$endDate|$date|$nonce';
+  }
+
+  /// JSON-based v2 canonical (for backward compatibility).
+  static String _canonicalPayloadJsonV2({
+    required String internshipId,
+    required String role,
+    required String status,
+    required String issuerId,
+    required String company,
+    required String startDate,
+    required String endDate,
+    required String date,
+    required String nonce,
+  }) {
+    return jsonEncode({
+      'v': 2,
+      'type': 'internship_role_qr',
+      'internshipId': internshipId,
+      'role': role,
+      'status': status,
+      'issuerId': issuerId,
+      'company': company,
+      'startDate': startDate,
+      'endDate': endDate,
+      'date': date,
+      'nonce': nonce,
+    });
   }
 
   /// Legacy v1 canonical (for verifying old QR codes).
