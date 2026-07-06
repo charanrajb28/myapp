@@ -723,3 +723,42 @@ ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION;
 
 ALTER TABLE public.internships
 ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION;
+
+-- ── Trigger to calculate progress based on check-ins ────────────────────────
+CREATE OR REPLACE FUNCTION public.update_application_progress_from_checkins()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_total_days INTEGER;
+  v_checkin_count INTEGER;
+BEGIN
+  -- 1. Count the number of check-in entries in the jsonb array
+  IF NEW.checkins IS NULL OR jsonb_typeof(NEW.checkins) != 'array' THEN
+    v_checkin_count := 0;
+  ELSE
+    v_checkin_count := jsonb_array_length(NEW.checkins);
+  END IF;
+
+  -- 2. Calculate the total number of days of the internship
+  IF NEW.start_date IS NOT NULL AND NEW.end_date IS NOT NULL AND NEW.end_date > NEW.start_date THEN
+    v_total_days := NEW.end_date - NEW.start_date;
+  ELSE
+    v_total_days := 90; -- Default fallback to 90 days (approx. 3 months)
+  END IF;
+
+  -- Prevent division by zero
+  IF v_total_days <= 0 THEN
+    v_total_days := 90;
+  END IF;
+
+  -- 3. Update the progress field (clamped between 0.00 and 1.00)
+  NEW.progress := LEAST(1.00, GREATEST(0.00, ROUND((v_checkin_count::numeric / v_total_days::numeric), 2)));
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_update_application_progress ON public.applications;
+CREATE TRIGGER trg_update_application_progress
+BEFORE INSERT OR UPDATE OF checkins, start_date, end_date ON public.applications
+FOR EACH ROW
+EXECUTE PROCEDURE public.update_application_progress_from_checkins();

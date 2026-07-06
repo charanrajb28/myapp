@@ -946,8 +946,17 @@ class StudentPortalRepository {
   }
 
   double _toDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    return double.tryParse(value?.toString() ?? '') ?? 0.0;
+    if (value == null) return 0.0;
+    double val = 0.0;
+    if (value is num) {
+      val = value.toDouble();
+    } else {
+      val = double.tryParse(value.toString()) ?? 0.0;
+    }
+    if (val > 1.0) {
+      val = val / 100.0;
+    }
+    return val;
   }
 
   Color _parseColor(String? hex) {

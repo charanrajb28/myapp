@@ -10,7 +10,10 @@ import 'posting_details_screen.dart';
 import 'create_posting_screen.dart';
 import 'edit_posting_screen.dart';
 import '../../../utils/qr_payload_security.dart';
-
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 class ManagePostingsScreen extends StatefulWidget {
   const ManagePostingsScreen({super.key});
 
@@ -616,45 +619,121 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
         throw Exception('QR service returned ${response.statusCode}');
       }
 
-      final fileName =
-          'job_qr_${(widget.posting['role']?.toString() ?? 'job').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_')}.png';
+      final bytes = response.bodyBytes;
+      final name = widget.posting['role']?.toString().replaceAll(' ', '_') ?? 'internship';
+      final fileName = '${name}_qr.png';
 
-      final FileSaveLocation? result = await getSaveLocation(
-        suggestedName: fileName,
-      );
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download not supported on web preview'), backgroundColor: Colors.orange),
+        );
+      } else if (Platform.isAndroid || Platform.isIOS) {
+        final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(bytes);
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved to: ${file.path}'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+        }
+      } else {
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Images',
+              extensions: ['png'],
+              mimeTypes: ['image/png'],
+            )
+          ],
+        );
 
-      if (result == null) {
-        return;
+        if (result != null) {
+          final file = File(result.path);
+          await file.writeAsBytes(bytes);
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('QR Code saved successfully'),
+                backgroundColor: Color(0xFF10B981),
+              ),
+            );
+          }
+        }
       }
-
-      final file = File(result.path);
-      await file.writeAsBytes(response.bodyBytes);
-
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('QR saved to ${file.path}'),
-          backgroundColor: const Color(0xFF10B981),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to download QR: $e'),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to download QR: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _downloading = false);
+      }
+    }
+  }
+
+  Future<void> _shareQr() async {
+    try {
+      final name = widget.posting['role']?.toString().replaceAll(' ', '_') ?? 'internship';
+      final fileName = '${name}_qr.png';
+      
+      final response = await http.get(Uri.parse(_qrImageUrl));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('QR service returned ${response.statusCode}');
+      }
+
+      final bytes = response.bodyBytes;
+
+      if (kIsWeb) {
+        await Clipboard.setData(ClipboardData(text: _qrImageUrl));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR Code image link copied to clipboard!'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+        }
+      } else {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(bytes);
+
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Check-in QR Code for ${widget.posting['role']}',
+        );
+      }
+    } catch (e) {
+      try {
+        await Clipboard.setData(ClipboardData(text: _qrImageUrl));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Native share unavailable. QR Image URL copied to clipboard!'),
+              backgroundColor: Color(0xFFF59E0B),
+            ),
+          );
+        }
+      } catch (clipError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to share or copy: $clipError'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
       }
     }
   }
@@ -838,32 +917,57 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
             ),
             const SizedBox(height: 16),
 
-            // Download button
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _downloading ? null : _downloadQr,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            // Download and Share buttons row
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _downloading ? null : _downloadQr,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      icon: _downloading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.download_rounded, size: 18),
+                      label: Text(
+                        _downloading ? 'SAVING...' : 'DOWNLOAD',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
+                      ),
+                    ),
+                  ),
                 ),
-                icon: _downloading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.download_rounded),
-                label: Text(
-                  _downloading ? 'SAVING...' : 'DOWNLOAD QR IMAGE',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _shareQr,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0F172A),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      label: const Text(
+                        'SHARE',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),

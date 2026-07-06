@@ -768,6 +768,55 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+              if (status.toLowerCase() == 'active' || status.toLowerCase() == 'completed' || status.toLowerCase() == 'removed') ...[
+                Builder(
+                  builder: (context) {
+                    double rawProgress = double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0;
+                    if (rawProgress > 1.0) {
+                      rawProgress = rawProgress / 100.0;
+                    }
+                    final progressValue = rawProgress;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'INTERNSHIP PROGRESS',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF64748B),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              '${(progressValue * 100).round()}%',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: progressValue,
+                            minHeight: 6,
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    );
+                  }
+                ),
+              ],
               _buildCandidateActionButtons(jobStatus, status, app['id'], name),
             ],
           ),
