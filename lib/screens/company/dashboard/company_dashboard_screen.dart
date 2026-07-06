@@ -42,8 +42,8 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
             _companyName = 'TechCorp Solutions (Dev Mode)';
             _companyLogoUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150';
             _recruitmentPool = '42';
-            _interviewing = '8';
-            _hired = '14';
+            _interviewing = '3';
+            _hired = '8';
             _activePostings = [
               {
                 'id': 'mock-posting-1',
@@ -111,8 +111,8 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       final List<String> postingIds = (postingsRes as List).map((p) => p['id'].toString()).toList();
       
       int pool = 0;
-      int interviewing = 0;
-      int hired = 0;
+      int postingsCount = (postingsRes as List).length;
+      int activeInterns = 0;
 
       if (postingIds.isNotEmpty) {
         final appsRes = await supabase
@@ -122,8 +122,7 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
             
         final apps = appsRes as List;
         pool = apps.length;
-        interviewing = apps.where((a) => a['status'] == 'Under Review' || a['status'] == 'Active').length;
-        hired = apps.where((a) => a['status'] == 'Completed' || a['status'] == 'Active').length;
+        activeInterns = apps.where((a) => a['status'] == 'Active').length;
       }
 
       // 3. Prepare Display List (Top 3 Postings)
@@ -149,8 +148,8 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
           _companyName = companyRes['name'] ?? 'Partner Company';
           _companyLogoUrl = companyRes['logo_url']?.toString() ?? '';
           _recruitmentPool = pool.toString();
-          _interviewing = interviewing.toString();
-          _hired = hired.toString();
+          _interviewing = postingsCount.toString();
+          _hired = activeInterns.toString();
           _activePostings = displayPostings;
           _isLoading = false;
         });
@@ -223,9 +222,14 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                           flex: 2,
                           child: Column(
                             children: [
-                              _premiumMiniCard('INTERVIEWING', _interviewing, const Color(0xFFF59E0B), Icons.forum_rounded),
+                              GestureDetector(
+                                onTap: () {
+                                  CompanyShell.of(context)?.setIndex(1);
+                                },
+                                child: _premiumMiniCard('INTERNSHIPS POSTED', _interviewing, const Color(0xFFF59E0B), Icons.work_rounded),
+                              ),
                               const SizedBox(height: 16),
-                              _premiumMiniCard('TOTAL HIRES', _hired, const Color(0xFF10B981), Icons.verified_rounded),
+                              _premiumMiniCard('ACTIVE INTERNS', _hired, const Color(0xFF10B981), Icons.verified_rounded),
                             ],
                           ),
                         ),

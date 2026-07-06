@@ -45,7 +45,7 @@ class _ManageCandidatesScreenState extends State<ManageCandidatesScreen> {
           .eq('internships.company_id', companyId)
           .order('created_at', ascending: true);
       
-      final List<Map<String, dynamic>> processed = [];
+      final Map<String, Map<String, dynamic>> grouped = {};
       for (var app in (res as List)) {
         if (app['internships'] == null) continue;
 
@@ -53,17 +53,37 @@ class _ManageCandidatesScreenState extends State<ManageCandidatesScreen> {
         final studentId = app['students']?['id']?.toString() ?? '';
         final role = app['internships']?['role'] ?? 'Unknown Role';
         final initials = studentName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase();
+        final status = app['status'] ?? 'Pending';
+        final dateParsed = DateTime.parse(app['created_at']);
 
-        processed.add({
-          'id': app['id'],
-          'studentId': studentId,
-          'initials': initials,
-          'name': studentName,
-          'targetRole': role,
-          'status': app['status'] ?? 'Pending',
-          'appliedDate': DateFormat('dd MMM yyyy').format(DateTime.parse(app['created_at'])),
-        });
+        if (grouped.containsKey(studentId)) {
+          final existing = grouped[studentId]!;
+          final List<String> roles = List<String>.from(existing['roles']);
+          if (!roles.contains(role)) {
+            roles.add(role);
+          }
+          existing['roles'] = roles;
+          existing['targetRole'] = roles.join(' / ');
+          
+          final existingStatus = existing['status'].toString().toLowerCase();
+          if (status.toLowerCase() == 'active' && existingStatus != 'active') {
+            existing['status'] = status;
+            existing['id'] = app['id'];
+          }
+        } else {
+          grouped[studentId] = {
+            'id': app['id'],
+            'studentId': studentId,
+            'initials': initials,
+            'name': studentName,
+            'roles': [role],
+            'targetRole': role,
+            'status': status,
+            'appliedDate': DateFormat('dd MMM yyyy').format(dateParsed),
+          };
+        }
       }
+      final processed = grouped.values.toList();
 
       if (mounted) {
         setState(() {
