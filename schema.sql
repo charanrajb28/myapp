@@ -713,3 +713,13 @@ DROP POLICY IF EXISTS "Users can update own device sessions" ON public.user_devi
 CREATE POLICY "Users can update own device sessions" ON public.user_device_sessions
 FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
+-- ── On-site location fields for internships ───────────────────────────────────
+-- Stores human-readable address and map coordinates when location = 'On-site'
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS location_address TEXT;
+
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS location_lat DOUBLE PRECISION;
+
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION;

@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'manage_postings_screen.dart';
@@ -11,17 +15,27 @@ class CreatePostingScreen extends StatefulWidget {
 }
 
 class _CreatePostingScreenState extends State<CreatePostingScreen> {
-  final roleController       = TextEditingController();
-  final descController       = TextEditingController();
-  final stipendController    = TextEditingController();
-  final durationController   = TextEditingController();
-  final notesController      = TextEditingController();
-  final _taskInputController = TextEditingController();
+  final roleController         = TextEditingController();
+  final descController         = TextEditingController();
+  final stipendController      = TextEditingController();
+  final durationController     = TextEditingController();
+  final notesController        = TextEditingController();
+  final _taskInputController   = TextEditingController();
   final activeDurationController = TextEditingController(text: '7');
+  final _locationSearchController = TextEditingController();
 
   DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 30));
   bool isRemote  = true;
   bool _isSaving = false;
+
+  // Location search state
+  String? _selectedLocationAddress;
+  double? _selectedLat;
+  double? _selectedLng;
+  List<Map<String, dynamic>> _locationSuggestions = [];
+  bool _searchingLocation = false;
+  Timer? _locationDebounce;
+  final _locationSearchFocus = FocusNode();
 
   // Tasks list
   final List<String> _tasks = [];
@@ -39,6 +53,9 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     notesController.dispose();
     _taskInputController.dispose();
     activeDurationController.dispose();
+    _locationSearchController.dispose();
+    _locationSearchFocus.dispose();
+    _locationDebounce?.cancel();
     super.dispose();
   }
 
@@ -55,10 +72,102 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     setState(() => _tasks.removeAt(index));
   }
 
+  // ── Location Search (OpenStreetMap Nominatim) ────────────────────────────────
+
+  void _onLocationQueryChanged(String query) {
+    _locationDebounce?.cancel();
+    if (query.trim().length < 3) {
+      setState(() => _locationSuggestions = []);
+      return;
+    }
+    _locationDebounce = Timer(const Duration(milliseconds: 450), () {
+      _fetchLocationSuggestions(query.trim());
+    });
+  }
+
+  Future<void> _fetchLocationSuggestions(String query) async {
+    if (!mounted) return;
+    setState(() => _searchingLocation = true);
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(query)}'
+        '&format=json&addressdetails=1&limit=6',
+      );
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'InternshipApp/1.0 (internship.app@example.com)',
+        'Accept-Language': 'en',
+      });
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _locationSuggestions = data
+              .map((item) => {
+                    'display_name': item['display_name']?.toString() ?? '',
+                    'short_name': _buildShortName(item),
+                    'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
+                    'lng': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
+                  })
+              .toList();
+          _searchingLocation = false;
+        });
+      } else {
+        setState(() {
+          _locationSuggestions = [];
+          _searchingLocation = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _locationSuggestions = []; _searchingLocation = false; });
+    }
+  }
+
+  String _buildShortName(dynamic item) {
+    final addr = item['address'];
+    if (addr == null) return item['display_name']?.toString() ?? '';
+    final parts = <String>[];
+    for (final key in ['amenity', 'building', 'road', 'neighbourhood', 'suburb',
+        'city', 'town', 'village', 'county', 'state', 'country']) {
+      final v = addr[key]?.toString();
+      if (v != null && v.isNotEmpty && !parts.contains(v)) parts.add(v);
+      if (parts.length >= 3) break;
+    }
+    return parts.isEmpty ? item['display_name']?.toString() ?? '' : parts.join(', ');
+  }
+
+  void _selectLocation(Map<String, dynamic> suggestion) {
+    setState(() {
+      _selectedLocationAddress = suggestion['short_name'];
+      _selectedLat = suggestion['lat'];
+      _selectedLng = suggestion['lng'];
+      _locationSearchController.text = suggestion['short_name'];
+      _locationSuggestions = [];
+    });
+    _locationSearchFocus.unfocus();
+  }
+
+  void _clearLocation() {
+    setState(() {
+      _selectedLocationAddress = null;
+      _selectedLat = null;
+      _selectedLng = null;
+      _locationSearchController.clear();
+      _locationSuggestions = [];
+    });
+  }
+
+  // ── Publish ──────────────────────────────────────────────────────────────────
+
   Future<void> _publishPosting() async {
     if (roleController.text.isEmpty || descController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required job details.')));
+      return;
+    }
+    if (!isRemote && (_selectedLocationAddress == null || _selectedLocationAddress!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an on-site location.')));
       return;
     }
     if (_activeDays.isEmpty) {
@@ -80,8 +189,8 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
           .eq('user_id', user.id)
           .single();
 
-      final companyId  = companyRes['id'];
-      final colors     = ['#6366F1', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'];
+      final companyId   = companyRes['id'];
+      final colors      = ['#6366F1', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'];
       final randomColor = colors[DateTime.now().millisecond % colors.length];
       final sortedDays  = _allDays.where((d) => _activeDays.contains(d)).toList();
 
@@ -93,6 +202,9 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'duration'    : durationController.text.trim(),
         'industry'    : 'Software Engineering',
         'location'    : isRemote ? 'Remote' : 'On-site',
+        'location_address': isRemote ? null : _selectedLocationAddress,
+        'location_lat': isRemote ? null : _selectedLat,
+        'location_lng': isRemote ? null : _selectedLng,
         'brand_color' : randomColor,
         'status'      : 'INTERVIEWING',
         'logo_initial': (companyRes['name'] as String).isNotEmpty
@@ -124,7 +236,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     }
   }
 
-  // ── Build ───────────────────────────────────────────────────────────────────
+  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -170,8 +282,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                 ]),
                 const SizedBox(height: 20),
                 Row(children: [
-                  Expanded(
-                      child: _deadlineField()),
+                  Expanded(child: _deadlineField()),
                   const SizedBox(width: 16),
                   Expanded(
                       child: _industrialField('APP ACTIVE DURATION (DAYS)', activeDurationController,
@@ -179,13 +290,13 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                 ]),
                 const SizedBox(height: 32),
 
-                // ── Work Location ───────────────────────────────────────
+                // ── Work Location ──────────────────────────────────────────
                 _sectionLabel('WORK LOCATION'),
                 const SizedBox(height: 16),
                 _locationOption(),
                 const SizedBox(height: 32),
 
-                // ── Days Active ─────────────────────────────────────────
+                // ── Days Active ────────────────────────────────────────────
                 _sectionLabel('DAYS ACTIVE IN THE WEEK'),
                 const SizedBox(height: 8),
                 const Text('Select which days interns are expected to be active',
@@ -197,7 +308,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                 _dayPickerSection(),
                 const SizedBox(height: 32),
 
-                // ── Task List ───────────────────────────────────────────
+                // ── Task List ──────────────────────────────────────────────
                 _sectionLabel('TASK LIST'),
                 const SizedBox(height: 8),
                 const Text('Add individual tasks the intern will be responsible for',
@@ -209,7 +320,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                 _taskListSection(),
                 const SizedBox(height: 32),
 
-                // ── Notes ───────────────────────────────────────────────
+                // ── Notes ──────────────────────────────────────────────────
                 _sectionLabel('NOTES'),
                 const SizedBox(height: 8),
                 const Text('Internal notes, special requirements, or any extra info',
@@ -236,7 +347,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     );
   }
 
-  // ── Widgets ─────────────────────────────────────────────────────────────────
+  // ── Widgets ──────────────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String label) => Text(label,
       style: const TextStyle(
@@ -244,6 +355,285 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
           fontSize: 9,
           fontWeight: FontWeight.w900,
           letterSpacing: 1));
+
+  Widget _locationOption() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Remote / On-site toggle
+        Row(children: [
+          _locBtn('Work from Home', isRemote,
+              () => setState(() { isRemote = true; _clearLocation(); })),
+          const SizedBox(width: 12),
+          _locBtn('On-site Office', !isRemote,
+              () => setState(() => isRemote = false)),
+        ]),
+
+        // On-site location search (shown only when On-site is selected)
+        if (!isRemote) ...[
+          const SizedBox(height: 16),
+          _locationSearchField(),
+        ],
+      ],
+    );
+  }
+
+  Widget _locationSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('OFFICE LOCATION',
+            style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+
+        // Selected location chip (shown when a location is picked)
+        if (_selectedLocationAddress != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_rounded, color: Color(0xFF6366F1), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _selectedLocationAddress!,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _clearLocation,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.close_rounded, color: Color(0xFFEF4444), size: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _clearLocation,
+            child: const Text(
+              'Change location',
+              style: TextStyle(
+                color: Color(0xFF6366F1),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ] else ...[
+          // Search input
+          TextField(
+            controller: _locationSearchController,
+            focusNode: _locationSearchFocus,
+            onChanged: _onLocationQueryChanged,
+            style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: 'Search city, area or office address…',
+              hintStyle: const TextStyle(
+                  color: Color(0xFFCBD5E1),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+              suffixIcon: _searchingLocation
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Color(0xFF6366F1))))
+                  : (_locationSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF94A3B8), size: 18),
+                          onPressed: () {
+                            _locationSearchController.clear();
+                            setState(() => _locationSuggestions = []);
+                          })
+                      : null),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            ),
+          ),
+
+          // Suggestions dropdown
+          if (_locationSuggestions.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _locationSuggestions.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                itemBuilder: (context, i) {
+                  final s = _locationSuggestions[i];
+                  return InkWell(
+                    onTap: () => _selectLocation(s),
+                    borderRadius: i == 0
+                        ? const BorderRadius.vertical(top: Radius.circular(12))
+                        : (i == _locationSuggestions.length - 1
+                            ? const BorderRadius.vertical(bottom: Radius.circular(12))
+                            : BorderRadius.zero),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              color: Color(0xFF6366F1), size: 16),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s['short_name'],
+                                  style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                if (s['display_name'] != s['short_name']) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    s['display_name'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w400),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ] else if (!_searchingLocation &&
+              _locationSearchController.text.length >= 3 &&
+              _locationSuggestions.isEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.search_off_rounded, color: Color(0xFF94A3B8), size: 16),
+                  SizedBox(width: 10),
+                  Text('No locations found. Try a different search.',
+                      style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _locBtn(String label, bool active, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 48,
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF6366F1) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: active
+                    ? const Color(0xFF6366F1)
+                    : const Color(0xFFE2E8F0),
+                width: 1.5),
+            boxShadow: active
+                ? [BoxShadow(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                label == 'Work from Home'
+                    ? Icons.home_work_rounded
+                    : Icons.location_city_rounded,
+                color: active ? Colors.white : const Color(0xFF94A3B8),
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                      color: active ? Colors.white : const Color(0xFF64748B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _taskListSection() {
     return Container(
@@ -459,7 +849,6 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
 
   Widget _dayChip(String day) {
     final isSelected = _activeDays.contains(day);
-    final isWeekend  = day == 'Sat' || day == 'Sun';
     return GestureDetector(
       onTap: () => setState(() {
         if (isSelected) {
@@ -618,47 +1007,6 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     );
     if (picked == null || !mounted) return;
     setState(() => _selectedDeadline = picked);
-  }
-
-  Widget _locationOption() {
-    return Row(
-      children: [
-        _locBtn('Work from Home', isRemote,
-            () => setState(() => isRemote = true)),
-        const SizedBox(width: 12),
-        _locBtn('On-site Office', !isRemote,
-            () => setState(() => isRemote = false)),
-      ],
-    );
-  }
-
-  Widget _locBtn(String label, bool active, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: active ? const Color(0xFF6366F1) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: active
-                    ? const Color(0xFF6366F1)
-                    : const Color(0xFFE2E8F0)),
-          ),
-          child: Center(
-            child: Text(label,
-                style: TextStyle(
-                    color: active
-                        ? Colors.white
-                        : const Color(0xFF64748B),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5)),
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _publishBtn(BuildContext context) {

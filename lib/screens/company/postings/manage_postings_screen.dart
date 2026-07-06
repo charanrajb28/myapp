@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:http/http.dart' as http;
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'posting_details_screen.dart';
 import 'create_posting_screen.dart';
@@ -552,12 +553,32 @@ class _CompanyQrDialog extends StatefulWidget {
 class _CompanyQrDialogState extends State<_CompanyQrDialog> {
   bool _downloading = false;
 
+  String _todayIso() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDisplayDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty || raw.trim() == 'null') return 'N/A';
+    try {
+      final d = DateTime.parse(raw.trim());
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${d.day} ${months[d.month - 1]} ${d.year}';
+    } catch (_) {
+      return raw.trim();
+    }
+  }
+
   String get _payload => jsonEncode(
         QrPayloadSecurity.buildRolePayload(
           internshipId: widget.posting['id']?.toString() ?? '',
           role: widget.posting['role']?.toString() ?? '',
           status: widget.posting['status']?.toString() ?? '',
           issuerId: widget.posting['company_id']?.toString() ?? '',
+          company: widget.posting['company_name']?.toString() ?? '',
+          startDate: widget.posting['start_date']?.toString() ?? '',
+          endDate: widget.posting['end_date']?.toString() ?? '',
+          date: _todayIso(),
         ),
       );
 
@@ -617,105 +638,238 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final role = widget.posting['role']?.toString() ?? 'ROLE';
-    return AlertDialog(
+    final role = widget.posting['role']?.toString() ?? 'Role';
+    final status = widget.posting['status']?.toString() ?? '';
+    final startDate = _formatDisplayDate(widget.posting['start_date']?.toString());
+    final endDate = _formatDisplayDate(widget.posting['end_date']?.toString());
+    final today = _todayIso();
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final now = DateTime.now();
+    final todayDisplay = '${now.day} ${months[now.month - 1]} ${now.year}';
+
+    return Dialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Text(
-        'SHARE JOB QR: ${role.toUpperCase()}',
-        style: const TextStyle(
-          color: Color(0xFF0F172A),
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          RepaintBoundary(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  _qrImageUrl,
-                  width: 220,
-                  height: 220,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return const SizedBox(
-                      width: 220,
-                      height: 220,
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  },
-                  errorBuilder: (context, _, __) => const SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: Center(
-                      child: Text(
-                        'Unable to generate QR',
-                        style: TextStyle(
-                          color: Color(0xFFDC2626),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.qr_code_2_rounded, color: Color(0xFF6366F1), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        role.toUpperCase(),
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                    ),
+                      Text(
+                        'Check-In QR Code',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: const Size(32, 32),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // QR Code (rendered locally via qr_flutter)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: _payload,
+                version: QrVersions.auto,
+                size: 220,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: Color(0xFF0F172A),
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: Color(0xFF0F172A),
+                ),
+                backgroundColor: Colors.white,
+                errorCorrectionLevel: QrErrorCorrectLevel.M,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Internship detail info card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status badge
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: status == 'ACTIVE'
+                              ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                              : const Color(0xFF6366F1).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: status == 'ACTIVE'
+                                ? const Color(0xFF059669)
+                                : const Color(0xFF6366F1),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Generated: $todayDisplay',
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(color: Color(0xFFE2E8F0), height: 1),
+                  const SizedBox(height: 10),
+                  _infoRow(Icons.work_outline_rounded, 'Role', role),
+                  const SizedBox(height: 6),
+                  _infoRow(Icons.fingerprint_rounded, 'Internship ID',
+                      widget.posting['id']?.toString() ?? 'N/A'),
+                  const SizedBox(height: 6),
+                  _infoRow(Icons.calendar_today_outlined, 'Period',
+                      '$startDate → $endDate'),
+                  const SizedBox(height: 6),
+                  _infoRow(Icons.event_note_outlined, 'QR Date', todayDisplay),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'SCAN WITH STUDENT APP TO CHECK IN',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Download button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _downloading ? null : _downloadQr,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: _downloading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.download_rounded),
+                label: Text(
+                  _downloading ? 'SAVING...' : 'DOWNLOAD QR IMAGE',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'DOWNLOAD THIS QR TO DISPLAY OR PRINT FOR STUDENTS',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF94A3B8),
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _downloading ? null : _downloadQr,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              icon: _downloading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.download_rounded),
-              label: Text(
-                _downloading ? 'SAVING' : 'DOWNLOAD AS IMAGE',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 13, color: const Color(0xFF6366F1)),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF475569),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

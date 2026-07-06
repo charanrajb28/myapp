@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,10 +23,20 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
 
   final TextEditingController _taskInputController = TextEditingController();
   late TextEditingController activeDurationController;
+  final TextEditingController _locationSearchController = TextEditingController();
 
   late DateTime _selectedDeadline;
   bool isRemote  = true;
   bool _isSaving = false;
+
+  // Location search state
+  String? _selectedLocationAddress;
+  double? _selectedLat;
+  double? _selectedLng;
+  List<Map<String, dynamic>> _locationSuggestions = [];
+  bool _searchingLocation = false;
+  Timer? _locationDebounce;
+  final _locationSearchFocus = FocusNode();
 
   // Tasks list (loaded from responsibilities[])
   late List<String> _tasks;
@@ -39,7 +53,8 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     stipendController  = TextEditingController(text: widget.posting['stipend']?.toString() ?? '');
     durationController = TextEditingController(text: widget.posting['duration']?.toString() ?? '');
     notesController    = TextEditingController(text: widget.posting['notes']?.toString() ?? '');
-    activeDurationController = TextEditingController(text: widget.posting['application_duration_days']?.toString() ?? '7');
+    activeDurationController = TextEditingController(
+        text: widget.posting['application_duration_days']?.toString() ?? '7');
 
     // Pre-populate tasks from responsibilities array
     final rawTasks = widget.posting['responsibilities'];
@@ -47,7 +62,17 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         ? rawTasks.map((t) => t.toString()).where((t) => t.isNotEmpty).toList()
         : [];
 
+    // Location
     isRemote = (widget.posting['location']?.toString().toLowerCase() ?? 'remote') == 'remote';
+    if (!isRemote) {
+      _selectedLocationAddress = widget.posting['location_address']?.toString();
+      _selectedLat = double.tryParse(widget.posting['location_lat']?.toString() ?? '');
+      _selectedLng = double.tryParse(widget.posting['location_lng']?.toString() ?? '');
+      if (_selectedLocationAddress != null) {
+        _locationSearchController.text = _selectedLocationAddress!;
+      }
+    }
+
     final parsedDeadline = DateTime.tryParse(widget.posting['deadline']?.toString() ?? '');
     _selectedDeadline = parsedDeadline ?? DateTime.now().add(const Duration(days: 30));
 
@@ -67,6 +92,9 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     notesController.dispose();
     _taskInputController.dispose();
     activeDurationController.dispose();
+    _locationSearchController.dispose();
+    _locationSearchFocus.dispose();
+    _locationDebounce?.cancel();
     super.dispose();
   }
 
@@ -81,10 +109,99 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
 
   void _removeTask(int index) => setState(() => _tasks.removeAt(index));
 
+  // ── Location Search (OpenStreetMap Nominatim) ────────────────────────────────
+
+  void _onLocationQueryChanged(String query) {
+    _locationDebounce?.cancel();
+    if (query.trim().length < 3) {
+      setState(() => _locationSuggestions = []);
+      return;
+    }
+    _locationDebounce = Timer(const Duration(milliseconds: 450), () {
+      _fetchLocationSuggestions(query.trim());
+    });
+  }
+
+  Future<void> _fetchLocationSuggestions(String query) async {
+    if (!mounted) return;
+    setState(() => _searchingLocation = true);
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(query)}'
+        '&format=json&addressdetails=1&limit=6',
+      );
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'InternshipApp/1.0 (internship.app@example.com)',
+        'Accept-Language': 'en',
+      });
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _locationSuggestions = data
+              .map((item) => {
+                    'display_name': item['display_name']?.toString() ?? '',
+                    'short_name': _buildShortName(item),
+                    'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
+                    'lng': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
+                  })
+              .toList();
+          _searchingLocation = false;
+        });
+      } else {
+        setState(() { _locationSuggestions = []; _searchingLocation = false; });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _locationSuggestions = []; _searchingLocation = false; });
+    }
+  }
+
+  String _buildShortName(dynamic item) {
+    final addr = item['address'];
+    if (addr == null) return item['display_name']?.toString() ?? '';
+    final parts = <String>[];
+    for (final key in ['amenity', 'building', 'road', 'neighbourhood', 'suburb',
+        'city', 'town', 'village', 'county', 'state', 'country']) {
+      final v = addr[key]?.toString();
+      if (v != null && v.isNotEmpty && !parts.contains(v)) parts.add(v);
+      if (parts.length >= 3) break;
+    }
+    return parts.isEmpty ? item['display_name']?.toString() ?? '' : parts.join(', ');
+  }
+
+  void _selectLocation(Map<String, dynamic> suggestion) {
+    setState(() {
+      _selectedLocationAddress = suggestion['short_name'];
+      _selectedLat = suggestion['lat'];
+      _selectedLng = suggestion['lng'];
+      _locationSearchController.text = suggestion['short_name'];
+      _locationSuggestions = [];
+    });
+    _locationSearchFocus.unfocus();
+  }
+
+  void _clearLocation() {
+    setState(() {
+      _selectedLocationAddress = null;
+      _selectedLat = null;
+      _selectedLng = null;
+      _locationSearchController.clear();
+      _locationSuggestions = [];
+    });
+  }
+
+  // ── Save ─────────────────────────────────────────────────────────────────────
+
   Future<void> _savePosting() async {
     if (roleController.text.trim().isEmpty || descController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required job details.')));
+      return;
+    }
+    if (!isRemote && (_selectedLocationAddress == null || _selectedLocationAddress!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an on-site location.')));
       return;
     }
     if (_activeDays.isEmpty) {
@@ -103,6 +220,9 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         'stipend'         : stipendController.text.trim(),
         'duration'        : durationController.text.trim(),
         'location'        : isRemote ? 'Remote' : 'On-site',
+        'location_address': isRemote ? null : _selectedLocationAddress,
+        'location_lat'    : isRemote ? null : _selectedLat,
+        'location_lng'    : isRemote ? null : _selectedLng,
         'responsibilities': _tasks,
         'notes'           : notesController.text.trim(),
         'active_days'     : sortedDays,
@@ -150,7 +270,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     setState(() => _selectedDeadline = picked);
   }
 
-  // ── Build ───────────────────────────────────────────────────────────────────
+  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -196,13 +316,13 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                 ]),
                 const SizedBox(height: 32),
 
-                // ── Location ────────────────────────────────────────────
+                // ── Location ──────────────────────────────────────────────
                 _label('> LOCATION_SELECT_TERMINAL'),
                 const SizedBox(height: 16),
                 _locationOption(),
                 const SizedBox(height: 32),
 
-                // ── Days Active ─────────────────────────────────────────
+                // ── Days Active ───────────────────────────────────────────
                 _label('> ACTIVE_DAYS_SCHEDULE'),
                 const SizedBox(height: 8),
                 const Text('Select which days interns are expected to be active',
@@ -214,7 +334,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                 _dayPickerSection(),
                 const SizedBox(height: 32),
 
-                // ── Task List ───────────────────────────────────────────
+                // ── Task List ─────────────────────────────────────────────
                 _label('> TASK_LIST'),
                 const SizedBox(height: 8),
                 const Text('Add individual tasks the intern will be responsible for',
@@ -226,7 +346,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                 _taskListSection(),
                 const SizedBox(height: 32),
 
-                // ── Notes ───────────────────────────────────────────────
+                // ── Notes ─────────────────────────────────────────────────
                 _label('> NOTES_LOG'),
                 const SizedBox(height: 8),
                 const Text('Internal notes, special requirements, or any extra info',
@@ -252,7 +372,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     );
   }
 
-  // ── Sub-widgets ─────────────────────────────────────────────────────────────
+  // ── Sub-widgets ──────────────────────────────────────────────────────────────
 
   Widget _label(String text) => Text(text,
       style: const TextStyle(
@@ -260,6 +380,259 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
           fontSize: 9,
           fontWeight: FontWeight.w900,
           letterSpacing: 2));
+
+  Widget _locationOption() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          _locBtn('REMOTE_IN', isRemote, () => setState(() { isRemote = true; _clearLocation(); })),
+          const SizedBox(width: 12),
+          _locBtn('ONSITE_HQ', !isRemote, () => setState(() => isRemote = false)),
+        ]),
+        if (!isRemote) ...[
+          const SizedBox(height: 16),
+          _locationSearchField(),
+        ],
+      ],
+    );
+  }
+
+  Widget _locationSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('OFFICE LOCATION',
+            style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+
+        if (_selectedLocationAddress != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_rounded, color: Color(0xFF6366F1), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _selectedLocationAddress!,
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _clearLocation,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.close_rounded, color: Color(0xFFEF4444), size: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _clearLocation,
+            child: const Text(
+              'Change location',
+              style: TextStyle(
+                color: Color(0xFF6366F1),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ] else ...[
+          TextField(
+            controller: _locationSearchController,
+            focusNode: _locationSearchFocus,
+            onChanged: _onLocationQueryChanged,
+            style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: 'Search city, area or office address…',
+              hintStyle: const TextStyle(
+                  color: Color(0xFFCBD5E1),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+              suffixIcon: _searchingLocation
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Color(0xFF6366F1))))
+                  : (_locationSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded,
+                              color: Color(0xFF94A3B8), size: 18),
+                          onPressed: () {
+                            _locationSearchController.clear();
+                            setState(() => _locationSuggestions = []);
+                          })
+                      : null),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            ),
+          ),
+
+          if (_locationSuggestions.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _locationSuggestions.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                itemBuilder: (context, i) {
+                  final s = _locationSuggestions[i];
+                  return InkWell(
+                    onTap: () => _selectLocation(s),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              color: Color(0xFF6366F1), size: 16),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s['short_name'],
+                                  style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                if (s['display_name'] != s['short_name']) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    s['display_name'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: Color(0xFF94A3B8),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w400),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ] else if (!_searchingLocation &&
+              _locationSearchController.text.length >= 3 &&
+              _locationSuggestions.isEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.search_off_rounded, color: Color(0xFF94A3B8), size: 16),
+                  SizedBox(width: 10),
+                  Text('No locations found. Try a different search.',
+                      style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _locBtn(String label, bool active, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 48,
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFF6366F1) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: active ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+                width: 1.5),
+            boxShadow: active
+                ? [BoxShadow(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))]
+                : null,
+          ),
+          child: Center(
+            child: Text(label,
+                style: TextStyle(
+                    color: active ? Colors.white : const Color(0xFF64748B),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5)),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _taskListSection() {
     return Container(
@@ -301,8 +674,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                 GestureDetector(
                   onTap: _addTask,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
                       color: const Color(0xFF6366F1),
                       borderRadius: BorderRadius.circular(8),
@@ -511,40 +883,43 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     return '${sorted.join(', ')} — ${sorted.length} day${sorted.length == 1 ? '' : 's'}/week';
   }
 
-  Widget _locationOption() {
-    return Row(
+  Widget _field(String label, TextEditingController controller,
+      {int maxLines = 1, bool isNumeric = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _locBtn('REMOTE_IN', isRemote, () => setState(() => isRemote = true)),
-        const SizedBox(width: 12),
-        _locBtn('ONSITE_HQ', !isRemote, () => setState(() => isRemote = false)),
-      ],
-    );
-  }
-
-  Widget _locBtn(String label, bool active, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: active ? const Color(0xFF6366F1) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-                color: active
-                    ? const Color(0xFF6366F1)
-                    : const Color(0xFFE2E8F0)),
-          ),
-          child: Center(
-            child: Text(label,
-                style: TextStyle(
-                    color: active ? Colors.white : const Color(0xFF64748B),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5)),
+        Text(label,
+            style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType:
+              isNumeric ? TextInputType.number : TextInputType.text,
+          style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 13,
+              fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: Color(0xFF6366F1), width: 2)),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -588,46 +963,6 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                     color: Color(0xFF94A3B8), size: 20),
               ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _field(String label, TextEditingController controller,
-      {int maxLines = 1, bool isNumeric = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType:
-              isNumeric ? TextInputType.number : TextInputType.text,
-          style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 13,
-              fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide:
-                    const BorderSide(color: Color(0xFF6366F1), width: 2)),
           ),
         ),
       ],
