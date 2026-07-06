@@ -1,7 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:file_selector/file_selector.dart';
 import '../candidates/student_history_dialog.dart';
-
+import '../../../utils/qr_payload_security.dart';
+import 'package:share_plus/share_plus.dart';
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
   const PostingDetailsScreen({super.key, required this.posting});
@@ -553,21 +562,55 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     return const SizedBox.shrink();
   }
 
+  String _todayIso() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  String get _payload {
+    return jsonEncode(
+      QrPayloadSecurity.buildRolePayload(
+        internshipId: _posting['id']?.toString() ?? '',
+        role: _posting['role']?.toString() ?? '',
+        status: _posting['status']?.toString() ?? '',
+        issuerId: _posting['company_id']?.toString() ?? '',
+        company: _posting['company_name']?.toString() ?? '',
+        startDate: _posting['start_date']?.toString() ?? '',
+        endDate: _posting['end_date']?.toString() ?? '',
+        date: _todayIso(),
+      ),
+    );
+  }
+
   Widget _buildContent(Color color) {
+    final status = _posting['status']?.toString().toUpperCase() ?? 'INTERVIEWING';
+    final hasQrTab = status == 'ACTIVE' || status == 'CLOSED';
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Row(
-            children: [
-              _tabButton(0, 'APPLICANTS', _displayedApplicants.length.toString()),
-              const SizedBox(width: 16),
-              _tabButton(1, 'DESCRIPTION', null),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _tabButton(0, 'APPLICANTS', _displayedApplicants.length.toString()),
+                const SizedBox(width: 16),
+                _tabButton(1, 'DESCRIPTION', null),
+                if (hasQrTab) ...[
+                  const SizedBox(width: 16),
+                  _tabButton(2, 'CHECK-IN QR', null),
+                ],
+              ],
+            ),
           ),
         ),
         Expanded(
-          child: _tabIndex == 0 ? _buildApplicantsList(color) : _buildDescription(color),
+          child: _tabIndex == 0
+              ? _buildApplicantsList(color)
+              : _tabIndex == 1
+                  ? _buildDescription(color)
+                  : _buildQrCodeTab(color),
         ),
       ],
     );
@@ -1264,6 +1307,263 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildQrCodeTab(Color color) {
+    final now = DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final todayDisplay = '${now.day} ${months[now.month - 1]} ${now.year}';
+    final role = _posting['role']?.toString() ?? 'Role';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'CHECK-IN QR CODE',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Scan to register daily check-in',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                  ),
+                  child: QrImageView(
+                    data: _payload,
+                    version: QrVersions.auto,
+                    size: 200,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF0F172A),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Color(0xFF0F172A),
+                    ),
+                    backgroundColor: Colors.white,
+                    errorCorrectionLevel: QrErrorCorrectLevel.M,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Role', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text(role, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Duration', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text('${_posting['duration'] ?? 'N/A'} Months', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('QR Date', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text(todayDisplay, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _downloadQrCode(context),
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: const Text('Download QR'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F172A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _shareQrCode(context),
+                        icon: const Icon(Icons.share_rounded, size: 18),
+                        label: const Text('Share Payload'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0F172A),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadQrCode(BuildContext context) async {
+    try {
+      final name = _posting['role']?.toString().replaceAll(' ', '_') ?? 'internship';
+      final fileName = '${name}_qr.png';
+      
+      final url = 'https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&format=png&margin=12&data=${Uri.encodeComponent(_payload)}';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('Server returned status code ${response.statusCode}');
+      }
+
+      final bytes = response.bodyBytes;
+
+      if (kIsWeb) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download not supported on web preview'), backgroundColor: Colors.orange),
+        );
+      } else if (Platform.isAndroid || Platform.isIOS) {
+        final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved to: ${file.path}'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+        }
+      } else {
+        // Desktop / Save File Dialog using file_selector
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Images',
+              extensions: ['png'],
+              mimeTypes: ['image/png'],
+            )
+          ],
+        );
+        if (result != null) {
+          final file = File(result.path);
+          await file.writeAsBytes(bytes);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('QR Code saved successfully'),
+                backgroundColor: Color(0xFF10B981),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to download QR code: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareQrCode(BuildContext context) async {
+    try {
+      final name = _posting['role']?.toString().replaceAll(' ', '_') ?? 'internship';
+      final fileName = '${name}_qr.png';
+      
+      final url = 'https://api.qrserver.com/v1/create-qr-code/?size=1024x1024&format=png&margin=12&data=${Uri.encodeComponent(_payload)}';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) {
+        throw Exception('Server returned status code ${response.statusCode}');
+      }
+
+      final bytes = response.bodyBytes;
+
+      if (kIsWeb) {
+        await Clipboard.setData(ClipboardData(text: url));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR Code image link copied to clipboard!'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+        }
+      } else {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(bytes);
+
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Check-in QR Code for ${_posting['role']}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share QR code: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
   }
 
   String _formatDate(dynamic value) {
