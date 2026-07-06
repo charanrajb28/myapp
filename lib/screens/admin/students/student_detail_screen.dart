@@ -496,11 +496,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     children: [
                       _buildTab('Overview', 0),
                       const SizedBox(width: 12),
-                      _buildTab('Applications', 1),
+                      _buildTab('Active Internships', 1),
                       const SizedBox(width: 12),
-                      _buildTab('Documents', 2),
+                      _buildTab('Applications', 2),
                       const SizedBox(width: 12),
-                      _buildTab('Past Internships', 3),
+                      _buildTab('Documents', 3),
+                      const SizedBox(width: 12),
+                      _buildTab('Past Internships', 4),
                     ],
                   ),
                 ),
@@ -538,10 +540,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   ),
                 ]
               ] else if (_activeTabIndex == 1) ...[
-                _buildApplicationsTab(isMobile),
+                _buildActiveInternshipsTab(isMobile),
               ] else if (_activeTabIndex == 2) ...[
-                _buildDocumentsTab(isMobile),
+                _buildApplicationsTab(isMobile),
               ] else if (_activeTabIndex == 3) ...[
+                _buildDocumentsTab(isMobile),
+              ] else if (_activeTabIndex == 4) ...[
                 _buildPastInternshipsTab(isMobile),
               ] else ...[
                 _buildComingSoonPlaceholder(_activeTabIndex),
@@ -584,7 +588,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildComingSoonPlaceholder(int tabIndex) {
-    final tabNames = ['Overview', 'Applications', 'Documents', 'Past Internships'];
+    final tabNames = ['Overview', 'Active Internships', 'Applications', 'Documents', 'Past Internships'];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 64),
@@ -604,6 +608,127 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActiveInternshipsTab(bool isMobile) {
+    if (_isLoadingData) return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
+    if (_currentInternships.isEmpty) return _buildComingSoonPlaceholder(1);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: _currentInternships.map((app) {
+        final intern = app['internships'] ?? {};
+        final comp = intern['companies'] ?? {};
+        final progressVal = double.tryParse(app['progress']?.toString() ?? '0.0') ?? 0.0;
+        final progressPercent = (progressVal * 100).toInt();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Container(
+            padding: EdgeInsets.all(isMobile ? 20 : 28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.01),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: const Icon(Icons.domain_rounded, color: Color(0xFF2563EB), size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            comp['name'] ?? 'Unknown Company',
+                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            intern['role'] ?? 'Intern Role',
+                            style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified_rounded, size: 14, color: Color(0xFF059669)),
+                          SizedBox(width: 6),
+                          Text(
+                            'ACTIVE',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Divider(color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 32,
+                  runSpacing: 16,
+                  children: [
+                    _buildInfoColumn('Start Date', app['start_date'] ?? 'TBD'),
+                    _buildInfoColumn('End Date', app['end_date'] ?? 'TBD'),
+                    _buildInfoColumn('Mentor', app['mentor_name'] ?? 'Unassigned'),
+                    _buildInfoColumn('Mentor Email', app['mentor_email'] ?? 'Unassigned'),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Progress
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Attendance / Internship Progress', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                    Text('$progressPercent%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF2563EB))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progressVal,
+                    minHeight: 8,
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -903,22 +1028,22 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   Widget _buildPastInternshipsTab(bool isMobile) {
     if (_isLoadingData) return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
-    if (_pastInternships.isEmpty) return _buildComingSoonPlaceholder(3);
+    if (_pastInternships.isEmpty) return _buildComingSoonPlaceholder(4);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: _pastInternships.map((app) {
         final intern = app['internships'] ?? {};
         final comp = intern['companies'] ?? {};
+        final startDate = app['start_date'] ?? intern['start_date'] ?? 'TBD';
+        final endDate = app['end_date'] ?? intern['end_date'] ?? 'TBD';
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: _buildPastInternshipCard(
             isMobile: isMobile,
             company: comp['name'] ?? 'Unknown',
             role: intern['role'] ?? 'Role',
-            duration: '${app['start_date'] ?? "?"} - ${app['end_date'] ?? "?"}',
-            rating: 4.5,
-            managerName: app['mentor_name'] ?? 'Mentor',
+            duration: '$startDate - $endDate',
             feedback: 'Completed Internship.',
           ),
         );
@@ -931,8 +1056,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String company,
     required String role,
     required String duration,
-    required double rating,
-    required String managerName,
     required String feedback,
   }) {
     return Container(
@@ -967,47 +1090,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, size: 16, color: Color(0xFFF59E0B)),
-                    const SizedBox(width: 4),
-                    Text(rating.toString(), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 20),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 24,
-            runSpacing: 12,
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF64748B)),
-                  const SizedBox(width: 8),
-                  Text(duration, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w600)),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.person_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                  const SizedBox(width: 8),
-                  Text(managerName, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w600)),
-                ],
-              ),
+              const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF64748B)),
+              const SizedBox(width: 8),
+              Text(duration, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 20),

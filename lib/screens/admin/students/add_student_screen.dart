@@ -629,7 +629,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
               style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
-              items: items.map((String val) {
+              items: (items.contains(value) ? items : [value, ...items]).map((String val) {
                 return DropdownMenuItem<String>(value: val, child: Text(val));
               }).toList(),
               onChanged: onChanged,

@@ -762,3 +762,26 @@ CREATE TRIGGER trg_update_application_progress
 BEFORE INSERT OR UPDATE OF checkins, start_date, end_date ON public.applications
 FOR EACH ROW
 EXECUTE PROCEDURE public.update_application_progress_from_checkins();
+
+-- ── Trigger to sync internship dates to student applications ──
+CREATE OR REPLACE FUNCTION public.sync_internship_dates_to_applications()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.applications
+  SET start_date = NEW.start_date,
+      end_date = NEW.end_date,
+      status = CASE 
+                 WHEN NEW.status = 'ACTIVE' AND status IN ('Applied', 'Accepted', 'Under Review') THEN 'Active'::public.application_status
+                 ELSE status
+               END
+  WHERE internship_id = NEW.id;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sync_internship_dates ON public.internships;
+CREATE TRIGGER trg_sync_internship_dates
+AFTER UPDATE OF status, start_date, end_date ON public.internships
+FOR EACH ROW
+EXECUTE PROCEDURE public.sync_internship_dates_to_applications();
