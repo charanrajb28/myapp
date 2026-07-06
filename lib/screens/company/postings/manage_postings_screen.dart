@@ -815,9 +815,13 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
                   _infoRow(Icons.fingerprint_rounded, 'Internship ID',
                       widget.posting['id']?.toString() ?? 'N/A'),
                   const SizedBox(height: 6),
-                  _infoRow(Icons.calendar_today_outlined, 'Period',
-                      '$startDate → $endDate'),
-                  const SizedBox(height: 6),
+                  if (widget.posting['start_date'] != null && widget.posting['end_date'] != null) ...[
+                    _infoRow(Icons.calendar_today_outlined, 'Period', '$startDate → $endDate'),
+                    const SizedBox(height: 6),
+                  ] else ...[
+                    _infoRow(Icons.timelapse_rounded, 'Duration', '${widget.posting['duration'] ?? 'N/A'} Months'),
+                    const SizedBox(height: 6),
+                  ],
                   _infoRow(Icons.event_note_outlined, 'QR Date', todayDisplay),
                 ],
               ),

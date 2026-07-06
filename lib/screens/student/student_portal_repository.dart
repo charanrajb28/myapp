@@ -72,7 +72,7 @@ class StudentPortalRepository {
       return [
         StudentInternship(
           applicationId: 'mock-app-1',
-          id: 'mock-intern-1',
+          id: 'mock-posting-1',
           company: 'TechCorp Solutions',
           role: 'Frontend Developer Intern',
           department: 'Engineering',
@@ -110,7 +110,7 @@ class StudentPortalRepository {
         ),
         StudentInternship(
           applicationId: 'mock-app-2',
-          id: 'mock-intern-2',
+          id: 'mock-posting-2',
           company: 'Innovate AI',
           role: 'Machine Learning Research Intern',
           department: 'R&D',
