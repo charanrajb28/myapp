@@ -15,11 +15,11 @@ class CreatePostingScreen extends StatefulWidget {
 }
 
 class _CreatePostingScreenState extends State<CreatePostingScreen> {
-  final roleController         = TextEditingController();
-  final descController         = TextEditingController();
-  final stipendController      = TextEditingController();
-  final durationController     = TextEditingController();
-  final notesController        = TextEditingController();
+  final roleController         = TextEditingController(text: 'Sales & HR Operations Intern');
+  final descController         = TextEditingController(text: 'We are seeking an enthusiastic intern to manage outbound sales outreach and coordinate recruiter/HR activities. This opportunity is ideal for B.Com, BBA, and MBA graduates looking to build a career in sales, recruitment, or business operations.');
+  final stipendController      = TextEditingController(text: '15000');
+  final durationController     = TextEditingController(text: '3');
+  final notesController        = TextEditingController(text: 'Candidate must have excellent communication, basic Excel skills, and a laptop.');
   final _taskInputController   = TextEditingController();
   final activeDurationController = TextEditingController(text: '7');
   final _locationSearchController = TextEditingController();
@@ -38,7 +38,27 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   final _locationSearchFocus = FocusNode();
 
   // Tasks list
-  final List<String> _tasks = [];
+  final List<String> _tasks = [
+    'Identify and research potential leads for corporate sales',
+    'Screen resume applications and schedule interviews for the HR team',
+    'Assist in onboarding new recruits and maintaining student records',
+    'Prepare weekly reports on sales pipelines and recruitment status'
+  ];
+
+  String _selectedIndustry = 'Marketing & Sales (BBA)';
+  final _customIndustryController = TextEditingController();
+  static const List<String> _industriesList = [
+    'Finance & Accounting (B.Com)',
+    'Banking & Insurance (B.Com)',
+    'Business Administration (BBA)',
+    'Marketing & Sales (BBA)',
+    'Human Resource Management (BBA/HR)',
+    'Computer Applications (BCA)',
+    'Web & App Development (BCA/CS)',
+    'IT Support & Systems (BCA)',
+    'Software Engineering (CS)',
+    'Other'
+  ];
 
   // Days of the week state
   static const List<String> _allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -56,6 +76,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     _locationSearchController.dispose();
     _locationSearchFocus.dispose();
     _locationDebounce?.cancel();
+    _customIndustryController.dispose();
     super.dispose();
   }
 
@@ -85,6 +106,22 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     });
   }
 
+  static const List<Map<String, dynamic>> _fallbackLocations = [
+    {'short_name': 'Bengaluru, Karnataka', 'display_name': 'Bengaluru, Karnataka, India', 'lat': 12.9716, 'lng': 77.5946},
+    {'short_name': 'Mumbai, Maharashtra', 'display_name': 'Mumbai, Maharashtra, India', 'lat': 19.0760, 'lng': 72.8777},
+    {'short_name': 'Delhi, NCR', 'display_name': 'Delhi, National Capital Region, India', 'lat': 28.7041, 'lng': 77.1025},
+    {'short_name': 'Hyderabad, Telangana', 'display_name': 'Hyderabad, Telangana, India', 'lat': 17.3850, 'lng': 78.4867},
+    {'short_name': 'Pune, Maharashtra', 'display_name': 'Pune, Maharashtra, India', 'lat': 18.5204, 'lng': 73.8567},
+    {'short_name': 'Chennai, Tamil Nadu', 'display_name': 'Chennai, Tamil Nadu, India', 'lat': 13.0827, 'lng': 80.2707},
+    {'short_name': 'Gurugram, Haryana', 'display_name': 'Gurugram, Haryana, India', 'lat': 28.4595, 'lng': 77.0266},
+    {'short_name': 'Noida, Uttar Pradesh', 'display_name': 'Noida, Uttar Pradesh, India', 'lat': 28.5355, 'lng': 77.3910},
+    {'short_name': 'San Francisco, CA', 'display_name': 'San Francisco, California, United States', 'lat': 37.7749, 'lng': -122.4194},
+    {'short_name': 'New York, NY', 'display_name': 'New York City, New York, United States', 'lat': 40.7128, 'lng': -74.0060},
+    {'short_name': 'London, UK', 'display_name': 'London, Greater London, United Kingdom', 'lat': 51.5074, 'lng': -0.1278},
+    {'short_name': 'Seattle, WA', 'display_name': 'Seattle, Washington, United States', 'lat': 47.6062, 'lng': -122.3321},
+    {'short_name': 'Boston, MA', 'display_name': 'Boston, Massachusetts, United States', 'lat': 42.3601, 'lng': -71.0589},
+  ];
+
   Future<void> _fetchLocationSuggestions(String query) async {
     if (!mounted) return;
     setState(() => _searchingLocation = true);
@@ -95,32 +132,45 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         '&format=json&addressdetails=1&limit=6',
       );
       final response = await http.get(uri, headers: {
-        'User-Agent': 'InternshipApp/1.0 (internship.app@example.com)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept-Language': 'en',
       });
       if (!mounted) return;
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        setState(() {
-          _locationSuggestions = data
-              .map((item) => {
-                    'display_name': item['display_name']?.toString() ?? '',
-                    'short_name': _buildShortName(item),
-                    'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
-                    'lng': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
-                  })
-              .toList();
-          _searchingLocation = false;
-        });
-      } else {
-        setState(() {
-          _locationSuggestions = [];
-          _searchingLocation = false;
-        });
+        if (data.isNotEmpty) {
+          setState(() {
+            _locationSuggestions = data
+                .map((item) => {
+                      'display_name': item['display_name']?.toString() ?? '',
+                      'short_name': _buildShortName(item),
+                      'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
+                      'lng': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
+                    })
+                .toList();
+            _searchingLocation = false;
+          });
+          return;
+        }
       }
+      _useFallbackSuggestions(query);
     } catch (_) {
-      if (mounted) setState(() { _locationSuggestions = []; _searchingLocation = false; });
+      if (mounted) {
+        _useFallbackSuggestions(query);
+      }
     }
+  }
+
+  void _useFallbackSuggestions(String query) {
+    final filtered = _fallbackLocations
+        .where((loc) =>
+            loc['short_name']!.toLowerCase().contains(query.toLowerCase()) ||
+            loc['display_name']!.toLowerCase().contains(query.toLowerCase()))
+        .toList();
+    setState(() {
+      _locationSuggestions = filtered;
+      _searchingLocation = false;
+    });
   }
 
   String _buildShortName(dynamic item) {
@@ -194,13 +244,17 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
       final randomColor = colors[DateTime.now().millisecond % colors.length];
       final sortedDays  = _allDays.where((d) => _activeDays.contains(d)).toList();
 
+      final finalIndustry = _selectedIndustry == 'Other'
+          ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
+          : _selectedIndustry;
+
       await supabase.from('internships').insert({
         'company_id'  : companyId,
         'role'        : roleController.text.trim(),
         'about'       : descController.text.trim(),
         'stipend'     : stipendController.text.trim(),
         'duration'    : durationController.text.trim(),
-        'industry'    : 'Software Engineering',
+        'industry'    : finalIndustry,
         'location'    : isRemote ? 'Remote' : 'On-site',
         'location_address': isRemote ? null : _selectedLocationAddress,
         'location_lat': isRemote ? null : _selectedLat,
@@ -270,6 +324,8 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                 const SizedBox(height: 20),
                 _industrialField('JOB DESCRIPTION', descController,
                     maxLines: 4, hint: 'What will the intern do?'),
+                const SizedBox(height: 20),
+                _categoryDropdownField(),
                 const SizedBox(height: 32),
                 Row(children: [
                   Expanded(
@@ -489,7 +545,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
           ),
 
           // Suggestions dropdown
-          if (_locationSuggestions.isNotEmpty) ...[
+          if (_locationSearchController.text.trim().isNotEmpty) ...[
             const SizedBox(height: 4),
             Container(
               decoration: BoxDecoration(
@@ -504,82 +560,108 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                   ),
                 ],
               ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _locationSuggestions.length,
-                separatorBuilder: (_, __) =>
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                itemBuilder: (context, i) {
-                  final s = _locationSuggestions[i];
-                  return InkWell(
-                    onTap: () => _selectLocation(s),
-                    borderRadius: i == 0
-                        ? const BorderRadius.vertical(top: Radius.circular(12))
-                        : (i == _locationSuggestions.length - 1
-                            ? const BorderRadius.vertical(bottom: Radius.circular(12))
-                            : BorderRadius.zero),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      _selectLocation({
+                        'short_name': _locationSearchController.text.trim(),
+                        'display_name': _locationSearchController.text.trim(),
+                        'lat': 0.0,
+                        'lng': 0.0,
+                      });
+                    },
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on_outlined,
-                              color: Color(0xFF6366F1), size: 16),
+                          const Icon(Icons.add_location_alt_rounded, color: Color(0xFF6366F1), size: 18),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  s['short_name'],
-                                  style: const TextStyle(
-                                      color: Color(0xFF0F172A),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                if (s['display_name'] != s['short_name']) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    s['display_name'],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        color: Color(0xFF94A3B8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w400),
+                                const Text(
+                                  'Use entered custom address',
+                                  style: TextStyle(
+                                    color: Color(0xFF6366F1),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _locationSearchController.text.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ] else if (!_searchingLocation &&
-              _locationSearchController.text.length >= 3 &&
-              _locationSuggestions.isEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.search_off_rounded, color: Color(0xFF94A3B8), size: 16),
-                  SizedBox(width: 10),
-                  Text('No locations found. Try a different search.',
-                      style: TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500)),
+                  ),
+                  if (_locationSuggestions.isNotEmpty) ...[
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _locationSuggestions.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      itemBuilder: (context, i) {
+                        final s = _locationSuggestions[i];
+                        return InkWell(
+                          onTap: () => _selectLocation(s),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.location_on_outlined,
+                                    color: Color(0xFF6366F1), size: 16),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        s['short_name'],
+                                        style: const TextStyle(
+                                            color: Color(0xFF0F172A),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                      if (s['display_name'] != s['short_name']) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          s['display_name'],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              color: Color(0xFF94A3B8),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w400),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1041,6 +1123,59 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _categoryDropdownField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('JOB CATEGORY / INDUSTRY',
+            style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _industriesList.contains(_selectedIndustry) ? _selectedIndustry : 'Other',
+          items: _industriesList.map((ind) {
+            return DropdownMenuItem<String>(
+              value: ind,
+              child: Text(ind, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+            );
+          }).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _selectedIndustry = val;
+                if (val != 'Other') {
+                  _customIndustryController.clear();
+                }
+              });
+            }
+          },
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2)),
+          ),
+        ),
+        if (_selectedIndustry == 'Other') ...[
+          const SizedBox(height: 12),
+          _industrialField('CUSTOM CATEGORY / INDUSTRY', _customIndustryController,
+              hint: 'e.g. Data Science, Logistics'),
+        ],
+      ],
     );
   }
 }
