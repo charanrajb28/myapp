@@ -135,19 +135,7 @@ class QrPayloadSecurity {
     required String date,
     required String nonce,
   }) {
-    return jsonEncode({
-      'v': 2,
-      'type': 'internship_role_qr',
-      'internshipId': internshipId,
-      'role': role,
-      'status': status,
-      'issuerId': issuerId,
-      'company': company,
-      'startDate': startDate,
-      'endDate': endDate,
-      'date': date,
-      'nonce': nonce,
-    });
+    return '2|internship_role_qr|$internshipId|$role|$status|$issuerId|$company|$startDate|$endDate|$date|$nonce';
   }
 
   /// Legacy v1 canonical (for verifying old QR codes).
@@ -158,15 +146,7 @@ class QrPayloadSecurity {
     required String issuerId,
     required String nonce,
   }) {
-    return jsonEncode({
-      'v': 1,
-      'type': 'internship_role_qr',
-      'internshipId': internshipId,
-      'role': role,
-      'status': status,
-      'issuerId': issuerId,
-      'nonce': nonce,
-    });
+    return '1|internship_role_qr|$internshipId|$role|$status|$issuerId|$nonce';
   }
 
   static String _hashHex(String value) {
