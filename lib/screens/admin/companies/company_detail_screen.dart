@@ -1003,6 +1003,9 @@ class _RolesTab extends StatelessWidget {
                                         'id': student['enrollment_id']?.toString() ?? student['id']?.toString() ?? 'N/A',
                                         'dept': student['department']?.toString() ?? 'CS',
                                         'status': app['status']?.toString() ?? 'Applied',
+                                        'application_id': app['id']?.toString() ?? '',
+                                        'progress': double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
+                                        'checkins': app['checkins'] as List? ?? [],
                                       };
                                     }).toList(),
                                   ),

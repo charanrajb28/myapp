@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../feedbacks/admin_form_builder_screen.dart';
-
+import '../../company/postings/posting_details_screen.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,7 +16,7 @@ class RoleDetailScreen extends StatefulWidget {
   final List<String> responsibilities;
   final List<String> activeDays;
   final String notes;
-  final List<Map<String, String>> applicants;
+  final List<Map<String, dynamic>> applicants;
 
   const RoleDetailScreen({
     super.key,
@@ -512,7 +512,7 @@ class _MetaBox extends StatelessWidget {
 }
 
 class _ApplicantRow extends StatelessWidget {
-  final Map<String, String> applicant;
+  final Map<String, dynamic> applicant;
   const _ApplicantRow({required this.applicant});
 
   static const _avatarColors = [
@@ -522,10 +522,10 @@ class _ApplicantRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name   = applicant['name']!;
-    final id     = applicant['id']!;
-    final dept   = applicant['dept']!;
-    final status = applicant['status']!;
+    final name   = applicant['name']?.toString() ?? 'Unknown';
+    final id     = applicant['id']?.toString() ?? 'N/A';
+    final dept   = applicant['dept']?.toString() ?? 'CS';
+    final status = applicant['status']?.toString() ?? 'Applied';
     final avatarColor = _avatarColors[name.codeUnitAt(0) % _avatarColors.length];
 
     return Container(
@@ -542,7 +542,22 @@ class _ApplicantRow extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {}, // future navigate to student detail
+          onTap: () {
+            final appId = applicant['application_id']?.toString() ?? '';
+            if (appId.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StudentInfoScreen(
+                    applicationId: appId,
+                    studentName: name,
+                    progress: double.tryParse(applicant['progress']?.toString() ?? '0') ?? 0.0,
+                    checkins: applicant['checkins'] as List? ?? [],
+                  ),
+                ),
+              );
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
