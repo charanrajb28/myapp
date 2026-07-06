@@ -20,6 +20,10 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
   late TextEditingController industryController;
   late TextEditingController descController;
   late TextEditingController locationController;
+  late TextEditingController websiteController;
+  late TextEditingController phoneController;
+  late TextEditingController emailController;
+  late TextEditingController mouDateController;
   bool _isSaving = false;
   String _logoUrl = '';
   String _bannerUrl = '';
@@ -39,6 +43,14 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
         TextEditingController(text: widget.companyData['description']);
     locationController =
         TextEditingController(text: widget.companyData['location']);
+    websiteController =
+        TextEditingController(text: widget.companyData['website']);
+    phoneController =
+        TextEditingController(text: widget.companyData['phone']);
+    emailController =
+        TextEditingController(text: widget.companyData['contact_email']);
+    mouDateController =
+        TextEditingController(text: widget.companyData['mou_date']);
     _logoUrl = widget.companyData['logo_url']?.toString() ?? '';
     _bannerUrl = widget.companyData['banner_url']?.toString() ?? '';
   }
@@ -175,6 +187,12 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
         'industry': industryController.text.trim(),
         'description': descController.text.trim(),
         'location': locationController.text.trim(),
+        'website': websiteController.text.trim(),
+        'phone': phoneController.text.trim(),
+        'contact_email': emailController.text.trim(),
+        'mou_date': mouDateController.text.trim().isNotEmpty
+            ? mouDateController.text.trim()
+            : null,
         'logo_url': logoUrl,
         'banner_url': bannerUrl,
       };
@@ -473,6 +491,40 @@ class _EditCompanyProfileScreenState extends State<EditCompanyProfileScreen> {
                       _industrialField(
                         'HEADQUARTERS LOCATION',
                         locationController,
+                      ),
+                      const SizedBox(height: 20),
+                      _industrialField('WEBSITE', websiteController),
+                      const SizedBox(height: 20),
+                      _industrialField('PHONE NUMBER', phoneController),
+                      const SizedBox(height: 20),
+                      _industrialField('CONTACT EMAIL', emailController),
+                      const SizedBox(height: 20),
+                      GestureDetector(
+                        onTap: () async {
+                          DateTime initial = DateTime.now();
+                          if (mouDateController.text.trim().isNotEmpty) {
+                            try {
+                              initial = DateTime.parse(mouDateController.text.trim());
+                            } catch (_) {}
+                          }
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: initial,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              mouDateController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                            });
+                          }
+                        },
+                        child: AbsorbPointer(
+                          child: _industrialField(
+                            'MOU SIGN DATE (TAP TO SELECT)',
+                            mouDateController,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 32),
                       const Text(
