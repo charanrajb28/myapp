@@ -105,11 +105,25 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           
       // 2. Perform applicant status conversions
       if (newStatus == 'ACTIVE' && oldStatus == 'INTERVIEWING') {
+        final String startDateStr = (_posting['start_date'] ?? DateTime.now().toIso8601String().split('T')[0]).toString();
+        String? endDateStr = _posting['end_date']?.toString();
+        if (endDateStr == null) {
+          try {
+            final startDate = DateTime.parse(startDateStr);
+            final durationStr = (_posting['duration']?.toString() ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+            final durationMonths = int.tryParse(durationStr) ?? 3;
+            endDateStr = DateTime(startDate.year, startDate.month + durationMonths, startDate.day).toIso8601String().split('T')[0];
+          } catch (_) {
+            endDateStr = DateTime.now().add(const Duration(days: 90)).toIso8601String().split('T')[0];
+          }
+        }
+
         await supabase
             .from('applications')
             .update({
               'status': 'Active',
-              'start_date': DateTime.now().toIso8601String().split('T')[0]
+              'start_date': startDateStr,
+              'end_date': endDateStr,
             })
             .eq('internship_id', _posting['id'])
             .eq('status', 'Accepted');
@@ -118,9 +132,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
             .from('applications')
             .update({
               'status': 'Applied',
-              'start_date': null
+              'start_date': null,
+              'end_date': null,
             })
             .eq('internship_id', _posting['id']);
+      } else if (newStatus == 'CLOSED') {
+        await supabase
+            .from('applications')
+            .update({
+              'status': 'Completed',
+            })
+            .eq('internship_id', _posting['id'])
+            .eq('status', 'Active');
       }
       
       // Update local state

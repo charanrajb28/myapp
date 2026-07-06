@@ -731,6 +731,11 @@ DECLARE
   v_total_days INTEGER;
   v_checkin_count INTEGER;
 BEGIN
+  -- 0. Only calculate progress once status is 'Completed'
+  IF NEW.status != 'Completed' THEN
+    RETURN NEW;
+  END IF;
+
   -- 1. Count the number of check-in entries in the jsonb array
   IF NEW.checkins IS NULL OR jsonb_typeof(NEW.checkins) != 'array' THEN
     v_checkin_count := 0;
@@ -739,8 +744,8 @@ BEGIN
   END IF;
 
   -- 2. Calculate the total number of days of the internship
-  IF NEW.start_date IS NOT NULL AND NEW.end_date IS NOT NULL AND NEW.end_date > NEW.start_date THEN
-    v_total_days := NEW.end_date - NEW.start_date;
+  IF NEW.start_date IS NOT NULL AND NEW.end_date IS NOT NULL AND NEW.end_date >= NEW.start_date THEN
+    v_total_days := NEW.end_date - NEW.start_date + 1;
   ELSE
     v_total_days := 90; -- Default fallback to 90 days (approx. 3 months)
   END IF;
@@ -759,29 +764,6 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_update_application_progress ON public.applications;
 CREATE TRIGGER trg_update_application_progress
-BEFORE INSERT OR UPDATE OF checkins, start_date, end_date ON public.applications
+BEFORE INSERT OR UPDATE OF status, checkins, start_date, end_date ON public.applications
 FOR EACH ROW
 EXECUTE PROCEDURE public.update_application_progress_from_checkins();
-
--- ── Trigger to sync internship dates to student applications ──
-CREATE OR REPLACE FUNCTION public.sync_internship_dates_to_applications()
-RETURNS TRIGGER AS $$
-BEGIN
-  UPDATE public.applications
-  SET start_date = NEW.start_date,
-      end_date = NEW.end_date,
-      status = CASE 
-                 WHEN NEW.status = 'ACTIVE' AND status IN ('Applied', 'Accepted', 'Under Review') THEN 'Active'::public.application_status
-                 ELSE status
-               END
-  WHERE internship_id = NEW.id;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_sync_internship_dates ON public.internships;
-CREATE TRIGGER trg_sync_internship_dates
-AFTER UPDATE OF status, start_date, end_date ON public.internships
-FOR EACH ROW
-EXECUTE PROCEDURE public.sync_internship_dates_to_applications();
