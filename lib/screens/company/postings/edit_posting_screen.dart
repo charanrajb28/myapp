@@ -83,7 +83,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         : {'Mon', 'Tue', 'Wed', 'Thu', 'Fri'};
 
     // Industry / Category setup
-    final rawIndustry = widget.posting['industry']?.toString() ?? 'Marketing & Sales (BBA)';
+    final rawIndustry = widget.posting['industry']?.toString() ?? 'Marketing & Sales';
     if (_industriesList.contains(rawIndustry)) {
       _selectedIndustry = rawIndustry;
     } else {
@@ -95,15 +95,15 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
   late String _selectedIndustry;
   final _customIndustryController = TextEditingController();
   static const List<String> _industriesList = [
-    'Finance & Accounting (B.Com)',
-    'Banking & Insurance (B.Com)',
-    'Business Administration (BBA)',
-    'Marketing & Sales (BBA)',
-    'Human Resource Management (BBA/HR)',
-    'Computer Applications (BCA)',
-    'Web & App Development (BCA/CS)',
-    'IT Support & Systems (BCA)',
-    'Software Engineering (CS)',
+    'Finance & Accounting',
+    'Banking & Insurance',
+    'Business Administration',
+    'Marketing & Sales',
+    'Human Resource Management',
+    'Computer Applications',
+    'Web & App Development',
+    'IT Support & Systems',
+    'Software Engineering',
     'Other'
   ];
 

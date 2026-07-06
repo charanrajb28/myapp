@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'posting_details_screen.dart';
 import 'create_posting_screen.dart';
+import 'edit_posting_screen.dart';
 import '../../../utils/qr_payload_security.dart';
 
 class ManagePostingsScreen extends StatefulWidget {
@@ -322,6 +323,17 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
           onStatusChange: (newStatus) => _updateStatus(filteredList[index]['id'], newStatus),
           onDiscard: () => _discardPosting(filteredList[index]['id']),
           onShareQr: () => _showQRDialog(context, filteredList[index]),
+          onEdit: () async {
+            final edited = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => EditPostingScreen(posting: filteredList[index]),
+              ),
+            );
+            if (edited == true && mounted) {
+              _fetchPostings();
+            }
+          },
         );
       },
     );
@@ -356,12 +368,14 @@ class _JobIndustrialCard extends StatelessWidget {
   final Function(String) onStatusChange;
   final VoidCallback onDiscard;
   final VoidCallback onShareQr;
+  final VoidCallback onEdit;
   const _JobIndustrialCard({
     required this.posting,
     required this.onTap,
     required this.onStatusChange,
     required this.onDiscard,
     required this.onShareQr,
+    required this.onEdit,
   });
 
   @override
@@ -435,6 +449,7 @@ class _JobIndustrialCard extends StatelessWidget {
 
   Widget _statusMenu(BuildContext context) {
     final status = posting['status'] as String? ?? 'INTERVIEWING';
+    final isInterviewing = status == 'INTERVIEWING';
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF94A3B8)),
       onSelected: (val) {
@@ -442,16 +457,24 @@ class _JobIndustrialCard extends StatelessWidget {
           onDiscard();
         } else if (val == 'SHARE_QR') {
           onShareQr();
+        } else if (val == 'EDIT') {
+          onEdit();
         } else {
           onStatusChange(val);
         }
       },
       itemBuilder: (context) => [
         ..._statusMenuItems(status),
-        const PopupMenuItem(
-          value: 'SHARE_QR',
-          child: Text('Share QR Code'),
-        ),
+        if (isInterviewing)
+          const PopupMenuItem(
+            value: 'EDIT',
+            child: Text('Edit Posting'),
+          ),
+        if (!isInterviewing)
+          const PopupMenuItem(
+            value: 'SHARE_QR',
+            child: Text('Share QR Code'),
+          ),
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: 'DISCARD',

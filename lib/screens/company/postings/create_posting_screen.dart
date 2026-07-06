@@ -45,18 +45,18 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     'Prepare weekly reports on sales pipelines and recruitment status'
   ];
 
-  String _selectedIndustry = 'Marketing & Sales (BBA)';
+  String _selectedIndustry = 'Marketing & Sales';
   final _customIndustryController = TextEditingController();
   static const List<String> _industriesList = [
-    'Finance & Accounting (B.Com)',
-    'Banking & Insurance (B.Com)',
-    'Business Administration (BBA)',
-    'Marketing & Sales (BBA)',
-    'Human Resource Management (BBA/HR)',
-    'Computer Applications (BCA)',
-    'Web & App Development (BCA/CS)',
-    'IT Support & Systems (BCA)',
-    'Software Engineering (CS)',
+    'Finance & Accounting',
+    'Banking & Insurance',
+    'Business Administration',
+    'Marketing & Sales',
+    'Human Resource Management',
+    'Computer Applications',
+    'Web & App Development',
+    'IT Support & Systems',
+    'Software Engineering',
     'Other'
   ];
 

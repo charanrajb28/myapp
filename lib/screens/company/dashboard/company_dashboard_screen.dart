@@ -51,6 +51,11 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                 'created_at': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
                 'applicants': '18',
                 'color': const Color(0xFF6366F1),
+                'about': 'Build responsive, elegant user interfaces using modern web frameworks.',
+                'location': 'Remote',
+                'stipend': '15000',
+                'duration': '3',
+                'responsibilities': ['Develop core components', 'Fix UI bugs', 'Collaborate with backend'],
               },
               {
                 'id': 'mock-posting-2',
@@ -59,6 +64,12 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                 'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
                 'applicants': '12',
                 'color': const Color(0xFFEC4899),
+                'about': 'Work closely with design and engineering teams to specify and launch products.',
+                'location': 'On-site',
+                'location_address': 'AECS Layout, Bengaluru',
+                'stipend': '18000',
+                'duration': '6',
+                'responsibilities': ['Write PRDs', 'Define success metrics', 'Run sprint planning'],
               },
               {
                 'id': 'mock-posting-3',
@@ -67,6 +78,11 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                 'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
                 'applicants': '12',
                 'color': const Color(0xFFF59E0B),
+                'about': 'Analyze data to extract insights, compile reports, and build dashboards.',
+                'location': 'Remote',
+                'stipend': '12000',
+                'duration': '3',
+                'responsibilities': ['Clean datasets', 'Build SQL queries', 'Create PowerBI charts'],
               },
             ];
             _isLoading = false;
@@ -87,7 +103,7 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       // 2. Get Postings and Application Counts
       final postingsRes = await supabase
           .from('internships')
-          .select('id, role, brand_color, status, created_at')
+          .select('*')
           .eq('company_id', companyId)
           .order('created_at', ascending: false);
       
@@ -119,8 +135,7 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
         }
         
         displayPostings.add({
-          'id': p['id'],
-          'role': p['role'],
+          ...p,
           'status': p['status'] ?? 'INTERVIEWING',
           'created_at': p['created_at'],
           'applicants': count.toString(),
