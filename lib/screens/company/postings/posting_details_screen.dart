@@ -458,18 +458,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     if (status == 'INTERVIEWING') {
       return SizedBox(
         width: double.infinity,
-        height: 52,
+        height: 42,
         child: ElevatedButton.icon(
           onPressed: () => _updateJobStatus('ACTIVE'),
-          icon: const Icon(Icons.play_circle_fill_rounded, size: 20),
+          icon: const Icon(Icons.play_circle_fill_rounded, size: 14),
           label: const Text(
             'START MISSION (ACTIVATE)',
-            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1, fontSize: 13),
+            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.8, fontSize: 9.5),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF10B981), // Emerald 500
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             elevation: 0,
           ),
         ),
@@ -479,18 +479,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         children: [
           Expanded(
             child: SizedBox(
-              height: 52,
+              height: 42,
               child: OutlinedButton.icon(
                 onPressed: () => _updateJobStatus('INTERVIEWING'),
-                icon: const Icon(Icons.undo_rounded, size: 18),
+                icon: const Icon(Icons.undo_rounded, size: 14),
                 label: const Text(
                   'REVERT TO INTERVIEW',
-                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 11),
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3, fontSize: 9.5),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
                   foregroundColor: const Color(0xFF6366F1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ),
@@ -498,18 +498,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: SizedBox(
-              height: 52,
+              height: 42,
               child: ElevatedButton.icon(
                 onPressed: () => _updateJobStatus('CLOSED'),
-                icon: const Icon(Icons.cancel_rounded, size: 18),
+                icon: const Icon(Icons.cancel_rounded, size: 14),
                 label: const Text(
                   'CLOSE MISSION',
-                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 11),
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3, fontSize: 9.5),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
               ),
@@ -522,18 +522,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         children: [
           Expanded(
             child: SizedBox(
-              height: 52,
+              height: 42,
               child: OutlinedButton.icon(
                 onPressed: () => _updateJobStatus('INTERVIEWING'),
-                icon: const Icon(Icons.people_outline_rounded, size: 18),
+                icon: const Icon(Icons.people_outline_rounded, size: 14),
                 label: const Text(
                   'INTERVIEWING',
-                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 11),
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3, fontSize: 9.5),
                 ),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF94A3B8), width: 1.5),
                   foregroundColor: const Color(0xFFCBD5E1),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ),
@@ -541,18 +541,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: SizedBox(
-              height: 52,
+              height: 42,
               child: ElevatedButton.icon(
                 onPressed: () => _updateJobStatus('ACTIVE'),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
+                icon: const Icon(Icons.refresh_rounded, size: 14),
                 label: const Text(
                   'REOPEN MISSION',
-                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 11),
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3, fontSize: 9.5),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
               ),
@@ -969,6 +969,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => StudentInfoScreen(
+                        applicationId: applicationId,
                         studentName: name,
                         progress: double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
                         checkins: app['checkins'] as List? ?? [],
@@ -1711,12 +1712,14 @@ class _DotPainter extends CustomPainter {
 }
 
 class StudentInfoScreen extends StatefulWidget {
+  final String applicationId;
   final String studentName;
   final double progress;
   final List<dynamic> checkins;
 
   const StudentInfoScreen({
     super.key,
+    required this.applicationId,
     required this.studentName,
     required this.progress,
     required this.checkins,
@@ -1729,12 +1732,24 @@ class StudentInfoScreen extends StatefulWidget {
 class _StudentInfoScreenState extends State<StudentInfoScreen> {
   late DateTime _selectedMonth;
   late DateTime _activeSelectedDate;
+  
+  bool _sendingAlert = false;
+  final _alertTitleController = TextEditingController();
+  final _alertMessageController = TextEditingController();
+  String _alertType = 'warning';
 
   @override
   void initState() {
     super.initState();
     _selectedMonth = DateTime.now();
     _activeSelectedDate = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _alertTitleController.dispose();
+    _alertMessageController.dispose();
+    super.dispose();
   }
 
   Map<String, dynamic>? _getCheckinForDate(DateTime date) {
@@ -1757,6 +1772,68 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
       return DateFormat('hh:mm a').format(dt);
     } catch (_) {
       return isoString;
+    }
+  }
+
+  Future<void> _sendAlert() async {
+    final title = _alertTitleController.text.trim();
+    final message = _alertMessageController.text.trim();
+    if (title.isEmpty || message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both title and message'), backgroundColor: Color(0xFFEF4444)),
+      );
+      return;
+    }
+
+    setState(() => _sendingAlert = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final res = await supabase
+          .from('applications')
+          .select('alerts')
+          .eq('id', widget.applicationId)
+          .maybeSingle();
+
+      List<dynamic> currentAlerts = [];
+      if (res != null && res['alerts'] is List) {
+        currentAlerts = List.from(res['alerts']);
+      }
+
+      currentAlerts.add({
+        'title': title,
+        'message': message,
+        'type': _alertType,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      await supabase
+          .from('applications')
+          .update({'alerts': currentAlerts})
+          .eq('id', widget.applicationId);
+
+      if (mounted) {
+        _alertTitleController.clear();
+        _alertMessageController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Internship Alert sent successfully!'),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send alert: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sendingAlert = false);
+      }
     }
   }
 
@@ -2179,6 +2256,114 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
                   ),
                 );
               }
+            ),
+            const SizedBox(height: 20),
+
+            // Send Alert Form Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.add_alert_rounded, size: 18, color: Color(0xFF6366F1)),
+                          SizedBox(width: 8),
+                          Text(
+                            'SEND INTERNSHIP ALERT',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        height: 32,
+                        width: 100,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _alertType,
+                            isExpanded: true,
+                            icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF64748B)),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                            items: const [
+                              DropdownMenuItem(value: 'info', child: Text('Info')),
+                              DropdownMenuItem(value: 'warning', child: Text('Warning')),
+                              DropdownMenuItem(value: 'danger', child: Text('Danger')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => _alertType = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _alertTitleController,
+                    decoration: InputDecoration(
+                      labelText: 'Alert Title',
+                      labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _alertMessageController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Message details...',
+                      labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: _sendingAlert ? null : _sendAlert,
+                      icon: _sendingAlert
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.send_rounded, size: 14),
+                      label: const Text('SEND INTERN ALERT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
