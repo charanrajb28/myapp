@@ -1525,7 +1525,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
       } else if (Platform.isAndroid || Platform.isIOS) {
         String? selectedDirectory;
         try {
-          selectedDirectory = await FilePicker.platform.getDirectoryPath();
+          selectedDirectory = await FilePicker.getDirectoryPath();
         } catch (e) {
           debugPrint('Directory picker error: $e');
         }

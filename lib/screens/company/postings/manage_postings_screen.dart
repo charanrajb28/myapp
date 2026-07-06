@@ -631,7 +631,7 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
       } else if (Platform.isAndroid || Platform.isIOS) {
         String? selectedDirectory;
         try {
-          selectedDirectory = await FilePicker.platform.getDirectoryPath();
+          selectedDirectory = await FilePicker.getDirectoryPath();
         } catch (e) {
           debugPrint('Directory picker error: $e');
         }
