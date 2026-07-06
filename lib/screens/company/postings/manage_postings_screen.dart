@@ -665,7 +665,6 @@ class _CompanyQrDialogState extends State<_CompanyQrDialog> {
     final status = widget.posting['status']?.toString() ?? '';
     final startDate = _formatDisplayDate(widget.posting['start_date']?.toString());
     final endDate = _formatDisplayDate(widget.posting['end_date']?.toString());
-    final today = _todayIso();
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final now = DateTime.now();
     final todayDisplay = '${now.day} ${months[now.month - 1]} ${now.year}';

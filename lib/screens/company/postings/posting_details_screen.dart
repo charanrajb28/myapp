@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../candidates/candidate_portfolio_screen.dart';
 import '../candidates/student_history_dialog.dart';
 
 class PostingDetailsScreen extends StatefulWidget {
