@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'student_history_dialog.dart';
 
 class ManageCandidatesScreen extends StatefulWidget {
   const ManageCandidatesScreen({super.key});
@@ -40,19 +41,22 @@ class _ManageCandidatesScreenState extends State<ManageCandidatesScreen> {
 
       final res = await supabase
           .from('applications')
-          .select('*, students(name), internships(role)')
-          .eq('internships.company_id', companyId);
+          .select('*, students(id, name), internships(role)')
+          .eq('internships.company_id', companyId)
+          .order('created_at', ascending: true);
       
       final List<Map<String, dynamic>> processed = [];
       for (var app in (res as List)) {
         if (app['internships'] == null) continue;
 
         final studentName = app['students']?['name'] ?? 'Unknown Student';
+        final studentId = app['students']?['id']?.toString() ?? '';
         final role = app['internships']?['role'] ?? 'Unknown Role';
         final initials = studentName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase();
 
         processed.add({
           'id': app['id'],
+          'studentId': studentId,
           'initials': initials,
           'name': studentName,
           'targetRole': role,
@@ -249,6 +253,24 @@ class _CandidateCard extends StatelessWidget {
                       style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.w700),
                     ),
                   ],
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => StudentHistoryDialog(
+                        studentId: candidate['studentId'],
+                        studentName: candidate['name'],
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.visibility_rounded, color: Color(0xFF6366F1), size: 18),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.all(8),
+                  ),
                 ),
               ],
             ),

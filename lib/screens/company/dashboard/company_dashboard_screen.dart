@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../company_shell.dart';
 import '../postings/posting_details_screen.dart';
+import '../candidates/manage_candidates_screen.dart';
 
 class CompanyDashboardScreen extends StatefulWidget {
   const CompanyDashboardScreen({super.key});
@@ -205,7 +206,17 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
                       children: [
                         Expanded(
                           flex: 3,
-                          child: _premiumLargeCard('TOTAL APPLICANTS', _recruitmentPool, const Color(0xFF6366F1), Icons.group_add_rounded),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ManageCandidatesScreen(),
+                                ),
+                              );
+                            },
+                            child: _premiumLargeCard('TOTAL APPLICANTS', _recruitmentPool, const Color(0xFF6366F1), Icons.group_add_rounded),
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(

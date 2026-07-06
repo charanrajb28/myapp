@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../candidates/candidate_portfolio_screen.dart';
+import '../candidates/student_history_dialog.dart';
 
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
@@ -42,7 +43,8 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
       final res = await supabase
           .from('applications')
           .select('*, students(*)')
-          .eq('internship_id', _posting['id']);
+          .eq('internship_id', _posting['id'])
+          .order('created_at', ascending: true);
 
       if (mounted) {
         setState(() {
@@ -704,36 +706,23 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                       ],
                     ),
                   ),
-                  if (jobStatus.toUpperCase() != 'INTERVIEWING')
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CandidatePortfolioScreen(
-                              candidate: {
-                                'id': student?['id'] ?? '',
-                                'name': student?['name'] ?? 'Candidate',
-                                'college': student?['college'] ?? 'University',
-                                'avatar': student?['avatar_url'] ?? 'https://api.dicebear.com/7.x/avataaars/png?seed=${student?['name'] ?? 'C'}',
-                              },
-                              applicationId: app['id'],
-                              applicationStatus: status,
-                              jobStatus: jobStatus,
-                              onStatusUpdated: () {
-                                _fetchApplicants();
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF6366F1), size: 16),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.all(8),
-                      ),
+                  IconButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => StudentHistoryDialog(
+                          studentId: student?['id'] ?? '',
+                          studentName: name,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.visibility_rounded, color: Color(0xFF6366F1), size: 16),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.all(8),
                     ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
