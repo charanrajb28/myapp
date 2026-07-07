@@ -33,7 +33,7 @@ class _StudentHistoryDialogState extends State<StudentHistoryDialog> {
       final supabase = Supabase.instance.client;
       final res = await supabase
           .from('applications')
-          .select('status, created_at, start_date, end_date, internships(role, companies(name))')
+          .select('status, created_at, internships(role, start_date, end_date, companies(name))')
           .eq('student_id', widget.studentId);
 
       final List<Map<String, dynamic>> currentList = [];

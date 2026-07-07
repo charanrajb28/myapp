@@ -79,25 +79,25 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
         }
       } else if (type == 'internships') {
         fileName = 'internship_reports_${DateTime.now().millisecondsSinceEpoch}.csv';
-        final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, companies(name))');
+        final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, start_date, end_date, companies(name))');
         sb.writeln('Student Name,Enrollment ID,Company,Role,Status,Progress %,Start Date,End Date,Mentor Name');
         for (final row in data) {
           final student = row['students'] as Map? ?? {};
           final internship = row['internships'] as Map? ?? {};
           final company = internship['companies'] as Map? ?? {};
           final progressPercent = (((row['progress'] as num?) ?? 0) * 100).round();
-          sb.writeln('"${student['name'] ?? ''}","${student['enrollment_id'] ?? ''}","${company['name'] ?? ''}","${internship['role'] ?? ''}","${row['status'] ?? ''}","$progressPercent","${row['start_date'] ?? ''}","${row['end_date'] ?? ''}","${row['mentor_name'] ?? ''}"');
+          sb.writeln('"${student['name'] ?? ''}","${student['enrollment_id'] ?? ''}","${company['name'] ?? ''}","${internship['role'] ?? ''}","${row['status'] ?? ''}","$progressPercent","${internship['start_date'] ?? ''}","${internship['end_date'] ?? ''}","${row['mentor_name'] ?? ''}"');
         }
       } else if (type == 'alerts') {
         fileName = 'alert_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
-        final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, companies(name))').inFilter('status', ['Removed', 'Completed']).order('progress', ascending: true);
+        final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, end_date, companies(name))').inFilter('status', ['Removed', 'Completed']).order('progress', ascending: true);
         sb.writeln('Alert Reason,Student Name,Enrollment ID,Company,Role,Status,Progress %,End Date');
         for (final row in data) {
           final student = row['students'] as Map? ?? {};
           final internship = row['internships'] as Map? ?? {};
           final company = internship['companies'] as Map? ?? {};
           final progressPercent = (((row['progress'] as num?) ?? 0) * 100).round();
-          sb.writeln('"Low Progress Alert","${student['name'] ?? ''}","${student['enrollment_id'] ?? ''}","${company['name'] ?? ''}","${internship['role'] ?? ''}","${row['status'] ?? ''}","$progressPercent","${row['end_date'] ?? ''}"');
+          sb.writeln('"Low Progress Alert","${student['name'] ?? ''}","${student['enrollment_id'] ?? ''}","${company['name'] ?? ''}","${internship['role'] ?? ''}","${row['status'] ?? ''}","$progressPercent","${internship['end_date'] ?? ''}"');
         }
       }
 

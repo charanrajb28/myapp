@@ -105,6 +105,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           
       // 2. Perform applicant status conversions
       if (newStatus == 'ACTIVE' && oldStatus == 'INTERVIEWING') {
+        // Also update internship start/end dates if not set
         final String startDateStr = (_posting['start_date'] ?? DateTime.now().toIso8601String().split('T')[0]).toString();
         String? endDateStr = _posting['end_date']?.toString();
         if (endDateStr == null) {
@@ -117,32 +118,32 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
             endDateStr = DateTime.now().add(const Duration(days: 90)).toIso8601String().split('T')[0];
           }
         }
+        // Update dates on the internship (single source of truth)
+        await supabase
+            .from('internships')
+            .update({'start_date': startDateStr, 'end_date': endDateStr})
+            .eq('id', _posting['id']);
 
         await supabase
             .from('applications')
-            .update({
-              'status': 'Active',
-              'start_date': startDateStr,
-              'end_date': endDateStr,
-            })
+            .update({'status': 'Active'})
             .eq('internship_id', _posting['id'])
             .eq('status', 'Accepted');
       } else if (newStatus == 'INTERVIEWING') {
         await supabase
             .from('applications')
-            .update({
-              'status': 'Applied',
-              'start_date': null,
-              'end_date': null,
-            })
+            .update({'status': 'Applied'})
             .eq('internship_id', _posting['id']);
       } else if (newStatus == 'CLOSED') {
+        // Record the actual end date on the internship
+        await supabase
+            .from('internships')
+            .update({'end_date': DateTime.now().toIso8601String().split('T')[0]})
+            .eq('id', _posting['id']);
+
         await supabase
             .from('applications')
-            .update({
-              'status': 'Completed',
-              'end_date': DateTime.now().toIso8601String().split('T')[0],
-            })
+            .update({'status': 'Completed'})
             .eq('internship_id', _posting['id'])
             .eq('status', 'Active');
       }

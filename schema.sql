@@ -131,8 +131,6 @@ CREATE TABLE IF NOT EXISTS applications (
   internship_id UUID NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
   status application_status DEFAULT 'Applied',
   progress NUMERIC(3, 2) DEFAULT 0.0,
-  start_date DATE,
-  end_date DATE,
   mentor_name VARCHAR(255),
   mentor_email VARCHAR(255),
   offer_letter_id VARCHAR(255),
@@ -725,14 +723,20 @@ ALTER TABLE public.internships
 ADD COLUMN IF NOT EXISTS location_lng DOUBLE PRECISION;
 
 -- ── Trigger to calculate progress based on check-ins ────────────────────────
+-- Reads internship start_date / end_date from the parent internships table
+-- to compute how many total days the internship spans, then computes progress
+-- as checkin_count / total_days (clamped to [0.00, 1.00]).
 CREATE OR REPLACE FUNCTION public.update_application_progress_from_checkins()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_total_days INTEGER;
+  v_total_days   INTEGER;
   v_checkin_count INTEGER;
+  v_start_date   DATE;
+  v_end_date     DATE;
 BEGIN
-  -- 0. Only calculate progress once status is 'Completed'
-  IF NEW.status != 'Completed' THEN
+  -- 0. Only recalculate progress when status changes to 'Active' or 'Completed'
+  --    (or when checkins are updated on an Active/Completed application)
+  IF NEW.status NOT IN ('Active', 'Completed') THEN
     RETURN NEW;
   END IF;
 
@@ -743,11 +747,17 @@ BEGIN
     v_checkin_count := jsonb_array_length(NEW.checkins);
   END IF;
 
-  -- 2. Calculate the total number of days of the internship
-  IF NEW.start_date IS NOT NULL AND NEW.end_date IS NOT NULL AND NEW.end_date >= NEW.start_date THEN
-    v_total_days := NEW.end_date - NEW.start_date + 1;
+  -- 2. Fetch start_date and end_date from the parent internship posting
+  SELECT start_date, end_date
+    INTO v_start_date, v_end_date
+    FROM public.internships
+   WHERE id = NEW.internship_id;
+
+  -- 3. Calculate total internship days from internship dates
+  IF v_start_date IS NOT NULL AND v_end_date IS NOT NULL AND v_end_date >= v_start_date THEN
+    v_total_days := v_end_date - v_start_date + 1;
   ELSE
-    v_total_days := 90; -- Default fallback to 90 days (approx. 3 months)
+    v_total_days := 90; -- Default fallback ~3 months
   END IF;
 
   -- Prevent division by zero
@@ -755,7 +765,7 @@ BEGIN
     v_total_days := 90;
   END IF;
 
-  -- 3. Update the progress field (clamped between 0.00 and 1.00)
+  -- 4. Update the progress field (clamped between 0.00 and 1.00)
   NEW.progress := LEAST(1.00, GREATEST(0.00, ROUND((v_checkin_count::numeric / v_total_days::numeric), 2)));
 
   RETURN NEW;
@@ -764,6 +774,13 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_update_application_progress ON public.applications;
 CREATE TRIGGER trg_update_application_progress
-BEFORE INSERT OR UPDATE OF status, checkins, start_date, end_date ON public.applications
+BEFORE INSERT OR UPDATE OF status, checkins ON public.applications
 FOR EACH ROW
 EXECUTE PROCEDURE public.update_application_progress_from_checkins();
+
+-- ── Migration: drop redundant date columns from applications ─────────────────
+-- start_date and end_date are now authoritative only on the internships table.
+-- Progress is computed by joining applications → internships to get those dates.
+ALTER TABLE public.applications
+  DROP COLUMN IF EXISTS start_date,
+  DROP COLUMN IF EXISTS end_date;

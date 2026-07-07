@@ -169,10 +169,10 @@ class StudentPortalRepository {
     final response = await _client
         .from('applications')
         .select(
-          'id, status, progress, start_date, end_date, mentor_name, '
+          'id, status, progress, mentor_name, '
           'alerts, checkins, '
           'mentor_email, offer_letter_id, internships('
-          'id, company_id, role, industry, location, stipend, duration, deadline, '
+          'id, company_id, role, industry, location, stipend, duration, deadline, start_date, end_date, '
           'brand_color, logo_initial, about, status, active_days, notes, feedback_form_schema, companies(id, name))',
         )
         .eq('student_id', studentId)
@@ -673,9 +673,10 @@ class StudentPortalRepository {
   StudentInternship _mapStudentInternship(Map<String, dynamic> item, Set<String> feedbackSubmittedCompanyIds) {
     final internship = (item['internships'] as Map<String, dynamic>?) ?? {};
     final status = item['status']?.toString() ?? 'Applied';
-    final startDate = item['start_date']?.toString();
+    // Dates are now sourced from internships, not applications
+    final startDate = internship['start_date']?.toString();
     final endDate = _resolvedEndDateRaw(
-      endDateRaw: item['end_date']?.toString(),
+      endDateRaw: internship['end_date']?.toString(),
       startDateRaw: startDate,
       durationRaw: internship['duration'],
     );

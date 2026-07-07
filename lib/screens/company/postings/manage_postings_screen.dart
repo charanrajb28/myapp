@@ -117,26 +117,16 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
             .from('applications')
             .update({
               'status': 'Active',
-              'start_date': todayLabel,
-              'end_date': null,
             })
             .eq('internship_id', id)
             .inFilter('status', ['Accepted', 'Active', 'Completed']);
       } else if (newStatus == 'CLOSED') {
-        await Supabase.instance.client
-            .from('applications')
-            .update({
-              'end_date': todayLabel,
-            })
-            .eq('internship_id', id)
-            .eq('status', 'Active');
+        // No application update needed - end_date is tracked on the internship
       } else if (newStatus == 'INTERVIEWING') {
         await Supabase.instance.client
             .from('applications')
             .update({
               'status': 'Accepted',
-              'start_date': null,
-              'end_date': null,
             })
             .eq('internship_id', id)
             .eq('status', 'Active');

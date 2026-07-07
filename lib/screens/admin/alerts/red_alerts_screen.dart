@@ -141,8 +141,6 @@ class RedAlertsScreen extends StatelessWidget {
           'id': 'alert-1',
           'status': 'Removed',
           'progress': 0.1,
-          'start_date': '2026-05-01',
-          'end_date': '2026-05-10',
           'created_at': '2026-05-01T08:00:00Z',
           'students': {
             'id': 'stu-1',
@@ -152,6 +150,8 @@ class RedAlertsScreen extends StatelessWidget {
           },
           'internships': {
             'role': 'Backend Intern',
+            'start_date': '2026-05-01',
+            'end_date': '2026-05-10',
             'companies': {
               'name': 'Stripe',
             }
@@ -161,8 +161,6 @@ class RedAlertsScreen extends StatelessWidget {
           'id': 'alert-2',
           'status': 'Removed',
           'progress': 0.15,
-          'start_date': '2026-05-02',
-          'end_date': '2026-05-12',
           'created_at': '2026-05-02T09:00:00Z',
           'students': {
             'id': 'stu-2',
@@ -172,6 +170,8 @@ class RedAlertsScreen extends StatelessWidget {
           },
           'internships': {
             'role': 'Data Analyst Intern',
+            'start_date': '2026-05-02',
+            'end_date': '2026-05-12',
             'companies': {
               'name': 'Meta',
             }
@@ -181,8 +181,6 @@ class RedAlertsScreen extends StatelessWidget {
           'id': 'alert-3',
           'status': 'Completed',
           'progress': 0.25,
-          'start_date': '2026-04-15',
-          'end_date': '2026-05-15',
           'created_at': '2026-04-15T10:00:00Z',
           'students': {
             'id': 'stu-3',
@@ -192,6 +190,8 @@ class RedAlertsScreen extends StatelessWidget {
           },
           'internships': {
             'role': 'Security Analyst Intern',
+            'start_date': '2026-04-15',
+            'end_date': '2026-05-15',
             'companies': {
               'name': 'Google',
             }
@@ -203,9 +203,9 @@ class RedAlertsScreen extends StatelessWidget {
     final response = await client
         .from('applications')
         .select(
-          'id, status, progress, start_date, end_date, created_at, '
+          'id, status, progress, created_at, '
           'students(id, name, department, semester), '
-          'internships(role, companies(name))',
+          'internships(role, start_date, end_date, companies(name))',
         )
         .inFilter('status', _alertStatuses)
         .order('progress', ascending: true)
@@ -335,8 +335,8 @@ class _AlertDetailScreen extends StatelessWidget {
             status: status,
             progressPercent: progressPercent,
             dateLabel: _dateLabel(
-              item['end_date']?.toString() ??
-                  item['start_date']?.toString() ??
+              internship['end_date']?.toString() ??
+                  internship['start_date']?.toString() ??
                   item['created_at']?.toString(),
             ),
           ),

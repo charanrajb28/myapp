@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_student_screen.dart';
+import '../../company/postings/posting_details_screen.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final String studentId;
@@ -699,8 +700,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   spacing: 32,
                   runSpacing: 16,
                   children: [
-                    _buildInfoColumn('Start Date', app['start_date'] ?? 'TBD'),
-                    _buildInfoColumn('End Date', app['end_date'] ?? 'TBD'),
+                    _buildInfoColumn('Start Date', intern['start_date'] ?? 'TBD'),
+                    _buildInfoColumn('End Date', intern['end_date'] ?? 'TBD'),
                     _buildInfoColumn('Mentor', app['mentor_name'] ?? 'Unassigned'),
                     _buildInfoColumn('Mentor Email', app['mentor_email'] ?? 'Unassigned'),
                   ],
@@ -1035,16 +1036,36 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       children: _pastInternships.map((app) {
         final intern = app['internships'] ?? {};
         final comp = intern['companies'] ?? {};
-        final startDate = app['start_date'] ?? intern['start_date'] ?? 'TBD';
-        final endDate = app['end_date'] ?? intern['end_date'] ?? 'TBD';
+        final startDate = intern['start_date'] ?? 'TBD';
+        final endDate = intern['end_date'] ?? 'TBD';
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: _buildPastInternshipCard(
-            isMobile: isMobile,
-            company: comp['name'] ?? 'Unknown',
-            role: intern['role'] ?? 'Role',
-            duration: '$startDate - $endDate',
-            feedback: 'Completed Internship.',
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StudentInfoScreen(
+                      applicationId: app['id']?.toString() ?? '',
+                      studentName: widget.studentName,
+                      progress: double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
+                      checkins: app['checkins'] as List? ?? [],
+                      showSendAlert: false,
+                    ),
+                  ),
+                );
+              },
+              child: _buildPastInternshipCard(
+                isMobile: isMobile,
+                company: comp['name'] ?? 'Unknown',
+                role: intern['role'] ?? 'Role',
+                duration: '$startDate - $endDate',
+                feedback: 'Completed Internship.',
+              ),
+            ),
           ),
         );
       }).toList(),
@@ -1102,28 +1123,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               const SizedBox(width: 8),
               Text(duration, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w600)),
             ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.format_quote_rounded, size: 16, color: Color(0xFF94A3B8)),
-                    SizedBox(width: 6),
-                    Text('Final Review', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(feedback, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), height: 1.5)),
-              ],
-            ),
           ),
         ],
       ),
@@ -1224,7 +1223,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               spacing: 32,
               runSpacing: 16,
               children: [
-                _buildInfoColumn('Start Date', currentApp?['start_date'] ?? 'TBD'),
+                _buildInfoColumn('Start Date', intern['start_date'] ?? 'TBD'),
                 _buildInfoColumn('Mentor', currentApp?['mentor_name'] ?? 'Unassigned'),
                 _buildInfoColumn('Status', hasCurrent ? 'ACTIVE' : 'IDLE'),
               ],
