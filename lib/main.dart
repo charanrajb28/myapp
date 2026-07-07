@@ -386,7 +386,7 @@ class _LoginPageState extends State<LoginPage>
         final role = userData['role'];
         if (!mounted) return;
         
-        if (role == 'admin') {
+        if (role == 'admin' || role == 'sub_admin') {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
           );
@@ -738,7 +738,7 @@ class _LoginPageState extends State<LoginPage>
                                     
                                     if (!context.mounted) return;
                                     
-                                    if (role == 'admin') {
+                                    if (role == 'admin' || role == 'sub_admin') {
                                       Navigator.of(context).pushReplacement(
                                         MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
                                       );

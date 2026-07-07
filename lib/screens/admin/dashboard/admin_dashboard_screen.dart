@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
 import '../feedbacks/admin_generated_forms_screen.dart';
+import '../admins/admins_list_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
@@ -20,6 +21,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _redAlerts = 0;
   bool _isLoading = true;
   bool _isSendingBroadcast = false;
+  String _userRole = 'admin';
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _partnerCompanies = 28;
             _activeInternships = 35;
             _redAlerts = 3;
+            _userRole = 'admin';
             _isLoading = false;
           });
         }
@@ -63,12 +66,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .count(CountOption.exact);
       final redAlertsCount = redAlertsRes.count;
 
+      // Fetch current admin user role details
+      String fetchedRole = 'sub_admin';
+      final user = client.auth.currentUser;
+      if (user != null) {
+        final userRes = await client.from('users').select('role').eq('id', user.id).single();
+        fetchedRole = userRes['role']?.toString() ?? 'sub_admin';
+      }
+
       if (mounted) {
         setState(() {
           _totalStudents = studentsCount;
           _partnerCompanies = companiesCount;
           _activeInternships = internshipsCount;
           _redAlerts = redAlertsCount;
+          _userRole = fetchedRole;
           _isLoading = false;
         });
       }
@@ -345,12 +357,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         const Text('Quick Actions',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {},
-                          style: TextButton.styleFrom(foregroundColor: const Color(0xFF3B82F6)),
-                          child: const Text('View All', style: TextStyle(fontWeight: FontWeight.w700)),
-                        )
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -401,6 +407,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             );
                           },
                         ),
+                        if (_userRole == 'admin') ...[
+                          const SizedBox(height: 12),
+                          _ActionTile(
+                            title: 'View Admins',
+                            subtitle: 'Manage administrative users and assistant credentials',
+                            icon: Icons.admin_panel_settings_rounded,
+                            color: const Color(0xFF8B5CF6),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const AdminsListScreen()),
+                              );
+                            },
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 16),

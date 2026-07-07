@@ -18,6 +18,40 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
   bool _autoRemindersEnabled = true;
   bool _reportLockEnabled = false;
 
+  String _userRole = 'admin';
+  String _userName = 'System Admin';
+  String _userEmail = 'admin@college.edu';
+  bool _loadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAdminProfile();
+  }
+
+  Future<void> _fetchAdminProfile() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final res = await supabase
+            .from('users')
+            .select('role, name, email')
+            .eq('id', user.id)
+            .single();
+        setState(() {
+          _userRole = res['role']?.toString() ?? 'admin';
+          _userName = res['name']?.toString() ?? 'System Admin';
+          _userEmail = res['email']?.toString() ?? user.email ?? 'admin@college.edu';
+          _loadingProfile = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching admin profile: $e');
+      setState(() => _loadingProfile = false);
+    }
+  }
+
   void _showExportDialog() {
     showDialog(
       context: context,
@@ -50,6 +84,15 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
             child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSubAdminsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => _SubAdminsManagementDialog(
+        onSuccess: (msg) => _showSuccessSnack(msg),
       ),
     );
   }
@@ -161,15 +204,35 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
           const SizedBox(height: 12),
 
           _ActionTile(
-            icon: Icons.swap_vert_circle_rounded,
-            color: const Color(0xFF6366F1),
+            icon: _userRole == 'sub_admin' ? Icons.lock_outline_rounded : Icons.swap_vert_circle_rounded,
+            color: _userRole == 'sub_admin' ? Colors.grey : const Color(0xFF6366F1),
             title: 'Semester Promotion',
-            subtitle: 'View all semesters & advance students to the next',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SemesterPromotionScreen()),
-            ),
+            subtitle: _userRole == 'sub_admin' ? 'Requires Super Admin privilege' : 'View all semesters & advance students to the next',
+            onTap: _userRole == 'sub_admin'
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Access Denied: Semester Promotion is restricted to Super Admins.'),
+                      backgroundColor: Colors.redAccent,
+                    ));
+                  }
+                : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SemesterPromotionScreen()),
+                    ),
           ),
+
+          if (_userRole == 'admin') ...[
+            const SizedBox(height: 28),
+            const _SectionHeader(label: 'Access Management', icon: Icons.admin_panel_settings_rounded, color: Color(0xFF8B5CF6)),
+            const SizedBox(height: 12),
+            _ActionTile(
+              icon: Icons.person_add_alt_1_rounded,
+              color: const Color(0xFF8B5CF6),
+              title: 'Manage Sub-Admins',
+              subtitle: 'Create and view credentials for assistant admins',
+              onTap: _showSubAdminsDialog,
+            ),
+          ],
 
           const SizedBox(height: 28),
 
@@ -220,11 +283,18 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
           const SizedBox(height: 12),
 
           _ActionTile(
-            icon: Icons.download_rounded,
-            color: const Color(0xFF3B82F6),
+            icon: _userRole == 'sub_admin' ? Icons.lock_outline_rounded : Icons.download_rounded,
+            color: _userRole == 'sub_admin' ? Colors.grey : const Color(0xFF3B82F6),
             title: 'Export Data',
-            subtitle: 'Download records as CSV / Excel',
-            onTap: _showExportDialog,
+            subtitle: _userRole == 'sub_admin' ? 'Requires Super Admin privilege' : 'Download records as CSV / Excel',
+            onTap: _userRole == 'sub_admin'
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Access Denied: Exporting data is restricted to Super Admins.'),
+                      backgroundColor: Colors.redAccent,
+                    ));
+                  }
+                : _showExportDialog,
           ),
           const SizedBox(height: 10),
           _ActionTile(
@@ -305,6 +375,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
   }
 
   Widget _adminCard() {
+    final isSubAdmin = _userRole == 'sub_admin';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -325,19 +396,20 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
           ),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('College Admin',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white)),
-            Text('admin@college.edu',
+            Text(_userName,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white)),
+            Text(_userEmail,
                 style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.6))),
           ])),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: isSubAdmin ? const Color(0xFFF59E0B).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
+              border: isSubAdmin ? Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)) : null,
             ),
-            child: const Text('Super Admin',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text(isSubAdmin ? 'Sub-Admin' : 'Super Admin',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isSubAdmin ? const Color(0xFFFBBF24) : Colors.white)),
           ),
         ]),
         const SizedBox(height: 18),
@@ -509,6 +581,241 @@ class _ExportOption extends StatelessWidget {
         ),
         child: const Text('Export', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
       ),
+    );
+  }
+}
+
+class _SubAdminsManagementDialog extends StatefulWidget {
+  final Function(String) onSuccess;
+  const _SubAdminsManagementDialog({required this.onSuccess});
+
+  @override
+  State<_SubAdminsManagementDialog> createState() => _SubAdminsManagementDialogState();
+}
+
+class _SubAdminsManagementDialogState extends State<_SubAdminsManagementDialog> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+
+  List<Map<String, dynamic>> _subAdmins = [];
+  bool _loading = true;
+  bool _creating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSubAdmins();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchSubAdmins() async {
+    setState(() => _loading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final res = await supabase
+          .from('sub_admins')
+          .select('*, users(name, email)')
+          .order('created_at', ascending: false);
+      setState(() {
+        _subAdmins = List<Map<String, dynamic>>.from(res);
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching sub admins: $e');
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _createSubAdmin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    setState(() => _creating = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) return;
+
+      // 1. Isolated client to prevent logging out the current super admin session
+      final inviteClient = SupabaseClient(
+        'https://nfurwspybtiaycqntzev.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+        authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+      );
+
+      final res = await inviteClient.auth.signUp(
+        email: email,
+        password: password,
+        data: {'role': 'sub_admin', 'name': name},
+      );
+
+      final newUser = res.user;
+      if (newUser == null) {
+        throw Exception('Failed to sign up sub-admin');
+      }
+
+      // 2. Create the user profile row under public.users using Super Admin's main client
+      await supabase.from('users').insert({
+        'id': newUser.id,
+        'role': 'sub_admin',
+        'email': email,
+        'name': name,
+      });
+
+      // 3. Create tracking row under public.sub_admins
+      await supabase.from('sub_admins').insert({
+        'user_id': newUser.id,
+        'created_by': currentUser.id,
+      });
+
+      _emailController.clear();
+      _passwordController.clear();
+      _nameController.clear();
+
+      widget.onSuccess('Sub-Admin registered successfully!');
+      _fetchSubAdmins();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create sub-admin: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Manage Sub-Admins',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A))),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Create sub-admin form
+            const Text(
+              'REGISTER NEW SUB-ADMIN',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                hintText: 'Full Name',
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                hintText: 'Official Email ID',
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'Password',
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _creating ? null : _createSubAdmin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
+              child: _creating
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('CREATE CREDENTIALS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: Color(0xFFE2E8F0)),
+            const SizedBox(height: 16),
+            const Text(
+              'ACTIVE SUB-ADMIN ACCOUNTS',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1),
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+            else if (_subAdmins.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No sub-admin accounts created yet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _subAdmins.length,
+                  separatorBuilder: (_, __) => const Divider(color: Color(0xFFF1F5F9)),
+                  itemBuilder: (context, index) {
+                    final sub = _subAdmins[index];
+                    final user = sub['users'] as Map? ?? {};
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(user['name']?.toString() ?? 'Sub-Admin', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      subtitle: Text(user['email']?.toString() ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                        child: const Icon(Icons.admin_panel_settings, color: Color(0xFF8B5CF6), size: 18),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))),
+        ),
+      ],
     );
   }
 }

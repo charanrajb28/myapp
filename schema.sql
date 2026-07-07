@@ -1,7 +1,7 @@
 -- 1. Create custom enum types if they don't exist
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-        CREATE TYPE user_role AS ENUM ('student', 'company', 'admin');
+        CREATE TYPE user_role AS ENUM ('student', 'company', 'admin', 'sub_admin');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'application_status') THEN
         CREATE TYPE application_status AS ENUM ('Applied', 'Accepted', 'Active', 'Completed', 'Upcoming', 'Rejected', 'Under Review', 'Removed');
@@ -149,6 +149,16 @@ CREATE TABLE IF NOT EXISTS password_reset_otps (
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4.5. Create sub_admins table
+CREATE TABLE IF NOT EXISTS public.sub_admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
 );
 
 CREATE TABLE IF NOT EXISTS student_notifications (
@@ -789,4 +799,16 @@ ALTER TABLE public.applications
 -- ── Migration: add vacancies to internships table ───────────────────────────
 ALTER TABLE public.internships
   ADD COLUMN IF NOT EXISTS vacancies INTEGER DEFAULT 1;
+
+-- ── Migration: add sub_admin enum value and sub_admins table ──────────────────
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'sub_admin';
+
+CREATE TABLE IF NOT EXISTS public.sub_admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
 

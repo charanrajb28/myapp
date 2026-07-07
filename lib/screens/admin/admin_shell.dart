@@ -12,13 +12,6 @@ class AdminShell extends StatefulWidget {
 
   const AdminShell({super.key, required this.child});
 
-  // Index constants for easy reference
-  static const int indexOverview = 0;
-  static const int indexStudents = 1;
-  static const int indexCompanies = 2;
-  static const int indexAlerts = 3;
-  static const int indexMore = 4;
-
   @override
   State<AdminShell> createState() => _AdminShellState();
 }
