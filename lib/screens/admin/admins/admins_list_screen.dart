@@ -38,10 +38,21 @@ class _AdminsListScreenState extends State<AdminsListScreen> {
     setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
+      if (supabase.auth.currentUser == null) {
+        // Dev Mode Mocking: Read from shared static list (only sub_admins)
+        setState(() {
+          _admins = SubAdminsManagementDialog.mockAdmins
+              .where((admin) => admin['role'] == 'sub_admin')
+              .toList();
+          _isLoading = false;
+        });
+        return;
+      }
+
       final res = await supabase
           .from('users')
           .select('*')
-          .inFilter('role', ['admin', 'sub_admin']);
+          .eq('role', 'sub_admin');
       
       if (mounted) {
         setState(() {
@@ -51,7 +62,19 @@ class _AdminsListScreenState extends State<AdminsListScreen> {
       }
     } catch (e) {
       debugPrint('Error fetching admins: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _admins = [
+            {
+              'name': 'System Admin',
+              'email': 'admin@scholarbridge.com',
+              'role': 'admin',
+              'created_at': DateTime.now().toIso8601String(),
+            }
+          ];
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -95,55 +118,18 @@ class _AdminsListScreenState extends State<AdminsListScreen> {
   void _showAddAdminDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        contentPadding: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Container(
-          width: 450,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Add New Sub-Admin',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A)),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Registration creates new sub-admin credentials. Sub-admins have restricted privileges.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 20),
-              // We reuse the registration form inside the sub-admin manager
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  // We can trigger the management panel from here
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Use the Manage Sub-Admins option in the More tab to register admins.')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Open Registration Dialog', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              )
-            ],
-          ),
-        ),
+      builder: (ctx) => SubAdminsManagementDialog(
+        onSuccess: (msg) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              backgroundColor: const Color(0xFF10B981),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          _fetchAdmins();
+        },
       ),
     );
   }

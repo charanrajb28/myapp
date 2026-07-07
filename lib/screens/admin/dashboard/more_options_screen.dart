@@ -91,7 +91,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
   void _showSubAdminsDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => _SubAdminsManagementDialog(
+      builder: (ctx) => SubAdminsManagementDialog(
         onSuccess: (msg) => _showSuccessSnack(msg),
       ),
     );
@@ -585,15 +585,38 @@ class _ExportOption extends StatelessWidget {
   }
 }
 
-class _SubAdminsManagementDialog extends StatefulWidget {
+class SubAdminsManagementDialog extends StatefulWidget {
   final Function(String) onSuccess;
-  const _SubAdminsManagementDialog({required this.onSuccess});
+  
+  // Shared static list for Dev/Guest mode coordinate mocking
+  static final List<Map<String, dynamic>> mockAdmins = [
+    {
+      'name': 'System Admin',
+      'email': 'admin@scholarbridge.com',
+      'role': 'admin',
+      'created_at': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+    },
+    {
+      'name': 'Jane Assistant',
+      'email': 'jane@college.edu',
+      'role': 'sub_admin',
+      'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+    },
+    {
+      'name': 'John Helper',
+      'email': 'john.h@college.edu',
+      'role': 'sub_admin',
+      'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+    }
+  ];
+
+  const SubAdminsManagementDialog({required this.onSuccess, super.key});
 
   @override
-  State<_SubAdminsManagementDialog> createState() => _SubAdminsManagementDialogState();
+  State<SubAdminsManagementDialog> createState() => _SubAdminsManagementDialogState();
 }
 
-class _SubAdminsManagementDialogState extends State<_SubAdminsManagementDialog> {
+class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
@@ -620,12 +643,41 @@ class _SubAdminsManagementDialogState extends State<_SubAdminsManagementDialog> 
     setState(() => _loading = true);
     try {
       final supabase = Supabase.instance.client;
+      if (supabase.auth.currentUser == null) {
+        // Dev Mode Mocking: Read only the sub_admins from mockAdmins
+        setState(() {
+          _subAdmins = SubAdminsManagementDialog.mockAdmins
+              .where((admin) => admin['role'] == 'sub_admin')
+              .map((admin) => {
+                    'id': admin['email'],
+                    'user_id': admin['email'],
+                    'created_at': admin['created_at'] ?? DateTime.now().toIso8601String(),
+                    'users': {
+                      'name': admin['name'],
+                      'email': admin['email'],
+                    }
+                  })
+              .toList();
+          _loading = false;
+        });
+        return;
+      }
+
       final res = await supabase
           .from('sub_admins')
-          .select('*, users(name, email)')
+          .select('*, users!sub_admins_user_id_fkey(name, email)')
           .order('created_at', ascending: false);
+      
+      final mappedRes = List<Map<String, dynamic>>.from(res).map((item) {
+        final Map<String, dynamic> copy = Map.from(item);
+        if (copy.containsKey('users!sub_admins_user_id_fkey')) {
+          copy['users'] = copy['users!sub_admins_user_id_fkey'];
+        }
+        return copy;
+      }).toList();
+
       setState(() {
-        _subAdmins = List<Map<String, dynamic>>.from(res);
+        _subAdmins = mappedRes;
         _loading = false;
       });
     } catch (e) {
@@ -650,7 +702,24 @@ class _SubAdminsManagementDialogState extends State<_SubAdminsManagementDialog> 
     try {
       final supabase = Supabase.instance.client;
       final currentUser = supabase.auth.currentUser;
-      if (currentUser == null) return;
+      
+      if (currentUser == null) {
+        // Dev/Guest Mode Mocking: Insert into shared static list
+        final mockAdmin = {
+          'name': name,
+          'email': email,
+          'role': 'sub_admin',
+          'created_at': DateTime.now().toIso8601String(),
+        };
+        SubAdminsManagementDialog.mockAdmins.insert(0, mockAdmin);
+        
+        _emailController.clear();
+        _passwordController.clear();
+        _nameController.clear();
+        widget.onSuccess('Sub-Admin registered successfully! (Dev Mode)');
+        _fetchSubAdmins();
+        return;
+      }
 
       // 1. Isolated client to prevent logging out the current super admin session
       final inviteClient = SupabaseClient(
@@ -671,15 +740,19 @@ class _SubAdminsManagementDialogState extends State<_SubAdminsManagementDialog> 
       }
 
       // 2. Create the user profile row under public.users using Super Admin's main client
-      await supabase.from('users').insert({
-        'id': newUser.id,
-        'role': 'sub_admin',
-        'email': email,
-        'name': name,
-      });
+      try {
+        await supabase.from('users').upsert({
+          'id': newUser.id,
+          'role': 'sub_admin',
+          'email': email,
+          'name': name,
+        });
+      } catch (e) {
+        debugPrint('Note: public.users upsert bypassed/handled by trigger: $e');
+      }
 
       // 3. Create tracking row under public.sub_admins
-      await supabase.from('sub_admins').insert({
+      await supabase.from('sub_admins').upsert({
         'user_id': newUser.id,
         'created_by': currentUser.id,
       });
