@@ -193,8 +193,14 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
                       Expanded(child: _buildInfoCard(Icons.location_on_rounded, 'Location', o.location, const Color(0xFF3B82F6))),
                       const SizedBox(width: 12),
                       Expanded(child: _buildInfoCard(Icons.payments_rounded, 'Stipend', o.stipend, const Color(0xFF10B981))),
-                      const SizedBox(width: 12),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
                       Expanded(child: _buildInfoCard(Icons.schedule_rounded, 'Duration', o.duration, const Color(0xFFF59E0B))),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildInfoCard(Icons.groups_rounded, 'Vacancies', '${o.vacancies} Openings', const Color(0xFF8B5CF6))),
                     ],
                   ),
                   const SizedBox(height: 32),

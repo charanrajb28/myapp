@@ -22,6 +22,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   final notesController        = TextEditingController(text: 'Candidate must have excellent communication, basic Excel skills, and a laptop.');
   final _taskInputController   = TextEditingController();
   final activeDurationController = TextEditingController(text: '7');
+  final vacanciesController    = TextEditingController(text: '1');
   final _locationSearchController = TextEditingController();
 
   DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 30));
@@ -73,6 +74,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     notesController.dispose();
     _taskInputController.dispose();
     activeDurationController.dispose();
+    vacanciesController.dispose();
     _locationSearchController.dispose();
     _locationSearchFocus.dispose();
     _locationDebounce?.cancel();
@@ -268,6 +270,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'notes'       : notesController.text.trim(),
         'active_days' : sortedDays,
         'application_duration_days': int.tryParse(activeDurationController.text.trim()) ?? 7,
+        'vacancies'   : int.tryParse(vacanciesController.text.trim()) ?? 1,
         'deadline'    : DateTime(
           _selectedDeadline.year,
           _selectedDeadline.month,
@@ -343,6 +346,14 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                   Expanded(
                       child: _industrialField('APP ACTIVE DURATION (DAYS)', activeDurationController,
                           isNumeric: true, hint: 'e.g. 7')),
+                ]),
+                const SizedBox(height: 20),
+                Row(children: [
+                  Expanded(
+                      child: _industrialField('VACANCIES AVAILABLE', vacanciesController,
+                          isNumeric: true, hint: 'e.g. 5')),
+                  const SizedBox(width: 16),
+                  const Spacer(),
                 ]),
                 const SizedBox(height: 32),
 

@@ -589,10 +589,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildComingSoonPlaceholder(int tabIndex) {
-    final tabNames = ['Overview', 'Active Internships', 'Applications', 'Documents', 'Past Internships'];
+    const configs = [
+      // 0 - Overview (unused but kept for safety)
+      (Icons.person_outline_rounded, 'No Overview Data', 'Student profile information will appear here.'),
+      // 1 - Active Internships
+      (Icons.work_off_outlined, 'No Active Internship', 'This student has no active internship at the moment. Internships appear here once a company marks them Active.'),
+      // 2 - Applications
+      (Icons.inbox_outlined, 'No Applications Yet', 'This student hasn\'t applied to any internship postings yet.'),
+      // 3 - Documents
+      (Icons.folder_open_outlined, 'No Documents Uploaded', 'The student hasn\'t uploaded any documents yet. They can add resumes and certificates from their portal.'),
+      // 4 - Past Internships
+      (Icons.history_toggle_off_outlined, 'No Past Internships', 'Completed or removed internships will show up here once the student finishes their first internship.'),
+    ];
+
+    final idx = tabIndex.clamp(0, configs.length - 1);
+    final (icon, title, subtitle) = configs[idx];
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 64),
+      padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 32),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -601,11 +616,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.construction_rounded, size: 48, color: Color(0xFFCBD5E1)),
-          const SizedBox(height: 16),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, size: 36, color: const Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 20),
           Text(
-            '${tabNames[tabIndex]} content coming soon',
-            style: const TextStyle(fontSize: 16, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500, height: 1.5),
           ),
         ],
       ),
@@ -1036,8 +1065,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       children: _pastInternships.map((app) {
         final intern = app['internships'] ?? {};
         final comp = intern['companies'] ?? {};
-        final startDate = intern['start_date'] ?? 'TBD';
-        final endDate = intern['end_date'] ?? 'TBD';
+        final progressVal = double.tryParse(app['progress']?.toString() ?? '0.0') ?? 0.0;
+        final status = app['status']?.toString() ?? 'Completed';
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Material(
@@ -1051,7 +1080,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     builder: (context) => StudentInfoScreen(
                       applicationId: app['id']?.toString() ?? '',
                       studentName: widget.studentName,
-                      progress: double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
+                      progress: progressVal,
                       checkins: app['checkins'] as List? ?? [],
                       showSendAlert: false,
                     ),
@@ -1062,8 +1091,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 isMobile: isMobile,
                 company: comp['name'] ?? 'Unknown',
                 role: intern['role'] ?? 'Role',
-                duration: '$startDate - $endDate',
-                feedback: 'Completed Internship.',
+                progress: progressVal,
+                status: status,
               ),
             ),
           ),
@@ -1076,9 +1105,20 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required bool isMobile,
     required String company,
     required String role,
-    required String duration,
-    required String feedback,
+    required double progress,
+    required String status,
   }) {
+    final progressPercent = (progress * 100).toInt();
+    final isRemoved = status.toLowerCase() == 'removed';
+    final statusColor = isRemoved ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
+    final statusBg = isRemoved ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4);
+    final statusBorder = isRemoved ? const Color(0xFFFECACA) : const Color(0xFFBBF7D0);
+    final progressColor = progress < 0.4
+        ? const Color(0xFFDC2626)
+        : progress < 0.7
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFF16A34A);
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 20 : 28),
       decoration: BoxDecoration(
@@ -1111,18 +1151,45 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   ],
                 ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusBorder),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: statusColor),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 16),
           Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF64748B)),
-              const SizedBox(width: 8),
-              Text(duration, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w600)),
+              const Text(
+                'Attendance Progress',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+              ),
+              Text(
+                '$progressPercent%',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: progressColor),
+              ),
             ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              backgroundColor: const Color(0xFFF1F5F9),
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            ),
           ),
         ],
       ),

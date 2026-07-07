@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS internships (
   start_date DATE,
   end_date DATE,
   application_duration_days INTEGER DEFAULT 7,
+  vacancies INTEGER DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -784,3 +785,8 @@ EXECUTE PROCEDURE public.update_application_progress_from_checkins();
 ALTER TABLE public.applications
   DROP COLUMN IF EXISTS start_date,
   DROP COLUMN IF EXISTS end_date;
+
+-- ── Migration: add vacancies to internships table ───────────────────────────
+ALTER TABLE public.internships
+  ADD COLUMN IF NOT EXISTS vacancies INTEGER DEFAULT 1;
+

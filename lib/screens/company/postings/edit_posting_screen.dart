@@ -23,6 +23,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
 
   final TextEditingController _taskInputController = TextEditingController();
   late TextEditingController activeDurationController;
+  late TextEditingController vacanciesController;
   final TextEditingController _locationSearchController = TextEditingController();
 
   late DateTime _selectedDeadline;
@@ -55,6 +56,8 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     notesController    = TextEditingController(text: widget.posting['notes']?.toString() ?? '');
     activeDurationController = TextEditingController(
         text: widget.posting['application_duration_days']?.toString() ?? '7');
+    vacanciesController = TextEditingController(
+        text: widget.posting['vacancies']?.toString() ?? '1');
 
     // Pre-populate tasks from responsibilities array
     final rawTasks = widget.posting['responsibilities'];
@@ -116,6 +119,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     notesController.dispose();
     _taskInputController.dispose();
     activeDurationController.dispose();
+    vacanciesController.dispose();
     _locationSearchController.dispose();
     _locationSearchFocus.dispose();
     _locationDebounce?.cancel();
@@ -289,6 +293,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         'notes'           : notesController.text.trim(),
         'active_days'     : sortedDays,
         'application_duration_days': int.tryParse(activeDurationController.text.trim()) ?? 7,
+        'vacancies'       : int.tryParse(vacanciesController.text.trim()) ?? 1,
         'deadline'        : DateTime(
           _selectedDeadline.year,
           _selectedDeadline.month,
@@ -377,6 +382,12 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                   Expanded(child: _deadlineField()),
                   const SizedBox(width: 16),
                   Expanded(child: _field('APP ACTIVE DURATION (DAYS)', activeDurationController, isNumeric: true)),
+                ]),
+                const SizedBox(height: 20),
+                Row(children: [
+                  Expanded(child: _field('VACANCIES AVAILABLE', vacanciesController, isNumeric: true)),
+                  const SizedBox(width: 16),
+                  const Spacer(),
                 ]),
                 const SizedBox(height: 32),
 

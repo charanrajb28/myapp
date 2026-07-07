@@ -59,6 +59,13 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
     setState(() => _isLoading = true);
     try {
       final supabase = Supabase.instance.client;
+      // Fetch updated internship info
+      final internshipRes = await supabase
+          .from('internships')
+          .select('*')
+          .eq('id', _posting['id'])
+          .single();
+
       // Fetch applications along with student profiles
       final res = await supabase
           .from('applications')
@@ -68,12 +75,13 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
 
       if (mounted) {
         setState(() {
+          _posting = Map<String, dynamic>.from(internshipRes);
           _applicants = List<Map<String, dynamic>>.from(res);
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching applicants: $e');
+      debugPrint('Error fetching applicants/posting: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -1688,9 +1696,11 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           const SizedBox(height: 32),
           Row(
             children: [
-              _infoTile('STIPEND', '₹${widget.posting['stipend']}/mo'),
-              const SizedBox(width: 16),
-              _infoTile('DURATION', '${widget.posting['duration']} Months'),
+              _infoTile('STIPEND', '₹${_posting['stipend']}/mo'),
+              const SizedBox(width: 12),
+              _infoTile('DURATION', '${_posting['duration']} Months'),
+              const SizedBox(width: 12),
+              _infoTile('VACANCIES', '${_posting['vacancies'] ?? 1} Available'),
             ],
           ),
 
