@@ -919,27 +919,32 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
           color: active ? const Color(0xFF0F172A) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: active ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0)),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? Colors.white : const Color(0xFF64748B),
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: active ? Colors.white : const Color(0xFF64748B),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
             if (count != null) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
                   color: active ? Colors.white.withValues(alpha: 0.2) : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6),
@@ -948,7 +953,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                   count,
                   style: TextStyle(
                     color: active ? Colors.white : const Color(0xFF0F172A),
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
