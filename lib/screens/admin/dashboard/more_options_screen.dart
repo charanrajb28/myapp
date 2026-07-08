@@ -17,7 +17,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
   final String _academicYear = '2024 – 2025';
   bool _notificationsEnabled = true;
   bool _autoRemindersEnabled = true;
-  bool _reportLockEnabled = false;
+
 
   String _userRole = 'admin';
   String _userName = 'System Admin';
@@ -262,18 +262,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
               _showSuccessSnack(v ? 'Auto-reminders activated' : 'Auto-reminders turned off');
             },
           ),
-          const SizedBox(height: 10),
-          _ToggleTile(
-            icon: Icons.lock_clock_rounded,
-            color: const Color(0xFFEF4444),
-            title: 'Report Submission Lock',
-            subtitle: 'Block late report entries after due date',
-            value: _reportLockEnabled,
-            onChanged: (v) {
-              setState(() => _reportLockEnabled = v);
-              _showSuccessSnack(v ? 'Late submissions blocked' : 'Late submissions allowed');
-            },
-          ),
+
 
           const SizedBox(height: 28),
 
@@ -295,14 +284,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
                   }
                 : _showExportDialog,
           ),
-          const SizedBox(height: 10),
-          _ActionTile(
-            icon: Icons.backup_rounded,
-            color: const Color(0xFF0EA5E9),
-            title: 'Backup System Data',
-            subtitle: 'Create a full backup of current records',
-            onTap: () => _showSuccessSnack("Backup initiated — you'll be notified when done"),
-          ),
+
           const SizedBox(height: 10),
           _ActionTile(
             icon: Icons.cleaning_services_rounded,
