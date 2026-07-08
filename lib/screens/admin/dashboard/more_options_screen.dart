@@ -755,6 +755,58 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
     }
   }
 
+  Future<void> _revokeSubAdmin(String userId, String email) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Revoke Sub-Admin Access'),
+        content: Text('Are you sure you want to revoke sub-admin access for $email? This will permanently disable their admin panel access.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Revoke'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _loading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      if (supabase.auth.currentUser == null) {
+        // Dev Mode Mocking: remove from shared static list
+        SubAdminsManagementDialog.mockAdmins.removeWhere((admin) => admin['email'] == email);
+        widget.onSuccess('Sub-Admin access revoked successfully! (Dev Mode)');
+        _fetchSubAdmins();
+        return;
+      }
+
+      // Delete from sub_admins table
+      await supabase.from('sub_admins').delete().eq('user_id', userId);
+      // Delete from users table
+      await supabase.from('users').delete().eq('id', userId);
+
+      widget.onSuccess('Sub-Admin access revoked successfully!');
+      _fetchSubAdmins();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to revoke sub-admin: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+      setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -824,43 +876,6 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
                   : const Text('CREATE CREDENTIALS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
             ),
             const SizedBox(height: 20),
-            const Divider(color: Color(0xFFE2E8F0)),
-            const SizedBox(height: 16),
-            const Text(
-              'ACTIVE SUB-ADMIN ACCOUNTS',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF94A3B8), letterSpacing: 1),
-            ),
-            const SizedBox(height: 12),
-            if (_loading)
-              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-            else if (_subAdmins.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text('No sub-admin accounts created yet.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _subAdmins.length,
-                  separatorBuilder: (_, __) => const Divider(color: Color(0xFFF1F5F9)),
-                  itemBuilder: (context, index) {
-                    final sub = _subAdmins[index];
-                    final user = sub['users'] as Map? ?? {};
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(user['name']?.toString() ?? 'Sub-Admin', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                      subtitle: Text(user['email']?.toString() ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                      leading: CircleAvatar(
-                        backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                        child: const Icon(Icons.admin_panel_settings, color: Color(0xFF8B5CF6), size: 18),
-                      ),
-                    );
-                  },
-                ),
-              ),
           ],
         ),
       ),
