@@ -87,6 +87,31 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Future<void> _toggleBlacklist() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_isBlacklisted ? 'Confirm Whitelist' : 'Confirm Blacklist'),
+        content: Text(_isBlacklisted
+            ? 'Are you sure you want to whitelist/unblock ${widget.studentName}?'
+            : 'Are you sure you want to blacklist/block ${widget.studentName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isBlacklisted ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     setState(() => _isBlacklisting = true);
     try {
       await Supabase.instance.client

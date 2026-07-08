@@ -535,6 +535,31 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
   }
 
   Future<void> _toggleBlacklist(String id, bool currentStatus) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(currentStatus ? 'Confirm Whitelist' : 'Confirm Blacklist'),
+        content: Text(currentStatus
+            ? 'Are you sure you want to whitelist/unblock this student?'
+            : 'Are you sure you want to blacklist/block this student?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: currentStatus ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     try {
       await ref.read(studentsProvider.notifier).toggleBlacklist(id, currentStatus);
       

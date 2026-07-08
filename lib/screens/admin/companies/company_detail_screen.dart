@@ -127,6 +127,31 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
 
   Future<void> _toggleBlacklist() async {
     final c = _dynamicCompany ?? widget.company;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(c.isBlacklisted ? 'Confirm Whitelist' : 'Confirm Block'),
+        content: Text(c.isBlacklisted
+            ? 'Are you sure you want to whitelist/unblock ${c.name}?'
+            : 'Are you sure you want to block/blacklist ${c.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: c.isBlacklisted ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
     try {
       await Supabase.instance.client
           .from('companies')

@@ -64,6 +64,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .from('applications')
           .select('id')
           .inFilter('status', ['Removed', 'Completed'])
+          .lt('progress', 1.0)
           .count(CountOption.exact);
       final redAlertsCount = redAlertsRes.count;
 

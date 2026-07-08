@@ -208,6 +208,7 @@ class RedAlertsScreen extends StatelessWidget {
           'internships(role, start_date, end_date, companies(name))',
         )
         .inFilter('status', _alertStatuses)
+        .lt('progress', 1.0)
         .order('progress', ascending: true)
         .order('created_at', ascending: true);
 

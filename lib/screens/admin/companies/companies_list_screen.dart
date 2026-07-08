@@ -169,6 +169,32 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
   }
 
   Future<void> _toggleBlacklist(String id, bool currentState) async {
+    final companyName = _companies.firstWhere((c) => c.id == id, orElse: () => const _Company(id: '', name: 'Company', industry: '', location: '', activeInterns: 0, totalPlacements: 0, openRoles: 0, rating: 0, status: '', logoColor: Colors.grey, logoInitial: '', about: '', isBlacklisted: false)).name;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(currentState ? 'Confirm Whitelist' : 'Confirm Block'),
+        content: Text(currentState
+            ? 'Are you sure you want to whitelist/unblock $companyName?'
+            : 'Are you sure you want to block/blacklist $companyName?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: currentState ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     try {
       final client = Supabase.instance.client;
       if (client.auth.currentUser == null) {
