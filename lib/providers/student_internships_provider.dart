@@ -36,10 +36,12 @@ class StudentInternshipsState {
 
 class StudentInternshipsNotifier extends Notifier<StudentInternshipsState> {
   late final StudentPortalRepository _repository;
+  bool _isDisposed = false;
 
   @override
   StudentInternshipsState build() {
     _repository = ref.watch(studentPortalRepositoryProvider);
+    _isDisposed = false;
     // Fetch available internships and student internships asynchronously on initialization
     Future.microtask(() => loadInternships());
 
@@ -48,6 +50,7 @@ class StudentInternshipsNotifier extends Notifier<StudentInternshipsState> {
       loadInternships();
     });
     ref.onDispose(() {
+      _isDisposed = true;
       timer.cancel();
     });
 
@@ -59,16 +62,20 @@ class StudentInternshipsNotifier extends Notifier<StudentInternshipsState> {
   }
 
   Future<void> loadInternships() async {
+    if (_isDisposed) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final available = await _repository.fetchAvailableInternships();
+      if (_isDisposed) return;
       final student = await _repository.fetchStudentInternships();
+      if (_isDisposed) return;
       state = state.copyWith(
         availableInternships: available,
         studentInternships: student,
         isLoading: false,
       );
     } catch (e) {
+      if (_isDisposed) return;
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
