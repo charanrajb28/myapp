@@ -2514,8 +2514,8 @@ class _OpportunityListItem extends StatelessWidget {
                               accent,
                             ),
                             _infoPill(
-                              Icons.payments_rounded,
-                              opportunity.stipend,
+                              Icons.people_alt_rounded,
+                              '${opportunity.vacancies} ',
                               accent,
                             ),
                             if (opportunity.createdAt != null)
