@@ -40,7 +40,7 @@ class CompanyDetailScreen extends StatefulWidget {
 
 class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   int _tabIndex = 0;
-  static const _tabs = ['Overview', 'Open Roles', 'Ongoing Roles', 'Past Roles', 'Documents'];
+  static const _tabs = ['Overview', 'Open Roles', 'Ongoing Roles', 'Past Roles'];
   late final PageController _pageController;
   
   bool _isLoading = true;
@@ -453,10 +453,6 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             statusName: 'Past',
             emptyIcon: Icons.inventory_2_outlined,
           ),
-        ),
-        SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
-          child: _DocsTab(docs: _docs),
         ),
       ],
     );

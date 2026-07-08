@@ -99,7 +99,7 @@ class _MyAppState extends State<MyApp> {
         ),
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+      home: const AuthGate(),
       routes: {
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/login': (context) => const LoginPage(),
@@ -107,6 +107,85 @@ class _MyAppState extends State<MyApp> {
         '/signup': (context) => const StudentSignUpScreen(),
       },
     );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      if (mounted) {
+        setState(() => _checking = false);
+      }
+      return;
+    }
+
+    try {
+      final userData = await Supabase.instance.client
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+      final role = userData['role'];
+      if (!mounted) return;
+
+      Widget destination;
+      if (role == 'admin' || role == 'sub_admin') {
+        destination = const AdminShell(child: AdminDashboardScreen());
+      } else if (role == 'student') {
+        destination = const StudentShell();
+      } else if (role == 'company') {
+        destination = const CompanyShell();
+      } else {
+        destination = const LoginPage();
+      }
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => destination),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _checking = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.school, size: 64, color: Color(0xFF0F172A)),
+              SizedBox(height: 24),
+              CircularProgressIndicator(
+                color: Color(0xFF0F172A),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return const LoginPage();
   }
 }
 

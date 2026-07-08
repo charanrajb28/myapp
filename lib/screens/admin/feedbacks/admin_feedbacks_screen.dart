@@ -6,7 +6,8 @@ class FeedbackModel {
   final String id;
   final String studentName;
   final String companyName;
-  final String type; // 'Compliment', 'Complaint', 'Suggestion'
+  final String companyId;
+  final String type; // 'Compliment', 'Complaint', 'Suggestion', 'Final Feedback'
   final String comment;
   final DateTime date;
 
@@ -14,6 +15,7 @@ class FeedbackModel {
     required this.id,
     required this.studentName,
     required this.companyName,
+    required this.companyId,
     required this.type,
     required this.comment,
     required this.date,
@@ -28,146 +30,70 @@ class AdminFeedbacksScreen extends StatefulWidget {
 }
 
 class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
-  DateTime _selectedDate = DateTime.now();
-  
-  List<FeedbackModel> _allFeedbacks = [];
-  Map<DateTime, List<FeedbackModel>> _groupedFeedbacks = {};
-  List<DateTime> _sortedDates = [];
-  Map<DateTime, GlobalKey> _dateKeys = {};
   bool _isLoading = true;
+  List<Map<String, dynamic>> _internships = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchFeedbacks();
+    _fetchInternships();
   }
 
-  Future<void> _fetchFeedbacks() async {
+  Future<void> _fetchInternships() async {
+    setState(() => _isLoading = true);
     try {
       final client = Supabase.instance.client;
       if (client.auth.currentUser == null) {
-        final now = DateTime.now();
-        _allFeedbacks = [
-          FeedbackModel(
-            id: 'fb-1',
-            studentName: 'Alex Guest',
-            companyName: 'TechCorp Solutions',
-            type: 'Compliment',
-            comment: 'The mentorship program has been exceptionally well-structured and I have learned a lot about full-stack engineering.',
-            date: now.subtract(const Duration(hours: 2)),
-          ),
-          FeedbackModel(
-            id: 'fb-2',
-            studentName: 'Sarah Chen',
-            companyName: 'Google',
-            type: 'Compliment',
-            comment: 'Thoroughly enjoying my internship. The tooling and team support are second to none!',
-            date: now.subtract(const Duration(days: 1, hours: 3)),
-          ),
-          FeedbackModel(
-            id: 'fb-3',
-            studentName: 'Michael Vance',
-            companyName: 'Meta',
-            type: 'Suggestion',
-            comment: 'Would love to see more internal learning modules made available early in the internship.',
-            date: now.subtract(const Duration(days: 2, hours: 5)),
-          ),
+        // Mock data
+        _internships = [
+          {
+            'id': 'intern-1',
+            'role': 'Full Stack Developer',
+            'company_id': 'comp-1',
+            'brand_color': '#3B82F6',
+            'logo_initial': 'T',
+            'companies': {'name': 'TechCorp Solutions'},
+          },
+          {
+            'id': 'intern-2',
+            'role': 'Software Engineer Intern',
+            'company_id': 'comp-2',
+            'brand_color': '#8B5CF6',
+            'logo_initial': 'G',
+            'companies': {'name': 'Google'},
+          },
+          {
+            'id': 'intern-3',
+            'role': 'Product Design Intern',
+            'company_id': 'comp-3',
+            'brand_color': '#EC4899',
+            'logo_initial': 'M',
+            'companies': {'name': 'Meta'},
+          },
         ];
       } else {
         final res = await client
-            .from('feedbacks')
-            .select('*, students(name), companies(name)')
+            .from('internships')
+            .select('id, role, company_id, brand_color, logo_initial, companies(name)')
             .order('created_at', ascending: false);
-            
-        final mapped = (res as List).map((f) {
-          return FeedbackModel(
-            id: f['id'].toString(),
-            studentName: f['students']?['name'] ?? 'Unknown Student',
-            companyName: f['companies']?['name'] ?? 'Unknown Company',
-            type: f['type'] ?? 'Suggestion',
-            comment: f['comment'] ?? '',
-            date: DateTime.tryParse(f['created_at'].toString()) ?? DateTime.now(),
-          );
-        }).toList();
-
-        _allFeedbacks = mapped;
+        _internships = List<Map<String, dynamic>>.from(res ?? []);
       }
     } catch (e) {
-      debugPrint('No feedbacks table or error fetching: $e');
-      // If table doesnt exist or errors out, keep list empty as requested
-      _allFeedbacks = [];
-    }
-
-    if (mounted) {
-      setState(() {
-        _groupedFeedbacks = {};
-        for (var f in _allFeedbacks) {
-          final dateOnly = DateTime(f.date.year, f.date.month, f.date.day);
-          _groupedFeedbacks.putIfAbsent(dateOnly, () => []).add(f);
-        }
-        
-        _sortedDates = _groupedFeedbacks.keys.toList()..sort((a, b) => b.compareTo(a));
-        _dateKeys = {for (var d in _sortedDates) d: GlobalKey()};
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _scrollToDate(DateTime date) {
-    setState(() => _selectedDate = date);
-    
-    if (_sortedDates.isEmpty) return;
-
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    
-    // Find the nearest date in our list of feedbacks
-    DateTime nearestDate = _sortedDates.first;
-    int minDifference = (dateOnly.difference(nearestDate).inDays).abs();
-
-    for (var d in _sortedDates) {
-      final diff = (dateOnly.difference(d).inDays).abs();
-      if (diff < minDifference) {
-        minDifference = diff;
-        nearestDate = d;
-      }
-    }
-
-    if (_dateKeys.containsKey(nearestDate)) {
-      final key = _dateKeys[nearestDate];
-      if (key?.currentContext != null) {
-        Scrollable.ensureVisible(
-          key!.currentContext!,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOutQuart,
-          alignment: 0.05, // 5% down from the top to allow header spacing
-        );
+      debugPrint('Error fetching internships for feedbacks: $e');
+      _internships = [];
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _pickDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF0F172A),
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Color(0xFF0F172A),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (picked != null) {
-      _scrollToDate(picked);
+  Color _parseColor(String? hex) {
+    if (hex == null || hex.isEmpty) return const Color(0xFF6366F1);
+    try {
+      return Color(int.parse(hex.replaceAll('#', '0xFF')));
+    } catch (_) {
+      return const Color(0xFF6366F1);
     }
   }
 
@@ -188,127 +114,116 @@ class _AdminFeedbacksScreenState extends State<AdminFeedbacksScreen> {
           child: Container(color: const Color(0xFFE2E8F0), height: 1),
         ),
       ),
-      body: Column(
-        children: [
-          // ── Calendar Strip ──
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  offset: const Offset(0, 4),
-                  blurRadius: 10,
-                )
-              ]
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: _pickDate,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(DateFormat('MMMM yyyy').format(_selectedDate), 
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.calendar_month_rounded, color: Color(0xFF64748B), size: 18),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFBFDBFE))
-                        ),
-                        child: Text(
-                          _selectedDate.day == DateTime.now().day && _selectedDate.month == DateTime.now().month 
-                            ? 'Today' 
-                            : DateFormat('E, MMM d').format(_selectedDate),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // ── Feedbacks List Grouped by Date ──
-          Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : _sortedDates.isEmpty
-                  ? const _EmptyState()
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                      child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _sortedDates.map((dateKey) {
-                        final feedbacksForDate = _groupedFeedbacks[dateKey]!;
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _internships.isEmpty
+              ? const _EmptyInternshipsState()
+              : RefreshIndicator(
+                  onRefresh: _fetchInternships,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    itemCount: _internships.length,
+                    itemBuilder: (context, index) {
+                      final intern = _internships[index];
+                      final role = intern['role'] ?? 'Internship Role';
+                      final companyName = intern['companies']?['name'] ?? 'Partner Company';
+                      final brandColor = _parseColor(intern['brand_color']);
+                      final logoInitial = intern['logo_initial'] ?? companyName[0].toUpperCase();
 
-                        return Column(
-                          key: _dateKeys[dateKey],
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12, top: 16),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AdminInternshipFeedbackDetailScreen(
+                                    companyId: intern['company_id']?.toString() ?? '',
+                                    companyName: companyName,
+                                    roleTitle: role,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Padding(
+                              padding: const EdgeInsets.all(18),
                               child: Row(
                                 children: [
                                   Container(
-                                    width: 4, height: 16,
+                                    width: 48,
+                                    height: 48,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF3B82F6),
-                                      borderRadius: BorderRadius.circular(4),
+                                      color: brandColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        logoInitial,
+                                        style: TextStyle(
+                                          color: brandColor,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 18,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    DateFormat('EEEE, MMMM d').format(dateKey),
-                                    style: const TextStyle(
-                                      fontSize: 14, 
-                                      fontWeight: FontWeight.w800, 
-                                      color: Color(0xFF94A3B8), 
-                                      letterSpacing: 0.5
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          role,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0F172A),
+                                            fontSize: 15,
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          companyName,
+                                          style: const TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
+                                  const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFCBD5E1), size: 16),
                                 ],
                               ),
                             ),
-                            ...feedbacksForDate.map((feedback) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _FeedbackTile(feedback: feedback),
-                                )),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-          ),
-        ],
-      ),
+                ),
     );
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _EmptyInternshipsState extends StatelessWidget {
+  const _EmptyInternshipsState();
 
   @override
   Widget build(BuildContext context) {
@@ -322,124 +237,279 @@ class _EmptyState extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 20, offset: const Offset(0, 10))
-              ]
             ),
-            child: const Icon(Icons.mark_email_read_rounded, size: 48, color: Color(0xFF94A3B8)),
+            child: const Icon(Icons.work_off_rounded, size: 48, color: Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 24),
-          const Text('No Feedbacks Received Yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+          const Text('No Internships Listed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
           const SizedBox(height: 8),
-          const Text("Students haven't posted any feedback.", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+          const Text("No internships are currently registered in the database.", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 }
 
-class _FeedbackTile extends StatelessWidget {
-  final FeedbackModel feedback;
+class AdminInternshipFeedbackDetailScreen extends StatefulWidget {
+  final String companyId;
+  final String companyName;
+  final String roleTitle;
 
-  const _FeedbackTile({required this.feedback});
+  const AdminInternshipFeedbackDetailScreen({
+    super.key,
+    required this.companyId,
+    required this.companyName,
+    required this.roleTitle,
+  });
+
+  @override
+  State<AdminInternshipFeedbackDetailScreen> createState() => _AdminInternshipFeedbackDetailScreenState();
+}
+
+class _AdminInternshipFeedbackDetailScreenState extends State<AdminInternshipFeedbackDetailScreen> {
+  bool _isLoading = true;
+  List<FeedbackModel> _feedbacks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFeedbacks();
+  }
+
+  Future<void> _fetchFeedbacks() async {
+    setState(() => _isLoading = true);
+    try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser == null) {
+        final now = DateTime.now();
+        final allMock = [
+          FeedbackModel(
+            id: 'fb-1',
+            studentName: 'Alex Guest',
+            companyName: 'TechCorp Solutions',
+            companyId: 'comp-1',
+            type: 'Compliment',
+            comment: 'The mentorship program has been exceptionally well-structured and I have learned a lot about full-stack engineering.',
+            date: now.subtract(const Duration(hours: 2)),
+          ),
+          FeedbackModel(
+            id: 'fb-2',
+            studentName: 'Sarah Chen',
+            companyName: 'Google',
+            companyId: 'comp-2',
+            type: 'Compliment',
+            comment: 'Thoroughly enjoying my internship. The tooling and team support are second to none!',
+            date: now.subtract(const Duration(days: 1, hours: 3)),
+          ),
+          FeedbackModel(
+            id: 'fb-3',
+            studentName: 'Michael Vance',
+            companyName: 'Meta',
+            companyId: 'comp-3',
+            type: 'Suggestion',
+            comment: 'Would love to see more internal learning modules made available early in the internship.',
+            date: now.subtract(const Duration(days: 2, hours: 5)),
+          ),
+        ];
+        _feedbacks = allMock.where((f) => f.companyId == widget.companyId).toList();
+      } else {
+        final res = await client
+            .from('feedbacks')
+            .select('*, students(name), companies(name)')
+            .eq('company_id', widget.companyId)
+            .order('created_at', ascending: false);
+
+        _feedbacks = (res as List).map((f) {
+          return FeedbackModel(
+            id: f['id'].toString(),
+            studentName: f['students']?['name'] ?? 'Unknown Student',
+            companyName: f['companies']?['name'] ?? 'Unknown Company',
+            companyId: f['company_id']?.toString() ?? '',
+            type: f['type'] ?? 'Suggestion',
+            comment: f['comment'] ?? '',
+            date: DateTime.tryParse(f['created_at'].toString()) ?? DateTime.now(),
+          );
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching feedbacks for detail view: $e');
+      _feedbacks = [];
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bool isCompliment = feedback.type == 'Compliment';
-    final bool isComplaint = feedback.type == 'Complaint';
-    
-    final Color color = isCompliment 
-        ? const Color(0xFF10B981) 
-        : (isComplaint ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
-        
-    final IconData icon = isCompliment 
-        ? Icons.favorite_rounded 
-        : (isComplaint ? Icons.warning_rounded : Icons.lightbulb_rounded);
+    final compliments = _feedbacks.where((f) => f.type.toLowerCase() == 'compliment').toList();
+    final complaints = _feedbacks.where((f) => f.type.toLowerCase() == 'complaint').toList();
+    final suggestions = _feedbacks.where((f) => f.type.toLowerCase() == 'suggestion').toList();
+    final finalFeedbacks = _feedbacks.where((f) => f.type.toLowerCase() == 'final feedback').toList();
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 20),
+              Text(
+                '${widget.companyName} Feedbacks',
+                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 16),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(feedback.studentName,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(Icons.domain_rounded, size: 12, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Text(feedback.companyName,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  feedback.type.toUpperCase(),
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: color, letterSpacing: 0.5),
-                ),
+              Text(
+                widget.roleTitle,
+                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF1F5F9))
-            ),
-            child: Text(
-              '""${feedback.comment}""',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF334155),
-                height: 1.5,
-                fontStyle: FontStyle.italic,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+          bottom: const TabBar(
+            labelColor: Color(0xFF0F172A),
+            unselectedLabelColor: Color(0xFF64748B),
+            indicatorColor: Color(0xFF0F172A),
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+            tabs: [
+              Tab(text: 'Compliments'),
+              Tab(text: 'Complaints'),
+              Tab(text: 'Suggestions'),
+              Tab(text: 'Final Feedback'),
+            ],
           ),
-          const SizedBox(height: 16),
-            Row(
-              children: [
-                Text(DateFormat('hh:mm a').format(feedback.date),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
-              ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [
+                  _FeedbackCategoryList(feedbacks: compliments, category: 'Compliments', icon: Icons.favorite_rounded, color: const Color(0xFF10B981)),
+                  _FeedbackCategoryList(feedbacks: complaints, category: 'Complaints', icon: Icons.warning_rounded, color: const Color(0xFFEF4444)),
+                  _FeedbackCategoryList(feedbacks: suggestions, category: 'Suggestions', icon: Icons.lightbulb_rounded, color: const Color(0xFFF59E0B)),
+                  _FeedbackCategoryList(feedbacks: finalFeedbacks, category: 'Final Feedbacks', icon: Icons.assignment_turned_in_rounded, color: const Color(0xFF3B82F6)),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _FeedbackCategoryList extends StatelessWidget {
+  final List<FeedbackModel> feedbacks;
+  final String category;
+  final IconData icon;
+  final Color color;
+
+  const _FeedbackCategoryList({
+    required this.feedbacks,
+    required this.category,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (feedbacks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 40, color: color.withValues(alpha: 0.4)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No $category Received',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No feedback is currently available in this category.',
+              style: TextStyle(color: const Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
         ),
       );
     }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(24),
+      itemCount: feedbacks.length,
+      itemBuilder: (context, index) {
+        final fb = feedbacks[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: color, size: 18),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(fb.studentName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                        const SizedBox(height: 2),
+                        Text(DateFormat('MMMM dd, yyyy • hh:mm a').format(fb.date),
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                ),
+                child: Text(
+                  '"${fb.comment}"',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF334155),
+                    height: 1.5,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
