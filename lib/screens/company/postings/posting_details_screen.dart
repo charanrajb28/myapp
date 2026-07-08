@@ -1001,7 +1001,51 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () {
+                            final allActiveAppIds = activeInterns
+                                .map((app) => app['id']?.toString() ?? '')
+                                .where((id) => id.isNotEmpty)
+                                .toList();
+                            final allSelected = allActiveAppIds.isNotEmpty &&
+                                allActiveAppIds.every((id) => _selectedBroadcastAppIds.contains(id));
+                            setState(() {
+                              if (allSelected) {
+                                for (final id in allActiveAppIds) {
+                                  _selectedBroadcastAppIds.remove(id);
+                                }
+                              } else {
+                                for (final id in allActiveAppIds) {
+                                  _selectedBroadcastAppIds.add(id);
+                                }
+                              }
+                            });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Builder(
+                            builder: (context) {
+                              final allActiveAppIds = activeInterns
+                                  .map((app) => app['id']?.toString() ?? '')
+                                  .where((id) => id.isNotEmpty)
+                                  .toList();
+                              final allSelected = allActiveAppIds.isNotEmpty &&
+                                  allActiveAppIds.every((id) => _selectedBroadcastAppIds.contains(id));
+                              return Text(
+                                allSelected ? 'DESELECT ALL' : 'SELECT ALL',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF6366F1),
+                                  letterSpacing: 0.5,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         SizedBox(
                           height: 32,
                           width: 80,

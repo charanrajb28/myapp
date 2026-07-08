@@ -42,10 +42,185 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
   bool _hasForm = false;
   bool _isLoadingForm = true;
 
+  final _broadcastTitleController = TextEditingController();
+  final _broadcastMessageController = TextEditingController();
+  bool _sendingBroadcast = false;
+
   @override
   void initState() {
     super.initState();
     _checkForm();
+  }
+
+  @override
+  void dispose() {
+    _broadcastTitleController.dispose();
+    _broadcastMessageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendBroadcastAlert() async {
+    final title = _broadcastTitleController.text.trim();
+    final message = _broadcastMessageController.text.trim();
+    if (title.isEmpty || message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both title and message'), backgroundColor: Color(0xFFEF4444)),
+      );
+      return;
+    }
+
+    setState(() => _sendingBroadcast = true);
+    try {
+      final supabase = Supabase.instance.client;
+      // Get all application IDs under this internship that are active or accepted
+      final targetApps = widget.applicants.where((a) {
+        final status = a['status']?.toString().toLowerCase() ?? '';
+        return status == 'active' || status == 'accepted';
+      }).toList();
+      
+      if (targetApps.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No active/accepted students in this internship to broadcast to.'), backgroundColor: Color(0xFFEA580C)),
+        );
+        setState(() => _sendingBroadcast = false);
+        return;
+      }
+
+      for (final app in targetApps) {
+        final appId = app['application_id']?.toString() ?? '';
+        if (appId.isEmpty) continue;
+
+        // Fetch current alerts
+        final res = await supabase
+            .from('applications')
+            .select('alerts')
+            .eq('id', appId)
+            .maybeSingle();
+
+        List<dynamic> currentAlerts = [];
+        if (res != null && res['alerts'] is List) {
+          currentAlerts = List.from(res['alerts']);
+        }
+
+        currentAlerts.add({
+          'title': title,
+          'message': message,
+          'type': 'warning',
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+
+        await supabase
+            .from('applications')
+            .update({'alerts': currentAlerts})
+            .eq('id', appId);
+      }
+
+      if (mounted) {
+        _broadcastTitleController.clear();
+        _broadcastMessageController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Broadcast sent successfully to all active students!'),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send broadcast: $e'), backgroundColor: const Color(0xFFDC2626)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sendingBroadcast = false);
+      }
+    }
+  }
+
+  void _showBroadcastDialog() {
+    _broadcastTitleController.clear();
+    _broadcastMessageController.clear();
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.campaign_rounded, color: Color(0xFF6366F1)),
+                SizedBox(width: 10),
+                Text('Broadcast to Interns', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A))),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'This announcement will be sent to all active/accepted students under this role.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _broadcastTitleController,
+                  decoration: InputDecoration(
+                    labelText: 'Announcement Title',
+                    hintText: 'e.g. Weekly Report Reminder',
+                    filled: true,
+                    fillColor: const Color(0xFFF1F5F9),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _broadcastMessageController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Message Body',
+                    hintText: 'Type your message details here...',
+                    filled: true,
+                    fillColor: const Color(0xFFF1F5F9),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: _sendingBroadcast
+                    ? null
+                    : () async {
+                        setDialogState(() => _sendingBroadcast = true);
+                        await _sendBroadcastAlert();
+                        setDialogState(() => _sendingBroadcast = false);
+                        if (mounted) Navigator.pop(ctx);
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                child: _sendingBroadcast
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('SEND BROADCAST', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+            ],
+          );
+        }
+      ),
+    );
   }
 
   Future<void> _checkForm() async {
@@ -401,6 +576,49 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                 ),
               ),
 
+              // ── Broadcast Notification Card ──
+              _buildSectionCard(
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                      child: const Icon(Icons.campaign_rounded, color: Color(0xFF6366F1), size: 20),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Broadcast Announcement',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Send a notification to all active students in this internship.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _showBroadcastDialog,
+                      icon: const Icon(Icons.send_rounded, size: 14),
+                      label: const Text('BROADCAST', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366F1),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               // ── Applicants Card ──
               _buildSectionCard(
                 child: Column(
@@ -553,7 +771,7 @@ class _ApplicantRow extends StatelessWidget {
                     studentName: name,
                     progress: double.tryParse(applicant['progress']?.toString() ?? '0') ?? 0.0,
                     checkins: applicant['checkins'] as List? ?? [],
-                    showSendAlert: false,
+                    showSendAlert: true,
                   ),
                 ),
               );
