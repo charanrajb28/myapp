@@ -4,6 +4,7 @@ import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
 import '../feedbacks/admin_generated_forms_screen.dart';
 import '../admins/admins_list_screen.dart';
+import '../internships/admin_internships_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
@@ -17,7 +18,7 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _totalStudents = 0;
   int _partnerCompanies = 0;
-  int _activeInternships = 0;
+  int _totalInternships = 0;
   int _redAlerts = 0;
   bool _isLoading = true;
   bool _isSendingBroadcast = false;
@@ -38,7 +39,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           setState(() {
             _totalStudents = 142;
             _partnerCompanies = 28;
-            _activeInternships = 35;
+            _totalInternships = 35;
             _redAlerts = 3;
             _userRole = 'admin';
             _isLoading = false;
@@ -55,8 +56,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final companiesRes = await client.from('companies').select('id').count(CountOption.exact);
       final companiesCount = companiesRes.count;
 
-      // Fetch active internships
-      final internshipsRes = await client.from('applications').select('id').eq('status', 'Active').count(CountOption.exact);
+      // Fetch total internships
+      final internshipsRes = await client.from('internships').select('id').count(CountOption.exact);
       final internshipsCount = internshipsRes.count;
 
       final redAlertsRes = await client
@@ -78,7 +79,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         setState(() {
           _totalStudents = studentsCount;
           _partnerCompanies = companiesCount;
-          _activeInternships = internshipsCount;
+          _totalInternships = internshipsCount;
           _redAlerts = redAlertsCount;
           _userRole = fetchedRole;
           _isLoading = false;
@@ -332,7 +333,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ? () => widget.onNavigateToTab!(2)
                               : null,
                         ),
-                        _StatCard(title: 'Active Internships', value: _activeInternships.toString(), icon: Icons.work_outline_rounded, color: const Color(0xFF10B981), constraints: constraints),
+                         _StatCard(
+                          title: 'Total Internships',
+                          value: _totalInternships.toString(),
+                          icon: Icons.work_outline_rounded,
+                          color: const Color(0xFF10B981),
+                          constraints: constraints,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AdminInternshipsScreen(),
+                              ),
+                            );
+                          },
+                        ),
                         _StatCard(
                           title: 'Red Alerts',
                           value: _redAlerts.toString(),

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_selector/file_selector.dart';
 import 'dart:typed_data';
+import '../../../utils/file_saver.dart';
 
 class AdminFormResponsesScreen extends StatefulWidget {
   final String internshipId;
@@ -117,20 +118,15 @@ class _AdminFormResponsesScreenState extends State<AdminFormResponsesScreen> {
       final fileBytes = excel.encode()!;
       final String fileName = 'Feedback_${widget.roleTitle.replaceAll(' ', '_')}.xlsx';
 
-      final FileSaveLocation? result = await getSaveLocation(suggestedName: fileName);
-      if (result == null) {
+      final String? path = await FileSaver.saveAndShareFile(
+        fileName: fileName,
+        bytes: fileBytes,
+      );
+
+      if (path == null) {
         setState(() => _isExporting = false);
         return; // User canceled
       }
-
-      final Uint8List uint8ListBytes = Uint8List.fromList(fileBytes);
-      final XFile xFile = XFile.fromData(
-        uint8ListBytes,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        name: fileName,
-      );
-      
-      await xFile.saveTo(result.path);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

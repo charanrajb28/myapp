@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../student_portal_repository.dart';
+import '../../../utils/file_saver.dart';
 
 class StudentDocumentsScreen extends StatefulWidget {
   const StudentDocumentsScreen({super.key});
@@ -384,6 +385,15 @@ class _StudentDocumentsScreenState extends State<StudentDocumentsScreen> {
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF2563EB),
                           foregroundColor: Colors.white,
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => FileSaver.downloadOrLaunchUrl(context, document.publicUrl, document.title),
+                        icon: const Icon(Icons.download_rounded, size: 16),
+                        label: const Text('Download'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0F172A),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
                         ),
                       ),
                       OutlinedButton.icon(

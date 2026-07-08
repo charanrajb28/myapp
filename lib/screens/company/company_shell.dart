@@ -71,34 +71,43 @@ class _CompanyShellState extends State<CompanyShell> {
       CompanyProfileScreen(key: _profileKey),
     ];
 
-    return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: setIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        onDestinationSelected: setIndex,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics_rounded),
-            label: 'Dashboard',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.post_add_outlined),
-            selectedIcon: Icon(Icons.post_add_rounded),
-            label: 'Postings',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
-        ],
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setIndex(0);
+        }
+      },
+      child: Scaffold(
+        body: PageView(
+          controller: _pageController,
+          onPageChanged: setIndex,
+          children: screens,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _currentIndex,
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          onDestinationSelected: setIndex,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics_rounded),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.post_add_outlined),
+              selectedIcon: Icon(Icons.post_add_rounded),
+              label: 'Postings',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded),
+              selectedIcon: Icon(Icons.person_rounded),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

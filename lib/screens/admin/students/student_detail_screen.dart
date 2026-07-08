@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_student_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
+import '../../../utils/file_saver.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final String studentId;
@@ -975,6 +976,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
               date: 'Profile Attachment',
               type: extension.length > 4 ? 'DOC' : extension,
               status: 'Verified',
+              url: url,
             ),
           );
         }),
@@ -987,6 +989,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String date,
     required String type,
     required String status,
+    required String url,
   }) {
     bool isActionRequired = status == 'Action Required' || status == 'Pending Signature';
 
@@ -1042,12 +1045,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () => FileSaver.downloadOrLaunchUrl(context, url, title),
             icon: const Icon(Icons.download_rounded, color: Color(0xFF64748B)),
             tooltip: 'Download',
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () => FileSaver.downloadOrLaunchUrl(context, url, title),
             icon: const Icon(Icons.visibility_outlined, color: Color(0xFF64748B)),
             tooltip: 'View',
           ),

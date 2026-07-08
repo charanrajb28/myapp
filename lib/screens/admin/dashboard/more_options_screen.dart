@@ -4,6 +4,7 @@ import 'dart:io' as io;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_selector/file_selector.dart';
+import '../../../utils/file_saver.dart';
 import 'semester_promotion_screen.dart';
 
 class MoreOptionsScreen extends StatefulWidget {
@@ -144,15 +145,13 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
         }
       }
 
-      final FileSaveLocation? result = await getSaveLocation(
-        suggestedName: fileName,
+      final String? path = await FileSaver.saveAndShareFile(
+        fileName: fileName,
+        content: sb.toString(),
       );
 
-      if (result == null) return;
-
-      final file = io.File(result.path);
-      await file.writeAsString(sb.toString(), encoding: utf8);
-      _showSuccessSnack('Exported successfully to ${result.path}');
+      if (path == null) return;
+      _showSuccessSnack('Exported successfully!');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

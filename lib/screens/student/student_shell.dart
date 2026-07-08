@@ -73,59 +73,68 @@ class StudentShellState extends ConsumerState<StudentShell> {
     final notificationState = ref.watch(studentNotificationsProvider);
     final unreadCount = notificationState.notifications.where((n) => !n.isRead).length;
 
-    return Scaffold(
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: setIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: const Color(0xFF0F172A).withValues(alpha: 0.08),
-        onDestinationSelected: setIndex,
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.work_outline_rounded),
-            selectedIcon: Icon(Icons.work_rounded),
-            label: 'Internships',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.qr_code_scanner_rounded),
-            selectedIcon: Icon(Icons.qr_code_scanner_rounded),
-            label: 'Check-In',
-          ),
-          NavigationDestination(
-            icon: unreadCount > 0
-                ? Badge(
-                    label: Text('$unreadCount'),
-                    backgroundColor: const Color(0xFFEF4444),
-                    textColor: Colors.white,
-                    child: const Icon(Icons.notifications_outlined),
-                  )
-                : const Icon(Icons.notifications_outlined),
-            selectedIcon: unreadCount > 0
-                ? Badge(
-                    label: Text('$unreadCount'),
-                    backgroundColor: const Color(0xFFEF4444),
-                    textColor: Colors.white,
-                    child: const Icon(Icons.notifications_rounded),
-                  )
-                : const Icon(Icons.notifications_rounded),
-            label: 'Notifications',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
-          ),
-        ],
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setIndex(0);
+        }
+      },
+      child: Scaffold(
+        body: PageView(
+          controller: _pageController,
+          onPageChanged: setIndex,
+          children: _screens,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _currentIndex,
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          indicatorColor: const Color(0xFF0F172A).withValues(alpha: 0.08),
+          onDestinationSelected: setIndex,
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Home',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.work_outline_rounded),
+              selectedIcon: Icon(Icons.work_rounded),
+              label: 'Internships',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.qr_code_scanner_rounded),
+              selectedIcon: Icon(Icons.qr_code_scanner_rounded),
+              label: 'Check-In',
+            ),
+            NavigationDestination(
+              icon: unreadCount > 0
+                  ? Badge(
+                      label: Text('$unreadCount'),
+                      backgroundColor: const Color(0xFFEF4444),
+                      textColor: Colors.white,
+                      child: const Icon(Icons.notifications_outlined),
+                    )
+                  : const Icon(Icons.notifications_outlined),
+              selectedIcon: unreadCount > 0
+                  ? Badge(
+                      label: Text('$unreadCount'),
+                      backgroundColor: const Color(0xFFEF4444),
+                      textColor: Colors.white,
+                      child: const Icon(Icons.notifications_rounded),
+                    )
+                  : const Icon(Icons.notifications_rounded),
+              label: 'Notifications',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded),
+              selectedIcon: Icon(Icons.person_rounded),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

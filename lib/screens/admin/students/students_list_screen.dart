@@ -7,6 +7,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../utils/file_saver.dart';
 import '../../../providers/students_provider.dart';
 import 'student_detail_screen.dart';
 import 'add_student_screen.dart';
@@ -220,19 +221,17 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
           );
         }
       } else {
-        final FileSaveLocation? result = await getSaveLocation(
-          suggestedName: 'student_directory_${DateTime.now().millisecondsSinceEpoch}.csv',
+        final String? path = await FileSaver.saveAndShareFile(
+          fileName: 'student_directory_${DateTime.now().millisecondsSinceEpoch}.csv',
+          content: csv,
         );
 
-        if (result == null) return;
-
-        final file = io.File(result.path);
-        await file.writeAsString(csv, encoding: utf8);
+        if (path == null) return;
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Records saved to: ${result.path}'),
+              content: const Text('Student directory exported successfully!'),
               backgroundColor: const Color(0xFF10B981),
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(16),
