@@ -316,6 +316,19 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     
     try {
       final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      String senderName = 'System Admin';
+      if (user != null) {
+        final adminRes = await client
+            .from('admins')
+            .select('name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+        if (adminRes != null && adminRes['name'] != null) {
+          senderName = adminRes['name'].toString();
+        }
+      }
+
       await Future.wait(
         userIds.map(
           (userId) => client.from('student_notifications').insert({
@@ -324,6 +337,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
             'message': messageController.text.trim(),
             'notification_type': selectedType,
             'is_read': false,
+            'sender_name': senderName,
           }),
         ),
       );

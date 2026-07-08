@@ -292,12 +292,27 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     setState(() => _isSendingNotification = true);
     try {
-      await Supabase.instance.client.from('student_notifications').insert({
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      String senderName = 'System Admin';
+      if (user != null) {
+        final adminRes = await supabase
+            .from('admins')
+            .select('name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+        if (adminRes != null && adminRes['name'] != null) {
+          senderName = adminRes['name'].toString();
+        }
+      }
+
+      await supabase.from('student_notifications').insert({
         'user_id': userId,
         'title': title,
         'message': message,
         'notification_type': type,
         'is_read': false,
+        'sender_name': senderName,
       });
 
       if (!mounted) return;

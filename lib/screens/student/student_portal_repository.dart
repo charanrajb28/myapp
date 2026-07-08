@@ -306,7 +306,7 @@ class StudentPortalRepository {
     try {
       final response = await _client
           .from('student_notifications')
-          .select('id, title, message, notification_type, is_read, created_at')
+          .select('id, title, message, notification_type, is_read, created_at, sender_name')
           .eq('user_id', user.id)
           .order('created_at', ascending: false)
           .timeout(const Duration(seconds: 8));
@@ -762,6 +762,9 @@ class StudentPortalRepository {
       timeLabel: _relativeTime(item['created_at']?.toString()),
       type: _mapNotificationType(item['notification_type']?.toString()),
       isRead: item['is_read'] == true,
+      sender: item['sender_name']?.toString().isNotEmpty == true
+          ? item['sender_name'].toString()
+          : 'System Admin',
     );
   }
 

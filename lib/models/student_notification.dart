@@ -14,6 +14,7 @@ class StudentNotification {
   final String timeLabel;
   final StudentNotificationType type;
   final bool isRead;
+  final String sender;
 
   const StudentNotification({
     required this.id,
@@ -22,6 +23,7 @@ class StudentNotification {
     required this.timeLabel,
     required this.type,
     required this.isRead,
+    this.sender = 'System Admin',
   });
 
   StudentNotification copyWith({
@@ -31,6 +33,7 @@ class StudentNotification {
     String? timeLabel,
     StudentNotificationType? type,
     bool? isRead,
+    String? sender,
   }) {
     return StudentNotification(
       id: id ?? this.id,
@@ -39,6 +42,7 @@ class StudentNotification {
       timeLabel: timeLabel ?? this.timeLabel,
       type: type ?? this.type,
       isRead: isRead ?? this.isRead,
+      sender: sender ?? this.sender,
     );
   }
 }

@@ -217,6 +217,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     setState(() => _isSendingBroadcast = true);
     try {
       final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      String senderName = 'System Admin';
+      if (user != null) {
+        final adminRes = await client
+            .from('admins')
+            .select('name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+        if (adminRes != null && adminRes['name'] != null) {
+          senderName = adminRes['name'].toString();
+        }
+      }
+
       final studentsRes = await client
           .from('students')
           .select('user_id')
@@ -247,6 +260,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             'message': message,
             'notification_type': type,
             'is_read': false,
+            'sender_name': senderName,
           }),
         ),
       );

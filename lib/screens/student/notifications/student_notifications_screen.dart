@@ -453,6 +453,11 @@ class _NotificationDetailScreen extends StatelessWidget {
                                   label: item.timeLabel,
                                   color: const Color(0xFF64748B),
                                 ),
+                                _metaChip(
+                                  icon: Icons.person_rounded,
+                                  label: item.sender,
+                                  color: const Color(0xFF64748B),
+                                ),
                               ],
                             ),
                           ],
