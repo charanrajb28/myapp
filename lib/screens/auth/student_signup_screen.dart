@@ -173,18 +173,11 @@ class _StudentSignUpScreenState extends State<StudentSignUpScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // ── Brand Header ──────────────────────────────────────
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEEF2FF),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        size: 36,
-                        color: _accent,
-                      ),
+                    Image.asset(
+                      'assets/logo.png',
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.contain,
                     ),
                     const SizedBox(height: 20),
                     const Text(
@@ -198,11 +191,12 @@ class _StudentSignUpScreenState extends State<StudentSignUpScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Student Registration · ScholarBridge',
+                      'An initiative by Dhruthi Internship Commitee, Seshadripuram college',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         color: _textSecondary,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 40),

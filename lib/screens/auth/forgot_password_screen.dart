@@ -188,18 +188,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.mark_email_read_rounded,
-                      size: 34,
-                      color: accentColor,
-                    ),
+                  Image.asset(
+                    'assets/logo.png',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 24),
                   const Text(
@@ -223,7 +216,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'An initiative by Dhruthi Internship Commitee, Seshadripuram college',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(

@@ -87,7 +87,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigatorKey,
-      title: 'ScholarBridge',
+      title: 'Aaroha',
       debugShowCheckedModeBanner: false,
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         scrollbars: false,
@@ -169,15 +169,43 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (_checking) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF8FAFC),
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.school, size: 64, color: Color(0xFF0F172A)),
-              SizedBox(height: 24),
-              CircularProgressIndicator(
+              Image.asset(
+                'assets/logo.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Aaroha',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.0),
+                child: Text(
+                  'An initiative by Dhruthi Internship Commitee, Seshadripuram college',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 36),
+              const CircularProgressIndicator(
                 color: Color(0xFF0F172A),
               ),
             ],
@@ -331,7 +359,7 @@ class _LogoutScreenState extends State<LogoutScreen> {
               child: Column(
                 children: [
                   Text(
-                    'ScholarBridge',
+                    'Aaroha',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -528,18 +556,15 @@ class _LoginPageState extends State<LoginPage>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // ── Logo ──────────────────────────────────────────────
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(Icons.school, size: 36, color: textPrimary),
+                  Image.asset(
+                    'assets/logo.png',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'ScholarBridge',
+                    'Aaroha',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
@@ -549,11 +574,12 @@ class _LoginPageState extends State<LoginPage>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Internship Management System',
+                    'An initiative by Dhruthi Internship Commitee, Seshadripuram college',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 13,
                       color: textSecondary,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 48),
