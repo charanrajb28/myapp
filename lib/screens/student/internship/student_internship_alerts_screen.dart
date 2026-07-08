@@ -160,14 +160,27 @@ class _StudentInternshipAlertsScreenState
                           letterSpacing: -0.3,
                         ),
                       ),
-                      Text(
-                        alert.type.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: alert.color,
-                          letterSpacing: 1.0,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            alert.type.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: alert.color,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '•  ${alert.sender}',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -271,6 +284,8 @@ class _StudentInternshipAlertsScreenState
     final requiresAcknowledgement = raw['requires_ack'] == true;
     final isAcknowledged = raw['acknowledged'] == true;
 
+    final sender = raw['sender']?.toString() ?? 'System Admin';
+
     return _InternshipAlert(
       id: raw['id']?.toString() ?? '',
       title: title,
@@ -281,6 +296,7 @@ class _StudentInternshipAlertsScreenState
       timeLabel: timeLabel,
       requiresAcknowledgement: requiresAcknowledgement,
       isAcknowledged: isAcknowledged,
+      sender: sender,
     );
   }
 
@@ -440,6 +456,7 @@ class _InternshipAlert {
   final String timeLabel;
   final bool requiresAcknowledgement;
   final bool isAcknowledged;
+  final String sender;
 
   const _InternshipAlert({
     required this.id,
@@ -451,5 +468,6 @@ class _InternshipAlert {
     required this.timeLabel,
     this.requiresAcknowledgement = false,
     this.isAcknowledged = false,
+    required this.sender,
   });
 }

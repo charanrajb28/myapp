@@ -348,6 +348,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                             setDialogState(() => sending = true);
                             try {
                               final supabase = Supabase.instance.client;
+                              final companyName = _posting['companies']?['name']?.toString() ?? 'Company';
                               for (final appId in _selectedBroadcastAppIds) {
                                 final res = await supabase
                                     .from('applications')
@@ -364,6 +365,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                                   'title': title,
                                   'message': message,
                                   'type': type,
+                                  'sender': companyName,
                                   'created_at': DateTime.now().toUtc().toIso8601String(),
                                 });
 
@@ -2331,6 +2333,19 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
     setState(() => _sendingAlert = true);
     try {
       final supabase = Supabase.instance.client;
+      final compRes = await supabase
+          .from('applications')
+          .select('internships(companies(name))')
+          .eq('id', widget.applicationId)
+          .maybeSingle();
+      String senderName = 'Company';
+      if (compRes != null && compRes['internships'] != null) {
+        final intern = compRes['internships'];
+        if (intern['companies'] != null) {
+          senderName = intern['companies']['name']?.toString() ?? 'Company';
+        }
+      }
+
       final res = await supabase
           .from('applications')
           .select('alerts')
@@ -2346,6 +2361,7 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
         'title': title,
         'message': message,
         'type': _alertType,
+        'sender': senderName,
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
 

@@ -72,6 +72,19 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     setState(() => _sendingBroadcast = true);
     try {
       final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      String senderName = 'System Admin';
+      if (user != null) {
+        final adminRes = await supabase
+            .from('admins')
+            .select('name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+        if (adminRes != null && adminRes['name'] != null) {
+          senderName = adminRes['name'].toString();
+        }
+      }
+
       // Get all application IDs under this internship that are active or accepted
       final targetApps = widget.applicants.where((a) {
         final status = a['status']?.toString().toLowerCase() ?? '';
@@ -106,6 +119,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           'title': title,
           'message': message,
           'type': 'warning',
+          'sender': senderName,
           'created_at': DateTime.now().toUtc().toIso8601String(),
         });
 
