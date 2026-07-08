@@ -26,6 +26,8 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
   final _locationSearchController = TextEditingController();
 
   DateTime _selectedDeadline = DateTime.now().add(const Duration(days: 30));
+  DateTime _expectedStartDate = DateTime.now().add(const Duration(days: 15));
+  String _durationUnit = 'Months';
   bool isRemote  = true;
   bool _isSaving = false;
 
@@ -255,7 +257,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'role'        : roleController.text.trim(),
         'about'       : descController.text.trim(),
         'stipend'     : stipendController.text.trim(),
-        'duration'    : durationController.text.trim(),
+        'duration'    : '${durationController.text.trim()} $_durationUnit',
         'industry'    : finalIndustry,
         'location'    : isRemote ? 'Remote' : 'On-site',
         'location_address': isRemote ? null : _selectedLocationAddress,
@@ -276,6 +278,17 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
           _selectedDeadline.month,
           _selectedDeadline.day,
         ).toIso8601String(),
+        'start_date'  : DateTime(
+          _expectedStartDate.year,
+          _expectedStartDate.month,
+          _expectedStartDate.day,
+        ).toIso8601String().split('T')[0],
+        'end_date'    : _calculateEndDate(
+          _expectedStartDate,
+          durationController.text,
+          _durationUnit,
+          _activeDays,
+        ).toIso8601String().split('T')[0],
       });
 
       if (mounted) {
@@ -336,8 +349,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                           isNumeric: true, hint: 'e.g. 15000')),
                   const SizedBox(width: 16),
                   Expanded(
-                      child: _industrialField('DURATION (MO)', durationController,
-                          isNumeric: true, hint: 'e.g. 06')),
+                      child: _durationField()),
                 ]),
                 const SizedBox(height: 20),
                 Row(children: [
@@ -353,7 +365,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                       child: _industrialField('VACANCIES AVAILABLE', vacanciesController,
                           isNumeric: true, hint: 'e.g. 5')),
                   const SizedBox(width: 16),
-                  const Spacer(),
+                  Expanded(child: _expectedStartDateField()),
                 ]),
                 const SizedBox(height: 32),
 
@@ -1100,6 +1112,186 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     );
     if (picked == null || !mounted) return;
     setState(() => _selectedDeadline = picked);
+  }
+
+  Widget _expectedStartDateField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('EXPECTED START DATE',
+            style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickExpectedStartDate,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.play_circle_fill_rounded,
+                    color: Color(0xFF10B981), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    DateFormat('dd MMM yyyy').format(_expectedStartDate),
+                    style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Icon(Icons.expand_more_rounded,
+                    color: Color(0xFF94A3B8), size: 20),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickExpectedStartDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate:
+          _expectedStartDate.isBefore(now) ? now : _expectedStartDate,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 5),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFF10B981),
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Color(0xFF0F172A),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _expectedStartDate = picked);
+  }
+
+  DateTime _calculateEndDate(DateTime startDate, String durationStr, String unit, Set<String> activeDays) {
+    final value = int.tryParse(durationStr.replaceAll(RegExp(r'[^0-9]'), '')) ?? 3;
+    if (unit.toLowerCase().contains('month')) {
+      return DateTime(startDate.year, startDate.month + value, startDate.day);
+    } else if (unit.toLowerCase().contains('week')) {
+      return startDate.add(Duration(days: value * 7));
+    } else {
+      // Days
+      DateTime current = startDate;
+      int added = 0;
+      final activeSet = activeDays.map((d) => d.substring(0, 3).toLowerCase()).toSet();
+      if (activeSet.isEmpty) {
+        return startDate.add(Duration(days: value));
+      }
+      const weekdayMap = {
+        1: 'mon',
+        2: 'tue',
+        3: 'wed',
+        4: 'thu',
+        5: 'fri',
+        6: 'sat',
+        7: 'sun',
+      };
+      while (added < value) {
+        final weekdayStr = weekdayMap[current.weekday];
+        if (activeSet.contains(weekdayStr)) {
+          added++;
+        }
+        if (added < value) {
+          current = current.add(const Duration(days: 1));
+        }
+      }
+      return current;
+    }
+  }
+
+  Widget _durationField() {
+    final calculatedEnd = _calculateEndDate(_expectedStartDate, durationController.text, _durationUnit, _activeDays);
+    final endDateStr = DateFormat('dd MMM yyyy').format(calculatedEnd);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('DURATION',
+            style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: durationController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold),
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'e.g. 3',
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _durationUnit,
+                    isExpanded: true,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                    items: const [
+                      DropdownMenuItem(value: 'Days', child: Text('Days')),
+                      DropdownMenuItem(value: 'Weeks', child: Text('Weeks')),
+                      DropdownMenuItem(value: 'Months', child: Text('Months')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _durationUnit = val);
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Expected End Date: $endDateStr',
+          style: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
   }
 
   Widget _publishBtn(BuildContext context) {

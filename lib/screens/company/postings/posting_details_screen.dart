@@ -113,18 +113,58 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           
       // 2. Perform applicant status conversions
       if (newStatus == 'ACTIVE' && oldStatus == 'INTERVIEWING') {
-        // Also update internship start/end dates if not set
-        final String startDateStr = (_posting['start_date'] ?? DateTime.now().toIso8601String().split('T')[0]).toString();
-        String? endDateStr = _posting['end_date']?.toString();
-        if (endDateStr == null) {
-          try {
-            final startDate = DateTime.parse(startDateStr);
-            final durationStr = (_posting['duration']?.toString() ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-            final durationMonths = int.tryParse(durationStr) ?? 3;
-            endDateStr = DateTime(startDate.year, startDate.month + durationMonths, startDate.day).toIso8601String().split('T')[0];
-          } catch (_) {
-            endDateStr = DateTime.now().add(const Duration(days: 90)).toIso8601String().split('T')[0];
+        final String startDateStr = DateTime.now().toIso8601String().split('T')[0];
+        String endDateStr;
+        try {
+          final startDate = DateTime.now();
+          final durationRaw = (_posting['duration']?.toString() ?? '3 Months');
+          final durationVal = int.tryParse(durationRaw.replaceAll(RegExp(r'[^0-9]'), '')) ?? 3;
+          
+          String unit = 'Months';
+          if (durationRaw.toLowerCase().contains('day')) {
+            unit = 'Days';
+          } else if (durationRaw.toLowerCase().contains('week')) {
+            unit = 'Weeks';
           }
+
+          final rawDays = _posting['active_days'];
+          final List<String> activeDays = rawDays is List ? rawDays.map((d) => d.toString()).toList() : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+          if (unit.toLowerCase().contains('month')) {
+            endDateStr = DateTime(startDate.year, startDate.month + durationVal, startDate.day).toIso8601String().split('T')[0];
+          } else if (unit.toLowerCase().contains('week')) {
+            endDateStr = startDate.add(Duration(days: durationVal * 7)).toIso8601String().split('T')[0];
+          } else {
+            // Days based on active days in week
+            DateTime current = startDate;
+            int added = 0;
+            final activeSet = activeDays.map((d) => d.substring(0, 3).toLowerCase()).toSet();
+            if (activeSet.isEmpty) {
+              endDateStr = startDate.add(Duration(days: durationVal)).toIso8601String().split('T')[0];
+            } else {
+              const weekdayMap = {
+                1: 'mon',
+                2: 'tue',
+                3: 'wed',
+                4: 'thu',
+                5: 'fri',
+                6: 'sat',
+                7: 'sun',
+              };
+              while (added < durationVal) {
+                final weekdayStr = weekdayMap[current.weekday];
+                if (activeSet.contains(weekdayStr)) {
+                  added++;
+                }
+                if (added < durationVal) {
+                  current = current.add(const Duration(days: 1));
+                }
+              }
+              endDateStr = current.toIso8601String().split('T')[0];
+            }
+          }
+        } catch (_) {
+          endDateStr = DateTime.now().add(const Duration(days: 90)).toIso8601String().split('T')[0];
         }
         // Update dates on the internship (single source of truth)
         await supabase
