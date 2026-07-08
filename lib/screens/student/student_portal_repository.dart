@@ -304,14 +304,31 @@ class StudentPortalRepository {
     }
 
     try {
-      final response = await _client
-          .from('student_notifications')
-          .select('id, title, message, notification_type, is_read, created_at, sender_name')
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false)
-          .timeout(const Duration(seconds: 8));
+      List responseList;
+      try {
+        final response = await _client
+            .from('student_notifications')
+            .select('id, title, message, notification_type, is_read, created_at, sender_name')
+            .eq('user_id', user.id)
+            .order('created_at', ascending: false)
+            .timeout(const Duration(seconds: 8));
+        responseList = response as List;
+      } on PostgrestException catch (e) {
+        if (e.code == '42703') {
+          // sender_name column not yet added — retry without it
+          debugPrint('sender_name column missing, fetching without it: $e');
+          final response = await _client
+              .from('student_notifications')
+              .select('id, title, message, notification_type, is_read, created_at')
+              .eq('user_id', user.id)
+              .order('created_at', ascending: false)
+              .timeout(const Duration(seconds: 8));
+          responseList = response as List;
+        } else {
+          rethrow;
+        }
+      }
 
-      final responseList = response as List;
       final notifications = <StudentNotification>[];
       for (final item in responseList) {
         try {
