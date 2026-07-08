@@ -2234,7 +2234,7 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
   bool _sendingAlert = false;
   final _alertTitleController = TextEditingController();
   final _alertMessageController = TextEditingController();
-  String _alertType = 'warning';
+  String _alertType = 'announcement';
 
   @override
   void initState() {
@@ -2803,10 +2803,12 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
                             isExpanded: true,
                             icon: const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF64748B)),
                             style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
-                            items: const [
-                              DropdownMenuItem(value: 'info', child: Text('Info')),
+                             items: const [
+                              DropdownMenuItem(value: 'announcement', child: Text('Announcement')),
+                              DropdownMenuItem(value: 'alert', child: Text('Alert')),
                               DropdownMenuItem(value: 'warning', child: Text('Warning')),
-                              DropdownMenuItem(value: 'danger', child: Text('Danger')),
+                              DropdownMenuItem(value: 'information', child: Text('Information')),
+                              DropdownMenuItem(value: 'appreciation', child: Text('Appreciation')),
                             ],
                             onChanged: (val) {
                               if (val != null) {

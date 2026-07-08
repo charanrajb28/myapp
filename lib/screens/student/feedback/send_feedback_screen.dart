@@ -250,6 +250,19 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF64748B)),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Note: This will be notified only to the admin/committee member.',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
