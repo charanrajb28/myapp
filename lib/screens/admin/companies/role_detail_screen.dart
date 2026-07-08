@@ -76,12 +76,12 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
       String senderName = 'System Admin';
       if (user != null) {
         final adminRes = await supabase
-            .from('admins')
-            .select('name')
+            .from('sub_admins')
+            .select('users!sub_admins_user_id_fkey(name)')
             .eq('user_id', user.id)
             .maybeSingle();
-        if (adminRes != null && adminRes['name'] != null) {
-          senderName = adminRes['name'].toString();
+        if (adminRes != null && adminRes['users'] != null) {
+          senderName = adminRes['users']['name']?.toString() ?? 'System Admin';
         }
       }
 
