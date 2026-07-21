@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../config/mail_config.dart';
 import 'company_detail_screen.dart';
 
 class AddCompanyScreen extends StatefulWidget {
@@ -15,20 +18,81 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
 
   // Profile data
   String _companyName = '';
-  String _industry = 'Information Technology';
+  String _industry = 'E-Commerce';
   String _location = '';
   String _about = '';
   String _website = '';
+  final _customIndustryController = TextEditingController();
+
+  List<String> _industries = [
+    'E-Commerce',
+    'Retail & Wholesale',
+    'Logistics & Supply Chain',
+    'Marketing & Sales',
+    'Fintech & Finance',
+    'E-Commerce Operations',
+    'Digital Marketing',
+    'Business Analytics',
+    'Customer Support',
+    'Other'
+  ];
 
   @override
   void initState() {
     super.initState();
     final c = widget.company;
+    final String rawIndustry = c?.industry ?? 'E-Commerce';
+    if (_industries.contains(rawIndustry)) {
+      _industry = rawIndustry;
+    } else {
+      _industry = 'Other';
+      _customIndustryController.text = rawIndustry;
+    }
     if (c != null) {
       _companyName = c.name;
-      if (_industries.contains(c.industry)) _industry = c.industry;
       _location = c.location;
       _about = c.about;
+    }
+    _loadDynamicIndustries(rawIndustry);
+  }
+
+  @override
+  void dispose() {
+    _customIndustryController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDynamicIndustries(String currentIndustry) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('companies')
+          .select('industry');
+      if (response != null && response is List) {
+        final dbIndustries = response
+            .map((item) => item['industry']?.toString().trim() ?? '')
+            .where((s) => s.isNotEmpty)
+            .toSet();
+        
+        setState(() {
+          _industries.remove('Other');
+          for (final ind in dbIndustries) {
+            if (!_industries.contains(ind)) {
+              _industries.add(ind);
+            }
+          }
+          _industries.add('Other');
+
+          // Re-evaluate selected industry now that list is updated
+          if (_industries.contains(currentIndustry)) {
+            _industry = currentIndustry;
+            if (currentIndustry != 'Other') {
+              _customIndustryController.clear();
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dynamic industries: $e');
     }
   }
 
@@ -41,16 +105,6 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
   String _hrEmail = '';
   String _password = '';
   bool _obscurePassword = true;
-
-  final _industries = [
-    'Information Technology',
-    'Financial Services',
-    'Aerospace & Defense',
-    'Mechanical Eng.',
-    'Healthcare & Biotech',
-    'Consulting',
-    'Other'
-  ];
 
   bool _isSubmitting = false;
 
@@ -107,10 +161,14 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
 
         if (res.user != null) {
           // 2. Wait for trigger to create profile, then Update detailed attributes
+          final finalIndustry = _industry == 'Other'
+              ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
+              : _industry;
+
           bool updated = false;
           for (int i = 0; i < 5; i++) {
             final updRes = await supabase.from('companies').update({
-              'industry': _industry,
+              'industry': finalIndustry,
               'location': _location,
               'website': _website,
               'phone': _phone,
@@ -125,6 +183,14 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
               break;
             }
             await Future.delayed(const Duration(milliseconds: 600));
+          }
+
+          if (updated && widget.company == null) {
+            await _dispatchEmailAutomation(
+              email: _hrEmail.trim(),
+              name: _companyName,
+              tempPassword: _password,
+            );
           }
 
           if (mounted) {
@@ -143,6 +209,45 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
       } finally {
         if (mounted) setState(() => _isSubmitting = false);
       }
+    }
+  }
+
+  Future<void> _dispatchEmailAutomation({
+    required String email,
+    required String name,
+    required String tempPassword,
+  }) async {
+    final String senderEmail = MailConfig.senderEmail;
+    final String senderPassword = MailConfig.senderAppPassword;
+
+    if (senderEmail.isEmpty || senderPassword.isEmpty) {
+      debugPrint('SMTP Credentials missing, skipping company mail send.');
+      return;
+    }
+
+    final smtpServer = gmail(senderEmail, senderPassword);
+
+    final message = Message()
+      ..from = Address(senderEmail, 'ScholarBridge Admin')
+      ..recipients.add(email)
+      ..subject = 'Welcome to ScholarBridge - Company Access Credentials'
+      ..html = """
+        <div style='font-family: sans-serif; padding: 20px; color: #0F172A;'>
+          <h2 style='color: #0F172A;'>Welcome to ScholarBridge, $name!</h2>
+          <p>A partner company account has been successfully created for you by the administration.</p>
+          <div style='background: #F8FAFC; padding: 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin: 20px 0;'>
+            <p style='margin: 5px 0;'><strong>Username / Email:</strong> $email</p>
+            <p style='margin: 5px 0;'><strong>Temporary Password:</strong> $tempPassword</p>
+          </div>
+          <p style='font-size: 12px; color: #64748B;'>Please log in and update your password immediately.</p>
+        </div>
+      """;
+
+    try {
+      final sendReport = await send(message, smtpServer);
+      debugPrint('Company welcome email sent: $sendReport');
+    } catch (e) {
+      debugPrint('Company email error: $e');
     }
   }
 
@@ -185,12 +290,31 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
 
               _DropdownField(
                 label: 'Industry Category',
-                value: _industry,
+                value: _industries.contains(_industry) ? _industry : 'Other',
                 items: _industries,
                 icon: Icons.category_outlined,
-                onChanged: (v) => setState(() => _industry = v!),
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() {
+                      _industry = v;
+                      if (v != 'Other') {
+                        _customIndustryController.clear();
+                      }
+                    });
+                  }
+                },
               ),
               const SizedBox(height: 20),
+
+              if (_industry == 'Other') ...[
+                _InputField(
+                  label: 'Custom Industry Category',
+                  hint: 'ex. Fintech, E-Commerce Logistics',
+                  icon: Icons.edit_note_rounded,
+                  controller: _customIndustryController,
+                ),
+                const SizedBox(height: 20),
+              ],
 
               Row(children: [
                 Expanded(

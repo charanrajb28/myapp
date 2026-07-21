@@ -44,6 +44,16 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
   // Tasks list (loaded from responsibilities[])
   late List<String> _tasks;
 
+  // Eligible departments state
+  static const List<String> _allDepartments = [
+    'B.Com LSCM',
+    'B.Com A&F',
+    'B.Com (Regular)',
+    'BCA',
+    'BBA',
+  ];
+  late Set<String> _eligibleDepartments;
+
   // Days of the week state
   static const List<String> _allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   late Set<String> _activeDays;
@@ -101,6 +111,12 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         ? rawDays.map((d) => d.toString()).toSet()
         : {'Mon', 'Tue', 'Wed', 'Thu', 'Fri'};
 
+    // Pre-populate eligible departments (default all if absent)
+    final rawDepts = widget.posting['eligible_departments'];
+    _eligibleDepartments = (rawDepts is List && rawDepts.isNotEmpty)
+        ? rawDepts.map((d) => d.toString()).toSet()
+        : _allDepartments.toSet();
+
     // Industry / Category setup
     final rawIndustry = widget.posting['industry']?.toString() ?? 'Marketing & Sales';
     if (_industriesList.contains(rawIndustry)) {
@@ -109,22 +125,57 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
       _selectedIndustry = 'Other';
       _customIndustryController.text = rawIndustry;
     }
+    _loadDynamicIndustries(rawIndustry);
   }
 
   late String _selectedIndustry;
   final _customIndustryController = TextEditingController();
-  static const List<String> _industriesList = [
-    'Finance & Accounting',
-    'Banking & Insurance',
-    'Business Administration',
+  List<String> _industriesList = [
+    'E-Commerce',
+    'Retail & Wholesale',
+    'Logistics & Supply Chain',
     'Marketing & Sales',
-    'Human Resource Management',
-    'Computer Applications',
-    'Web & App Development',
-    'IT Support & Systems',
-    'Software Engineering',
+    'Fintech & Finance',
+    'E-Commerce Operations',
+    'Digital Marketing',
+    'Business Analytics',
+    'Customer Support',
     'Other'
   ];
+
+  Future<void> _loadDynamicIndustries(String currentIndustry) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('internships')
+          .select('industry');
+      if (response != null && response is List) {
+        final dbIndustries = response
+            .map((item) => item['industry']?.toString().trim() ?? '')
+            .where((s) => s.isNotEmpty)
+            .toSet();
+        
+        setState(() {
+          _industriesList.remove('Other');
+          for (final ind in dbIndustries) {
+            if (!_industriesList.contains(ind)) {
+              _industriesList.add(ind);
+            }
+          }
+          _industriesList.add('Other');
+
+          // Re-evaluate selected industry now that list is updated
+          if (_industriesList.contains(currentIndustry)) {
+            _selectedIndustry = currentIndustry;
+            if (currentIndustry != 'Other') {
+              _customIndustryController.clear();
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dynamic industries: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -286,10 +337,16 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         const SnackBar(content: Text('Please select at least one active day.')));
       return;
     }
+    if (_eligibleDepartments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one target department.')));
+      return;
+    }
 
     setState(() => _isSaving = true);
     try {
       final sortedDays = _allDays.where((d) => _activeDays.contains(d)).toList();
+      final sortedDepts = _allDepartments.where((d) => _eligibleDepartments.contains(d)).toList();
 
       final finalIndustry = _selectedIndustry == 'Other'
           ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
@@ -308,6 +365,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         'responsibilities': _tasks,
         'notes'           : notesController.text.trim(),
         'active_days'     : sortedDays,
+        'eligible_departments': sortedDepts,
         'application_duration_days': int.tryParse(activeDurationController.text.trim()) ?? 7,
         'vacancies'       : int.tryParse(vacanciesController.text.trim()) ?? 1,
         'deadline'        : DateTime(
@@ -596,6 +654,18 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
                   const SizedBox(width: 16),
                   Expanded(child: _expectedStartDateField()),
                 ]),
+                const SizedBox(height: 32),
+
+                // ── Target Departments ─────────────────────────────────────
+                _label('> TARGET_DEPARTMENTS_TERMINAL'),
+                const SizedBox(height: 8),
+                const Text('Select which student departments are eligible for this posting',
+                    style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 16),
+                _departmentPickerSection(),
                 const SizedBox(height: 32),
 
                 // ── Location ──────────────────────────────────────────────
@@ -1106,6 +1176,121 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
         ),
+      ),
+    );
+  }
+
+  Widget _departmentPickerSection() {
+    final allSelected = _eligibleDepartments.length == _allDepartments.length;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Quick Select:',
+                  style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (allSelected) {
+                      _eligibleDepartments.clear();
+                    } else {
+                      _eligibleDepartments.addAll(_allDepartments);
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: allSelected ? const Color(0xFF6366F1).withValues(alpha: 0.1) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: allSelected ? const Color(0xFF6366F1) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Text(
+                    allSelected ? 'Deselect All' : 'Select All',
+                    style: TextStyle(
+                      color: allSelected ? const Color(0xFF6366F1) : const Color(0xFF475569),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 10,
+            children: _allDepartments.map((dept) {
+              final isSelected = _eligibleDepartments.contains(dept);
+              return FilterChip(
+                label: Text(dept),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _eligibleDepartments.add(dept);
+                    } else {
+                      _eligibleDepartments.remove(dept);
+                    }
+                  });
+                },
+                selectedColor: const Color(0xFF6366F1),
+                backgroundColor: const Color(0xFFF8FAFC),
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF334155),
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+                    width: 1.5,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (_eligibleDepartments.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Divider(color: Color(0xFFF1F5F9), height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.school_rounded, size: 13, color: Color(0xFF6366F1)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    allSelected
+                        ? 'All departments are eligible for this internship'
+                        : '${_eligibleDepartments.length} of ${_allDepartments.length} departments selected (${_eligibleDepartments.join(', ')})',
+                    style: const TextStyle(
+                      color: Color(0xFF6366F1),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -304,7 +304,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                             _buildDropdownField(
                               label: 'Department / Major',
                               value: _selectedDepartment,
-                              items: ['B.Com LSCM', 'B.Com AF', 'BCA', 'BBA'],
+                              items: ['B.Com LSCM', 'B.Com A&F', 'B.Com (Regular)', 'BCA', 'BBA'],
                               onChanged: (val) => setState(() => _selectedDepartment = val!),
                             ),
                           ]),

@@ -256,7 +256,7 @@ class StudentPortalRepository {
         .from('internships')
         .select('id, role, industry, location, stipend, duration, deadline, '
             'brand_color, logo_initial, about, requirements, responsibilities, '
-            'active_days, notes, vacancies, application_duration_days, created_at, companies(name)')
+            'active_days, eligible_departments, notes, vacancies, application_duration_days, created_at, companies(name)')
         .eq('status', 'INTERVIEWING')
         .order('created_at', ascending: false)
         .timeout(const Duration(seconds: 15));
@@ -758,6 +758,7 @@ class StudentPortalRepository {
       requirements: _stringList(item['requirements']),
       responsibilities: _stringList(item['responsibilities']),
       activeDays: _stringList(item['active_days']),
+      eligibleDepartments: _stringList(item['eligible_departments']),
       notes: item['notes']?.toString() ?? '',
       applicationDurationDays: item['application_duration_days'] != null
           ? int.tryParse(item['application_duration_days'].toString()) ?? 7

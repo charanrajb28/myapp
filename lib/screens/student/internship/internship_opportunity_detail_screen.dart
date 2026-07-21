@@ -226,6 +226,12 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
                   ),
                   const SizedBox(height: 20),
                   _buildSectionCard(
+                    title: 'Eligible Departments',
+                    icon: Icons.school_rounded,
+                    child: _buildEligibleDepartmentsList(o),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSectionCard(
                     title: 'Active Days',
                     icon: Icons.calendar_month_rounded,
                     child: _buildActiveDaysList(o),
@@ -436,6 +442,51 @@ class _InternshipOpportunityDetailScreenState extends State<InternshipOpportunit
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEligibleDepartmentsList(InternshipOpportunity o) {
+    if (o.eligibleDepartments.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Text('Open to all departments.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w600)),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: o.eligibleDepartments.map((dept) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF6366F1)),
+              const SizedBox(width: 6),
+              Text(
+                dept,
+                style: const TextStyle(
+                  color: Color(0xFF4338CA),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 

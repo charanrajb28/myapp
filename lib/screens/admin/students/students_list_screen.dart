@@ -30,7 +30,8 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
 
   final List<String> _defaultDepartments = [
     'B.Com LSCM',
-    'B.Com AF',
+    'B.Com A&F',
+    'B.Com (Regular)',
     'BCA',
     'BBA',
   ];

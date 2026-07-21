@@ -4,10 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 class QrPayloadSecurity {
-  static const String _secret = String.fromEnvironment(
-    'QR_SIGNING_SECRET',
-    defaultValue: 'your_strong_secret_value',
-  );
+  static const String _secret = String.fromEnvironment('QR_SIGNING_SECRET');
 
   /// Builds a signed QR payload that includes full internship details.
   /// [date] is the ISO-8601 date string this QR is valid for (e.g. "2026-07-06").

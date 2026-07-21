@@ -299,8 +299,11 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
               SizedBox(
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCompanyScreen()));
+                  onPressed: () async {
+                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCompanyScreen()));
+                    if (result == true) {
+                      _fetchCompanies();
+                    }
                   },
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Add', style: TextStyle(fontWeight: FontWeight.w600)),

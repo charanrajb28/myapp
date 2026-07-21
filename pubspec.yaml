@@ -1,5 +1,5 @@
 name: myapp
-description: "A new Flutter project."
+description: "Aaroha - Internship Management Platform"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -27,6 +27,7 @@ dependencies:
   file_selector: ^1.1.0
   excel: ^4.0.6
   share_plus: ^12.0.2
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

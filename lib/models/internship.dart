@@ -77,6 +77,7 @@ class InternshipOpportunity {
   final List<String> activeDays;
   final String notes;
   final bool? isApplied;
+  final List<String> eligibleDepartments;
   final int applicationDurationDays;
   final int vacancies;
   final DateTime? createdAt;
@@ -95,6 +96,7 @@ class InternshipOpportunity {
     required this.about,
     this.isApplied = false,
     this.activeDays = const [],
+    this.eligibleDepartments = const [],
     this.notes = '',
     this.applicationDurationDays = 7,
     this.vacancies = 1,

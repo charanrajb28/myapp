@@ -1859,6 +1859,58 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
               ),
             ),
           ],
+          // ── Target Departments ─────────────────────────────────────
+          const SizedBox(height: 32),
+          _sectionTitle('TARGET DEPARTMENTS / COURSES'),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: (widget.posting['eligible_departments'] is List && (widget.posting['eligible_departments'] as List).isNotEmpty)
+                ? Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: (widget.posting['eligible_departments'] as List).map((dept) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: color.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_rounded, size: 14, color: color),
+                            const SizedBox(width: 6),
+                            Text(
+                              dept.toString(),
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  )
+                : const Text(
+                    'All Departments Eligible',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
+
           const SizedBox(height: 24),
         ],
       ),

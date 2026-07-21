@@ -386,10 +386,13 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(
+            onPressed: () async {
+              final result = await Navigator.push(context, MaterialPageRoute(
                 builder: (_) => AddCompanyScreen(company: c),
               ));
+              if (result == true) {
+                _fetchCompanyData();
+              }
             },
             tooltip: 'Edit',
           ),

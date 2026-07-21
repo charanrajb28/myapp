@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth/forgot_password_screen.dart';
@@ -97,6 +98,7 @@ class _MyAppState extends State<MyApp> {
           seedColor: const Color(0xFF1E293B),
           brightness: Brightness.light,
         ),
+        textTheme: GoogleFonts.figtreeTextTheme(ThemeData.light().textTheme),
         useMaterial3: true,
       ),
       home: const AuthGate(),

@@ -101,6 +101,10 @@ ADD COLUMN IF NOT EXISTS feedback_form_schema JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.internships
 ADD COLUMN IF NOT EXISTS application_duration_days INTEGER DEFAULT 7;
 
+-- Target student departments for each internship posting
+ALTER TABLE public.internships
+ADD COLUMN IF NOT EXISTS eligible_departments TEXT[] DEFAULT '{}'::TEXT[];
+
 -- 5. Create internships table (internship opportunities)
 CREATE TABLE IF NOT EXISTS internships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -121,6 +125,7 @@ CREATE TABLE IF NOT EXISTS internships (
   end_date DATE,
   application_duration_days INTEGER DEFAULT 7,
   vacancies INTEGER DEFAULT 1,
+  eligible_departments TEXT[],
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

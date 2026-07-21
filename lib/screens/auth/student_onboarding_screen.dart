@@ -52,7 +52,8 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen>
 
   final List<String> _departments = [
     'B.Com LSCM',
-    'B.Com AF',
+    'B.Com A&F',
+    'B.Com (Regular)',
     'BCA',
     'BBA',
   ];
