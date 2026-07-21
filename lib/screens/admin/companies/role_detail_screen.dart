@@ -76,6 +76,37 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           .update({'status': newStatus})
           .eq('id', widget.id);
 
+      if (newStatus == 'INTERVIEWING') {
+        // Fetch company name if available
+        final postingRes = await Supabase.instance.client
+            .from('internships')
+            .select('role, companies(name)')
+            .eq('id', widget.id)
+            .maybeSingle();
+
+        final roleName = widget.title.isNotEmpty ? widget.title : (postingRes?['role']?.toString() ?? 'New Internship');
+        final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
+
+        // Broadcast notification to all students
+        final studentsRes = await Supabase.instance.client
+            .from('students')
+            .select('user_id');
+
+        if (studentsRes is List && studentsRes.isNotEmpty) {
+          final notifications = studentsRes.map((s) => {
+            'user_id': s['user_id'],
+            'title': 'New Internship Available: $roleName',
+            'message': '$companyName has posted a new opportunity for "$roleName". Apply now in your Student Portal!',
+            'notification_type': 'announcement',
+            'is_read': false,
+          }).toList();
+
+          await Supabase.instance.client
+              .from('student_notifications')
+              .insert(notifications);
+        }
+      }
+
       if (mounted) {
         setState(() {
           _currentStatus = newStatus;
@@ -83,7 +114,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(newStatus == 'INTERVIEWING' ? 'Posting Approved and moved to Open!' : 'Posting Rejected.'),
+            content: Text(newStatus == 'INTERVIEWING' ? 'Posting Approved & Notification Sent to Students!' : 'Posting Rejected.'),
             backgroundColor: newStatus == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
           ),
         );

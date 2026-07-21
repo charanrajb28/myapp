@@ -64,12 +64,43 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
           .update({'status': status})
           .eq('id', id);
 
+      if (status == 'INTERVIEWING') {
+        // Fetch role and company details to send notification
+        final postingRes = await Supabase.instance.client
+            .from('internships')
+            .select('role, companies(name)')
+            .eq('id', id)
+            .maybeSingle();
+
+        final roleName = postingRes?['role']?.toString() ?? 'New Internship';
+        final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
+
+        // Broadcast notification to all students
+        final studentsRes = await Supabase.instance.client
+            .from('students')
+            .select('user_id');
+
+        if (studentsRes is List && studentsRes.isNotEmpty) {
+          final notifications = studentsRes.map((s) => {
+            'user_id': s['user_id'],
+            'title': 'New Internship Available: $roleName',
+            'message': '$companyName has posted a new opportunity for "$roleName". Apply now in your Student Portal!',
+            'notification_type': 'announcement',
+            'is_read': false,
+          }).toList();
+
+          await Supabase.instance.client
+              .from('student_notifications')
+              .insert(notifications);
+        }
+      }
+
       _fetchInternships();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(status == 'INTERVIEWING' ? 'Posting Approved and moved to Open!' : 'Posting Rejected.'),
+            content: Text(status == 'INTERVIEWING' ? 'Posting Approved & Notification Sent to Students!' : 'Posting Rejected.'),
             backgroundColor: status == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
           ),
         );

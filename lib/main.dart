@@ -11,7 +11,7 @@ import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
-import 'utils/device_session_helper.dart';
+import 'utils/device_session_helper.dart';import 'services/onesignal_service.dart';
 
 
 void main() async {
@@ -49,6 +49,12 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+
+    // Initialize OneSignal Push Notifications with navigator context
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      OneSignalService.initialize(_navigatorKey.currentContext);
+    });
+
     _authSubscription =
         Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final session = data.session;
@@ -58,12 +64,15 @@ class _MyAppState extends State<MyApp> {
       // let it handle routing itself.
       if (suppressAuthRedirect) return;
 
-      // Active session — nothing to do here; screens handle their own routing.
-      if (session != null) return;
+      if (session != null) {
+        OneSignalService.login(session.user.id);
+        return;
+      }
 
       // Only redirect to login on explicit sign-out.
       // (AuthChangeEvent.userDeleted is deprecated and never fired.)
       if (event == AuthChangeEvent.signedOut) {
+        OneSignalService.logout();
         _redirectToLogin();
       }
     });
