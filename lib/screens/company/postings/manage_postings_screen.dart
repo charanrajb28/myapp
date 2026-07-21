@@ -403,8 +403,6 @@ class _JobIndustrialCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(posting['role'].toUpperCase(), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                      const SizedBox(height: 6),
-                      _statusChip('${posting['applicants']} APPLICANTS', color),
                     ],
                   ),
                 ),

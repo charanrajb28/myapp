@@ -266,51 +266,6 @@ class StudentInternshipDetailScreen extends StatelessWidget {
                 );
               }),
             const SizedBox(height: 32),
-            
-            // Mentor info (unique to active)
-            _sectionTitle('Mentor & Support'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [internship.brandColor.withValues(alpha: 0.05), Colors.white],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: internship.brandColor.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: internship.brandColor.withValues(alpha: 0.2),
-                    child: Icon(Icons.person_rounded, color: internship.brandColor),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          internship.mentorName,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                        ),
-                        Text(
-                          internship.mentorEmail,
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.mail_rounded, color: internship.brandColor, size: 20),
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 32),
             const SizedBox(height: 40),
           ],
         ),

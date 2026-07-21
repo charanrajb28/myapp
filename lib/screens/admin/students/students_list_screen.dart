@@ -665,93 +665,68 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
                       ),
               ),
 
-              // ── Interactive Horizontal Scroll Data Table ──
+              // ── Native Vertical Student List ──
               Expanded(
                 child: isLoading 
                   ? const Center(child: CircularProgressIndicator())
                   : activeStudents.isEmpty
                     ? const Center(child: Text('No students found.'))
-                    : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: SizedBox(
-                    width: isMobile ? 850 : constraints.maxWidth - 40,
-                    child: Column(
-                      children: [
-                        // Header
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 56), // Avatar spacer
-                              Expanded(flex: 3, child: _headerText('STUDENT INFO')),
-                              Expanded(flex: 2, child: _headerText('DEPARTMENT')),
-                              Expanded(flex: 2, child: _headerText('INTERNSHIP STATUS')),
-                              const SizedBox(width: 40), // Action icon spacer
-                            ],
-                          ),
-                        ),
-                        // List Content
-                        Expanded(
-                          child: ListView.separated(
-                            padding: const EdgeInsets.only(bottom: 24),
-                            itemCount: activeStudents.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final student = activeStudents[index];
-                              final name = student['name'] ?? 'Unknown';
-                              final department = student['department'] ?? 'Dept. Not Assigned';
-                              final collegeId = student['college'] ?? 'ID-Not-Set';
-                              final semester = student['semester'] ?? 'N/A';
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 24, top: 12),
+                          itemCount: activeStudents.length,
+                          separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                          itemBuilder: (context, index) {
+                            final student = activeStudents[index];
+                            final name = student['name'] ?? 'Unknown';
+                            final department = student['department'] ?? 'Dept. Not Assigned';
+                            final collegeId = student['college'] ?? 'ID-Not-Set';
+                            final semester = student['semester'] ?? 'N/A';
+                            
+                            final email = student['contact_email'] ?? student['email'] ?? department;
                               
-                              final email = student['contact_email'] ?? student['email'] ?? department;
-                                
-                              // For MVP, we use dummy status since joining applications adds complexity
-                              final status = 'Active'; 
-                              final company = 'Unassigned';
-                              
-                              return _buildStudentDashboardTile(
-                                name: name,
-                                email: email,
-                                collegeId: collegeId,
-                                department: department,
-                                semester: semester,
-                                status: status,
-                                company: company,
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => StudentDetailScreen(
-                                        studentId: student['id'].toString(),
-                                        studentName: name,
-                                        collegeId: collegeId,
-                                        status: status,
-                                        department: department,
-                                        company: company,
-                                      ),
+                            final status = 'Active'; 
+                            final company = 'Unassigned';
+                            
+                            return _buildStudentDashboardTile(
+                              name: name,
+                              email: email,
+                              collegeId: collegeId,
+                              department: department,
+                              semester: semester,
+                              status: status,
+                              company: company,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => StudentDetailScreen(
+                                      studentId: student['id'].toString(),
+                                      studentName: name,
+                                      collegeId: collegeId,
+                                      status: status,
+                                      department: department,
+                                      company: company,
                                     ),
-                                  ).then((value) {
-                                    if (value == true) _refreshStudents();
-                                  });
-                                },
-                                onEdit: () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => AddStudentScreen(student: student)),
-                                  );
-                                  if (result == true) _refreshStudents();
-                                },
-                                onBlacklist: () => _toggleBlacklist(student['id'], student['is_blacklisted'] ?? false),
-                                onDelete: () => _deleteStudent(student['id']),
-                                isBlacklisted: student['is_blacklisted'] ?? false,
-                              );
-                            },
-                          ),
+                                  ),
+                                ).then((value) {
+                                  if (value == true) _refreshStudents();
+                                });
+                              },
+                              onEdit: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => AddStudentScreen(student: student)),
+                                );
+                                if (result == true) _refreshStudents();
+                              },
+                              onBlacklist: () => _toggleBlacklist(student['id'], student['is_blacklisted'] ?? false),
+                              onDelete: () => _deleteStudent(student['id']),
+                              isBlacklisted: student['is_blacklisted'] ?? false,
+                            );
+                          },
                         ),
-                      ],
-                    ),
-                  ),
-                ),
+                      ),
               ),
             ],
           );
@@ -850,23 +825,22 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _sortBy,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-          style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w600, fontSize: 14),
-          alignment: AlignmentDirectional.center,
-          isExpanded: true,
-          items: <String>['Newest', 'Oldest', 'A-Z', 'Status'].map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text('Sort: $value'),
-            );
-          }).toList(),
-          onChanged: (newValue) {
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
+          style: const TextStyle(color: Color(0xFF334155), fontWeight: FontWeight.w700, fontSize: 13),
+          onChanged: (String? newValue) {
             if (newValue != null) {
               setState(() {
                 _sortBy = newValue;
               });
             }
           },
+          items: <String>['Newest', 'Oldest', 'A-Z', 'Status']
+              .map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text('Sort: $value'),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -917,14 +891,14 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
     );
   }
 
-  Widget _headerText(String title) {
+  Widget _headerText(String text) {
     return Text(
-      title,
+      text,
       style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFF94A3B8),
-        letterSpacing: 0.5,
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+        color: Color(0xFF64748B),
+        letterSpacing: 0.8,
       ),
     );
   }
@@ -943,19 +917,12 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
     required VoidCallback onDelete,
     bool isBlacklisted = false,
   }) {
-    final isAlert = status == 'Red Alert';
-    final isUnassigned = status == 'Unassigned';
-    
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: isBlacklisted ? const Color(0xFFFEF2F2).withValues(alpha: 0.5) : Colors.white,
+        color: isBlacklisted ? const Color(0xFFFEF2F2) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isBlacklisted 
-              ? const Color(0xFFFCA5A5) 
-              : (isAlert ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0)), 
-          width: (isBlacklisted || isAlert) ? 1.5 : 1.0,
-        ),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -964,21 +931,18 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
           onTap: onTap,
           hoverColor: const Color(0xFFF8FAFC),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
             child: Row(
               children: [
-                // Avatar
                 CircleAvatar(
-                  backgroundColor: (isBlacklisted || isAlert) ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
-                  foregroundColor: (isBlacklisted || isAlert) ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                  backgroundColor: isBlacklisted ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9),
+                  foregroundColor: isBlacklisted ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
                   radius: 20,
-                  child: Text(name.substring(0, 1), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(name.isNotEmpty ? name.substring(0, 1) : '?', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 
-                // Student Info (Flex 3)
                 Expanded(
-                  flex: 3,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -987,27 +951,37 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
                           Flexible(
                             child: Text(
                               name,
-                              style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 15),
+                              style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontSize: 14),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (isBlacklisted) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.black,
-                                borderRadius: BorderRadius.circular(4),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isBlacklisted ? const Color(0xFFDC2626) : const Color(0xFF10B981).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: isBlacklisted ? const Color(0xFFDC2626) : const Color(0xFF10B981),
+                                width: 1,
                               ),
-                              child: const Text('BLACKLISTED', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                             ),
-                          ],
+                            child: Text(
+                              isBlacklisted ? 'BLOCKED' : 'ACTIVE',
+                              style: TextStyle(
+                                color: isBlacklisted ? Colors.white : const Color(0xFF047857),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 2),
                       Text(
                         email,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1015,57 +989,11 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
                   ),
                 ),
                 
-                // Department (Flex 2)
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        department,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF334155), fontSize: 14),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        semester,
-                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Status / Company (Flex 2)
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStatusBadge(status),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(isUnassigned ? Icons.help_outline_rounded : Icons.domain_rounded, size: 12, color: const Color(0xFF94A3B8)),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              company,
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Actions
                 PopupMenuButton<String>(
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.more_vert_rounded, 
-                    color: isBlacklisted ? Colors.red : const Color(0xFF94A3B8), 
-                    size: 20
+                    color: Color(0xFF64748B), 
+                    size: 20,
                   ),
                   onSelected: (value) {
                     if (value == 'edit') onEdit();

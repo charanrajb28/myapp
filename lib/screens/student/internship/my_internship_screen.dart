@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../models/internship.dart';
 import '../../../providers/student_internships_provider.dart';
 import 'internship_opportunity_detail_screen.dart';
@@ -1465,13 +1466,20 @@ class InternshipDetailScreen extends StatelessWidget {
                       color: internship.brandColor,
                       child: _RoleSection(internship: internship),
                     ),
-                    const SizedBox(height: 36),
-                    _DetailSectionCard(
-                      title: 'Industry Mentor',
-                      icon: Icons.person_pin_rounded,
-                      color: const Color(0xFF8B5CF6),
-                      child: _MentorSection(internship: internship),
-                    ),
+                    if (internship.feedbackFormSchema != null &&
+                        internship.feedbackFormSchema!.isNotEmpty &&
+                        internship.feedbackFormSchema!.first is Map &&
+                        (internship.feedbackFormSchema!.first['gform_url']?.toString().isNotEmpty ?? false)) ...[
+                      const SizedBox(height: 36),
+                      _DetailSectionCard(
+                        title: 'Internship Feedback Form',
+                        icon: Icons.assignment_turned_in_rounded,
+                        color: const Color(0xFF10B981),
+                        child: _GoogleFormFeedbackSection(
+                          gformUrl: internship.feedbackFormSchema!.first['gform_url'].toString(),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 36),
                     _DetailSectionCard(
                       title: 'Documents',
@@ -1833,6 +1841,93 @@ class _MentorSection extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF475569))),
       ]),
+    );
+  }
+}
+
+// ─── Google Form Feedback Section ──────────────────────────────────
+class _GoogleFormFeedbackSection extends StatelessWidget {
+  final String gformUrl;
+  const _GoogleFormFeedbackSection({required this.gformUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFA7F3D0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.assignment_turned_in_rounded, color: Color(0xFF059669), size: 20),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mandatory Feedback Form',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF065F46)),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Please open and complete the Google Form feedback to evaluate your internship experience.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF047857), fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              String rawUrl = gformUrl.trim();
+              if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+                rawUrl = 'https://$rawUrl';
+              }
+              final uri = Uri.parse(rawUrl);
+              try {
+                final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!launched) {
+                  await launchUrl(uri, mode: LaunchMode.platformDefault);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open link: $rawUrl'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: const Text('OPEN GOOGLE FORM', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

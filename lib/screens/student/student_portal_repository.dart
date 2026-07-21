@@ -229,16 +229,18 @@ class StudentPortalRepository {
   Future<List<InternshipOpportunity>> fetchAvailableInternships() async {
     final user = _client.auth.currentUser;
     Set<String> appliedInternshipIds = {};
+    String? studentDept;
 
     if (user != null) {
       final student = await _client
           .from('students')
-          .select('id')
+          .select('id, department')
           .eq('user_id', user.id)
           .maybeSingle()
           .timeout(const Duration(seconds: 15));
 
       if (student != null) {
+        studentDept = student['department']?.toString().trim();
         final appliedResponse = await _client
             .from('applications')
             .select('internship_id')
@@ -261,14 +263,26 @@ class StudentPortalRepository {
         .order('created_at', ascending: false)
         .timeout(const Duration(seconds: 15));
 
-    return (response as List)
-        .map(
-          (item) => _mapOpportunity(
-            item as Map<String, dynamic>,
-            appliedInternshipIds,
-          ),
-        )
-        .toList();
+    final allItems = (response as List).map(
+      (item) => _mapOpportunity(
+        item as Map<String, dynamic>,
+        appliedInternshipIds,
+      ),
+    ).toList();
+
+    if (studentDept == null || studentDept.isEmpty) {
+      return allItems;
+    }
+
+    return allItems.where((opp) {
+      // If eligibleDepartments is empty, it defaults to all departments eligible
+      if (opp.eligibleDepartments.isEmpty) return true;
+
+      // Case-insensitive match check for student department in eligible list
+      return opp.eligibleDepartments.any((dept) {
+        return dept.trim().toLowerCase() == studentDept!.toLowerCase();
+      });
+    }).toList();
   }
 
   Future<List<StudentNotification>> fetchStudentNotifications() async {

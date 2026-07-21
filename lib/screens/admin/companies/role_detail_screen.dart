@@ -237,6 +237,8 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     );
   }
 
+  String _gformUrl = '';
+
   Future<void> _checkForm() async {
     if (widget.id.isEmpty) {
       if (mounted) setState(() => _isLoadingForm = false);
@@ -252,7 +254,15 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
       final schema = res['feedback_form_schema'];
       if (mounted) {
         setState(() {
-          _hasForm = schema != null && (schema as List).isNotEmpty;
+          if (schema is List && schema.isNotEmpty && schema.first is Map && schema.first['gform_url'] != null) {
+            _gformUrl = schema.first['gform_url'].toString();
+            _hasForm = _gformUrl.isNotEmpty;
+          } else if (schema is List && schema.isNotEmpty) {
+            _hasForm = true;
+          } else {
+            _hasForm = false;
+            _gformUrl = '';
+          }
         });
       }
     } catch (e) {
@@ -262,12 +272,106 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     }
   }
 
+  void _showGFormDialog() {
+    final controller = TextEditingController(text: _gformUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.link_rounded, color: Color(0xFF10B981)),
+            SizedBox(width: 10),
+            Text('Add Google Form Link', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF0F172A))),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Paste your Google Form URL for students to fill out when completing this internship.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: 'https://forms.gle/... or https://docs.google.com/forms/...',
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final link = controller.text.trim();
+              if (link.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a Google Form URL'), backgroundColor: Color(0xFFEF4444)),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              setState(() => _isLoadingForm = true);
+              try {
+                final newSchema = [
+                  {'gform_url': link, 'created_at': DateTime.now().toIso8601String()}
+                ];
+                await Supabase.instance.client
+                    .from('internships')
+                    .update({'feedback_form_schema': newSchema})
+                    .eq('id', widget.id);
+
+                if (mounted) {
+                  setState(() {
+                    _gformUrl = link;
+                    _hasForm = true;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Google Form link saved successfully!'), backgroundColor: Color(0xFF10B981)),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error saving GForm link: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save link: $e'), backgroundColor: const Color(0xFFEF4444)),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isLoadingForm = false);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('SAVE LINK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _clearForm() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear Form?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-        content: const Text('This will delete all custom questions for this form. Are you sure?'),
+        title: const Text('Remove Google Form Link?', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+        content: const Text('This will remove the attached Google Form link for students. Are you sure?'),
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
@@ -284,7 +388,10 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                     .from('internships')
                     .update({'feedback_form_schema': []})
                     .eq('id', widget.id);
-                setState(() => _hasForm = false);
+                setState(() {
+                  _hasForm = false;
+                  _gformUrl = '';
+                });
               } catch (e) {
                 debugPrint('Error clearing form: $e');
               } finally {
@@ -296,7 +403,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
               foregroundColor: Colors.white,
               elevation: 0,
             ),
-            child: const Text('Clear Form'),
+            child: const Text('Remove Link'),
           ),
         ],
       ),
@@ -535,57 +642,57 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text('Feedback Form', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
-                        ),
-                        if (widget.id.isNotEmpty)
-                          _isLoadingForm 
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Row(
-                                children: [
-                                  if (_hasForm) ...[
-                                    OutlinedButton.icon(
-                                      onPressed: _clearForm,
-                                      icon: const Icon(Icons.delete_outline, size: 16),
-                                      label: const Text('Clear'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: const Color(0xFFEF4444),
-                                        side: const BorderSide(color: Color(0xFFFECACA)),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => AdminFormBuilderScreen(internshipId: widget.id),
-                                        ),
-                                      ).then((_) => _checkForm());
-                                    },
-                                    icon: Icon(_hasForm ? Icons.edit_document : Icons.add_circle_outline, size: 16),
-                                    label: Text(_hasForm ? 'Configure' : 'Create'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _hasForm ? const Color(0xFF1D4ED8) : const Color(0xFF10B981),
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ]
+                    const Text(
+                      'Google Form Feedback', 
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2),
                     ),
-                    const SizedBox(height: 12),
-                    const Text('Create custom feedback questions for students to answer when their internship completes.',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Text(
+                      _hasForm 
+                          ? 'Attached Form: $_gformUrl' 
+                          : 'Attach a Google Form URL for students to complete their feedback response upon internship completion.',
+                      style: TextStyle(
+                        color: _hasForm ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                        fontSize: 13,
+                        fontWeight: _hasForm ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (widget.id.isNotEmpty)
+                      _isLoadingForm 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Row(
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _showGFormDialog,
+                                icon: Icon(_hasForm ? Icons.edit_rounded : Icons.add_link_rounded, size: 16),
+                                label: Text(_hasForm ? 'Edit GForm Link' : 'Add GForm Link'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _hasForm ? const Color(0xFF1D4ED8) : const Color(0xFF10B981),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ),
+                              if (_hasForm) ...[
+                                const SizedBox(width: 10),
+                                OutlinedButton.icon(
+                                  onPressed: _clearForm,
+                                  icon: const Icon(Icons.delete_outline, size: 16),
+                                  label: const Text('Remove'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFEF4444),
+                                    side: const BorderSide(color: Color(0xFFFECACA)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                   ],
                 ),
               ),
@@ -677,7 +784,22 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                         ),
                       )
                     else
-                      ...widget.applicants.map((a) => _ApplicantRow(applicant: a)),
+                      ...widget.applicants.map((a) => _ApplicantRow(
+                            applicant: a,
+                            onStatusUpdate: (appId, newStatus) async {
+                              try {
+                                await Supabase.instance.client
+                                    .from('applications')
+                                    .update({'status': newStatus})
+                                    .eq('id', appId);
+                                setState(() {
+                                  a['status'] = newStatus;
+                                });
+                              } catch (e) {
+                                debugPrint('Error updating status: $e');
+                              }
+                            },
+                          )),
                   ],
                 ),
               ),
@@ -745,7 +867,9 @@ class _MetaBox extends StatelessWidget {
 
 class _ApplicantRow extends StatelessWidget {
   final Map<String, dynamic> applicant;
-  const _ApplicantRow({required this.applicant});
+  final Function(String appId, String newStatus)? onStatusUpdate;
+
+  const _ApplicantRow({required this.applicant, this.onStatusUpdate});
 
   static const _avatarColors = [
     Color(0xFF6366F1), Color(0xFF0EA5E9), Color(0xFF10B981),
@@ -758,6 +882,7 @@ class _ApplicantRow extends StatelessWidget {
     final id     = applicant['id']?.toString() ?? 'N/A';
     final dept   = applicant['dept']?.toString() ?? 'CS';
     final status = applicant['status']?.toString() ?? 'Applied';
+    final appId  = applicant['application_id']?.toString() ?? applicant['id']?.toString() ?? '';
     final avatarColor = _avatarColors[name.codeUnitAt(0) % _avatarColors.length];
 
     return Container(
@@ -770,60 +895,122 @@ class _ApplicantRow extends StatelessWidget {
           BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            final appId = applicant['application_id']?.toString() ?? '';
-            if (appId.isNotEmpty) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StudentInfoScreen(
-                    applicationId: appId,
-                    studentName: name,
-                    progress: double.tryParse(applicant['progress']?.toString() ?? '0') ?? 0.0,
-                    checkins: applicant['checkins'] as List? ?? [],
-                    showSendAlert: true,
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                if (appId.isNotEmpty) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentInfoScreen(
+                        applicationId: appId,
+                        studentName: name,
+                        progress: double.tryParse(applicant['progress']?.toString() ?? '0') ?? 0.0,
+                        checkins: applicant['checkins'] as List? ?? [],
+                        showSendAlert: false,
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(children: [
+                  // Avatar
+                  Container(
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: avatarColor.withValues(alpha: 0.1),
+                    ),
+                    child: Center(
+                      child: Text(name[0],
+                        style: TextStyle(fontWeight: FontWeight.w800, color: avatarColor, fontSize: 18)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Info
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name,
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 15, letterSpacing: -0.3),
+                      overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text('$id • $dept', 
+                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis),
+                  ])),
+                  const SizedBox(width: 12),
+                  _StatusBadge(status: status),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 20),
+                ]),
+              ),
+            ),
+          ),
+          if (onStatusUpdate != null && (status == 'Applied' || status == 'Under Review')) ...[
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 36,
+                      child: OutlinedButton.icon(
+                        onPressed: () => onStatusUpdate!(appId, 'Rejected'),
+                        icon: const Icon(Icons.close_rounded, size: 14),
+                        label: const Text('REJECT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEF4444),
+                          side: const BorderSide(color: Color(0xFFFECACA)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 36,
+                      child: ElevatedButton.icon(
+                        onPressed: () => onStatusUpdate!(appId, 'Accepted'),
+                        icon: const Icon(Icons.check_rounded, size: 14),
+                        label: const Text('ACCEPT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (onStatusUpdate != null && (status == 'Accepted' || status == 'Rejected')) ...[
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => onStatusUpdate!(appId, 'Applied'),
+                  icon: const Icon(Icons.undo_rounded, size: 13),
+                  label: const Text('RESET STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF64748B),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 ),
-              );
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              // Avatar
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: avatarColor.withValues(alpha: 0.1),
-                ),
-                child: Center(
-                  child: Text(name[0],
-                    style: TextStyle(fontWeight: FontWeight.w800, color: avatarColor, fontSize: 18)),
-                ),
               ),
-              const SizedBox(width: 16),
-              // Info
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(name,
-                  style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontSize: 15, letterSpacing: -0.3),
-                  overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text('$id • $dept', 
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
-                  overflow: TextOverflow.ellipsis),
-              ])),
-              const SizedBox(width: 12),
-              _StatusBadge(status: status),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 20),
-            ]),
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }

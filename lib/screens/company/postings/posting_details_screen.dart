@@ -866,6 +866,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
 
   Widget _buildContent(Color color) {
     final status = _posting['status']?.toString().toUpperCase() ?? 'INTERVIEWING';
+    final hasActiveStudentsTab = status == 'ACTIVE' || status == 'CLOSED';
     final hasQrTab = status == 'ACTIVE' || status == 'CLOSED';
 
     return Column(
@@ -875,16 +876,18 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
           child: Row(
             children: [
               Expanded(
-                child: _tabButton(0, 'APPLICANTS', _displayedApplicants.length.toString()),
+                child: _tabButton(0, 'DESCRIPTION', null),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _tabButton(1, 'DESCRIPTION', null),
-              ),
+              if (hasActiveStudentsTab) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _tabButton(1, 'INTERNS', _displayedApplicants.length.toString()),
+                ),
+              ],
               if (hasQrTab) ...[
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _tabButton(2, 'CHECK-IN QR', null),
+                  child: _tabButton(hasActiveStudentsTab ? 2 : 1, 'CHECK-IN QR', null),
                 ),
               ],
             ],
@@ -899,8 +902,8 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
               });
             },
             children: [
-              _buildApplicantsList(color),
               _buildDescription(color),
+              if (hasActiveStudentsTab) _buildApplicantsList(color),
               if (hasQrTab) _buildQrCodeTab(color),
             ],
           ),
