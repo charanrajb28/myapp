@@ -40,7 +40,7 @@ class CompanyDetailScreen extends StatefulWidget {
 
 class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   int _tabIndex = 0;
-  static const _tabs = ['Overview', 'Open Roles', 'Ongoing Roles', 'Past Roles'];
+  static const _tabs = ['Overview', 'Review', 'Open Roles', 'Ongoing Roles', 'Past Roles'];
   late final PageController _pageController;
   
   bool _isLoading = true;
@@ -447,6 +447,11 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   }
 
   Widget _buildTabContent(CompanyDetailArgs c, bool isMobile) {
+    final reviewRoles = _openRoles.where((r) {
+      final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
+      return status == 'UNDER_REVIEW';
+    }).toList();
+
     final interviewingRoles = _openRoles.where((r) {
       final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
       return status == 'INTERVIEWING';
@@ -459,7 +464,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
 
     final closedRoles = _openRoles.where((r) {
       final status = (r['status'] as String? ?? 'INTERVIEWING').toUpperCase();
-      return status == 'CLOSED';
+      return status == 'CLOSED' || status == 'REJECTED';
     }).toList();
 
     return PageView(
@@ -469,6 +474,14 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
         SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
           child: _OverviewTab(c: c, isMobile: isMobile),
+        ),
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
+          child: _RolesTab(
+            roles: reviewRoles,
+            statusName: 'Review',
+            emptyIcon: Icons.rate_review_outlined,
+          ),
         ),
         SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(isMobile ? 16.0 : 24.0, 0, isMobile ? 16.0 : 24.0, 48),
@@ -1043,15 +1056,19 @@ class _RolesTab extends StatelessWidget {
                                   builder: (_) => RoleDetailScreen(
                                     id: role['id']?.toString() ?? '',
                                     title: role['role'] ?? 'Intern Role',
-                                    type: 'Full-time',
+                                    type: role['location'] ?? 'Full-time',
                                     deadline: role['deadline'] ?? 'TBD',
-                                    slots: role['total_slots']?.toString() ?? '0',
-                                    startDate: 'May 1, 2025',
-                                    duration: '6 Months',
+                                    slots: role['vacancies']?.toString() ?? role['total_slots']?.toString() ?? '0',
+                                    startDate: role['start_date'] ?? 'TBD',
+                                    duration: '${role['duration'] ?? 3}',
                                     description: role['about'] ?? 'No description provided.',
                                     responsibilities: List<String>.from(role['responsibilities'] ?? []),
                                     activeDays: List<String>.from(role['active_days'] ?? []),
+                                    eligibleDepartments: List<String>.from(role['eligible_departments'] ?? []),
+                                    stipend: role['stipend']?.toString() ?? '',
+                                    location: role['location']?.toString() ?? '',
                                     notes: role['notes']?.toString() ?? '',
+                                    status: role['status']?.toString() ?? 'INTERVIEWING',
                                     applicants: (role['applications'] as List? ?? []).map((app) {
                                       final student = app['students'] as Map<String, dynamic>? ?? {};
                                       return {

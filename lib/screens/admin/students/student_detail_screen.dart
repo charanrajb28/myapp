@@ -552,10 +552,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
                 // ── State-Based Content Layout ──
                 if (_activeTabIndex == 0) ...[
-                  // ── Responsive Split Layout for Details ──
+                  // ── Responsive Layout for Academic & Personal Details ──
                   if (isMobile) ...[
-                    _buildCurrentInternshipCard(company, isUnassigned, isMobile),
-                    const SizedBox(height: 24),
                     _buildAcademicProfileCard(isMobile, department),
                     const SizedBox(height: 24),
                     _buildPersonalDetailsCard(isMobile, studentName),
@@ -564,24 +562,16 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          flex: 5,
-                          child: _buildCurrentInternshipCard(company, isUnassigned, isMobile),
+                          child: _buildAcademicProfileCard(isMobile, department),
                         ),
                         const SizedBox(width: 24),
                         Expanded(
-                          flex: 4,
-                          child: Column(
-                            children: [
-                              _buildAcademicProfileCard(isMobile, department),
-                              const SizedBox(height: 24),
-                              _buildPersonalDetailsCard(isMobile, studentName),
-                            ],
-                          ),
+                          child: _buildPersonalDetailsCard(isMobile, studentName),
                         ),
-                    ],
-                  ),
-                ]
-              ] else if (_activeTabIndex == 1) ...[
+                      ],
+                    ),
+                  ]
+                ] else if (_activeTabIndex == 1) ...[
                 _buildActiveInternshipsTab(isMobile),
               ] else if (_activeTabIndex == 2) ...[
                 _buildApplicationsTab(isMobile),

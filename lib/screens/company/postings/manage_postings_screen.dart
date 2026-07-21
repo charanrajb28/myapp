@@ -216,7 +216,7 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: const Color(0xFFF1F5F9),
         floatingActionButton: FloatingActionButton.extended(
@@ -257,6 +257,7 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                           unselectedLabelColor: const Color(0xFF94A3B8),
                           dividerColor: Colors.transparent,
                           tabs: const [
+                            Tab(text: 'UNDER REVIEW'),
                             Tab(text: 'INTERVIEWING'),
                             Tab(text: 'ACTIVE JOBS'),
                             Tab(text: 'CLOSED JOBS'),
@@ -272,6 +273,7 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
                    : TabBarView(
                         physics: const BouncingScrollPhysics(),
                         children: [
+                          _buildListForStatus('UNDER_REVIEW'),
                           _buildListForStatus('INTERVIEWING'),
                           _buildListForStatus('ACTIVE'),
                           _buildListForStatus('CLOSED'),

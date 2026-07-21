@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../feedbacks/admin_form_builder_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
+import '../../company/postings/edit_posting_screen.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -15,7 +16,11 @@ class RoleDetailScreen extends StatefulWidget {
   final String description;
   final List<String> responsibilities;
   final List<String> activeDays;
+  final List<String> eligibleDepartments;
+  final String stipend;
+  final String location;
   final String notes;
+  final String status;
   final List<Map<String, dynamic>> applicants;
 
   const RoleDetailScreen({
@@ -30,7 +35,11 @@ class RoleDetailScreen extends StatefulWidget {
     required this.description,
     required this.responsibilities,
     this.activeDays = const [],
+    this.eligibleDepartments = const [],
+    this.stipend = '',
+    this.location = '',
     this.notes = '',
+    this.status = 'INTERVIEWING',
     required this.applicants,
   });
 
@@ -42,6 +51,9 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
   bool _hasForm = false;
   bool _isLoadingForm = true;
 
+  late String _currentStatus;
+  bool _isUpdatingStatus = false;
+
   final _broadcastTitleController = TextEditingController();
   final _broadcastMessageController = TextEditingController();
   bool _sendingBroadcast = false;
@@ -49,7 +61,40 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _currentStatus = widget.status.toUpperCase();
     _checkForm();
+  }
+
+  Future<void> _updatePostingStatus(String newStatus) async {
+    if (widget.id.isEmpty) return;
+    setState(() => _isUpdatingStatus = true);
+    try {
+      await Supabase.instance.client
+          .from('internships')
+          .update({'status': newStatus})
+          .eq('id', widget.id);
+
+      if (mounted) {
+        setState(() {
+          _currentStatus = newStatus;
+          _isUpdatingStatus = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newStatus == 'INTERVIEWING' ? 'Posting Approved and moved to Open!' : 'Posting Rejected.'),
+            backgroundColor: newStatus == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating posting status: $e');
+      if (mounted) {
+        setState(() => _isUpdatingStatus = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update status: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
   }
 
   @override
@@ -443,10 +488,47 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
         scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF0F172A)),
-            onPressed: () {},
             tooltip: 'Options',
+            onSelected: (val) async {
+              if (val == 'edit' && widget.id.isNotEmpty) {
+                try {
+                  final res = await Supabase.instance.client
+                      .from('internships')
+                      .select('*')
+                      .eq('id', widget.id)
+                      .single();
+                  if (context.mounted) {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditPostingScreen(posting: Map<String, dynamic>.from(res)),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('Error fetching posting for edit: $e');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to load posting details: $e'), backgroundColor: const Color(0xFFEF4444)),
+                    );
+                  }
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18, color: Color(0xFF0F172A)),
+                    SizedBox(width: 10),
+                    Text('Edit Posting', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 8),
         ],
@@ -457,19 +539,115 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Review Action Card (when status is UNDER_REVIEW) ──
+              if (_currentStatus == 'UNDER_REVIEW')
+                _buildSectionCard(
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.rate_review_outlined, color: Color(0xFFD97706), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Pending Admin Review',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Review this company posting and approve or reject it.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        if (_isUpdatingStatus)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _updatePostingStatus('REJECTED'),
+                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  label: const Text('REJECT POSTING', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 0.5)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFEF4444),
+                                    side: const BorderSide(color: Color(0xFFFECACA), width: 1.5),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _updatePostingStatus('INTERVIEWING'),
+                                  icon: const Icon(Icons.check_rounded, size: 18),
+                                  label: const Text('APPROVE & OPEN', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 0.5)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // ── Header Card ──
               _buildSectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(widget.type.toUpperCase(), 
-                        style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D4ED8).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            widget.location.isNotEmpty ? widget.location.toUpperCase() : widget.type.toUpperCase(), 
+                            style: const TextStyle(color: Color(0xFF1D4ED8), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${widget.slots} VACANCIES', 
+                            style: const TextStyle(color: Color(0xFF047857), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Text(widget.title,
@@ -478,7 +656,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                     const SizedBox(height: 24),
                     Row(
                       children: [
-                        Expanded(child: _MetaBox(icon: Icons.play_circle_fill, label: 'Starts', value: widget.startDate, color: const Color(0xFF0EA5E9))),
+                        Expanded(child: _MetaBox(icon: Icons.payments_rounded, label: 'Stipend', value: widget.stipend.isNotEmpty ? widget.stipend : 'Unpaid', color: const Color(0xFF10B981))),
                         const SizedBox(width: 12),
                         Expanded(child: _MetaBox(icon: Icons.timer_rounded, label: 'Duration', value: widget.duration, color: const Color(0xFF8B5CF6))),
                         const SizedBox(width: 12),
@@ -488,6 +666,43 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                   ],
                 ),
               ),
+
+              // ── Eligible Departments Card ──
+              if (widget.eligibleDepartments.isNotEmpty)
+                _buildSectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Eligible Departments', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.eligibleDepartments.map((dept) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.school_rounded, size: 14, color: Color(0xFF6366F1)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  dept,
+                                  style: const TextStyle(color: Color(0xFF4338CA), fontSize: 12, fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
               
               // ── Details Card (About, Responsibilities, Task List) ──
               _buildSectionCard(

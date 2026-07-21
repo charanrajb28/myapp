@@ -318,7 +318,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'location_lat': isRemote ? null : _selectedLat,
         'location_lng': isRemote ? null : _selectedLng,
         'brand_color' : randomColor,
-        'status'      : 'INTERVIEWING',
+        'status'      : 'UNDER_REVIEW',
         'logo_initial': (companyRes['name'] as String).isNotEmpty
             ? (companyRes['name'] as String)[0].toUpperCase()
             : 'C',
