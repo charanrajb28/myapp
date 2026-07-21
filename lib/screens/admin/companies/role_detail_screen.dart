@@ -17,6 +17,7 @@ class RoleDetailScreen extends StatefulWidget {
   final List<String> responsibilities;
   final List<String> activeDays;
   final List<String> eligibleDepartments;
+  final List<String> eligibleYears;
   final String stipend;
   final String location;
   final String notes;
@@ -36,6 +37,7 @@ class RoleDetailScreen extends StatefulWidget {
     required this.responsibilities,
     this.activeDays = const [],
     this.eligibleDepartments = const [],
+    this.eligibleYears = const [],
     this.stipend = '',
     this.location = '',
     this.notes = '',
@@ -694,6 +696,43 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                                 Text(
                                   dept,
                                   style: const TextStyle(color: Color(0xFF4338CA), fontSize: 12, fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // ── Eligible Years Card ──
+              if (widget.eligibleYears.isNotEmpty)
+                _buildSectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Eligible Year of Study', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1E293B), letterSpacing: -0.2)),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.eligibleYears.map((yr) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF0EA5E9).withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF0EA5E9)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  yr,
+                                  style: const TextStyle(color: Color(0xFF0284C7), fontSize: 12, fontWeight: FontWeight.w700),
                                 ),
                               ],
                             ),

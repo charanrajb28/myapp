@@ -111,6 +111,18 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
     'BBA',
   };
 
+  // Eligible years state
+  static const List<String> _allYears = [
+    '1st Year',
+    '2nd Year',
+    '3rd Year',
+  ];
+  final Set<String> _eligibleYears = {
+    '1st Year',
+    '2nd Year',
+    '3rd Year',
+  };
+
   // Days of the week state
   static const List<String> _allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   final Set<String> _activeDays = {'Mon', 'Tue', 'Wed', 'Thu', 'Fri'};
@@ -301,6 +313,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
       final randomColor = colors[DateTime.now().millisecond % colors.length];
       final sortedDays  = _allDays.where((d) => _activeDays.contains(d)).toList();
       final sortedDepts = _allDepartments.where((d) => _eligibleDepartments.contains(d)).toList();
+      final sortedYears = _allYears.where((y) => _eligibleYears.contains(y)).toList();
 
       final finalIndustry = _selectedIndustry == 'Other'
           ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
@@ -326,6 +339,7 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
         'notes'       : notesController.text.trim(),
         'active_days' : sortedDays,
         'eligible_departments': sortedDepts,
+        'eligible_years': sortedYears,
         'application_duration_days': int.tryParse(activeDurationController.text.trim()) ?? 7,
         'vacancies'   : int.tryParse(vacanciesController.text.trim()) ?? 1,
         'deadline'    : DateTime(
@@ -434,6 +448,18 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                         fontWeight: FontWeight.w500)),
                 const SizedBox(height: 16),
                 _departmentPickerSection(),
+                const SizedBox(height: 32),
+
+                // ── Target Years of Study ──────────────────────────────────
+                _sectionLabel('TARGET YEARS OF STUDY'),
+                const SizedBox(height: 8),
+                const Text('Select which student years of study are eligible for this posting',
+                    style: TextStyle(
+                        color: Color(0xFFCBD5E1),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 16),
+                _yearPickerSection(),
                 const SizedBox(height: 32),
 
                 // ── Work Location ──────────────────────────────────────────
@@ -1080,6 +1106,121 @@ class _CreatePostingScreenState extends State<CreatePostingScreen> {
                     allSelected
                         ? 'All departments are eligible for this internship'
                         : '${_eligibleDepartments.length} of ${_allDepartments.length} departments selected (${_eligibleDepartments.join(', ')})',
+                    style: const TextStyle(
+                      color: Color(0xFF6366F1),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _yearPickerSection() {
+    final allSelected = _eligibleYears.length == _allYears.length;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Quick Select:',
+                  style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (allSelected) {
+                      _eligibleYears.clear();
+                    } else {
+                      _eligibleYears.addAll(_allYears);
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: allSelected ? const Color(0xFF6366F1).withValues(alpha: 0.1) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: allSelected ? const Color(0xFF6366F1) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Text(
+                    allSelected ? 'Deselect All' : 'Select All',
+                    style: TextStyle(
+                      color: allSelected ? const Color(0xFF6366F1) : const Color(0xFF475569),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 10,
+            children: _allYears.map((yr) {
+              final isSelected = _eligibleYears.contains(yr);
+              return FilterChip(
+                label: Text(yr),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _eligibleYears.add(yr);
+                    } else {
+                      _eligibleYears.remove(yr);
+                    }
+                  });
+                },
+                selectedColor: const Color(0xFF6366F1),
+                backgroundColor: const Color(0xFFF8FAFC),
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF334155),
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+                    width: 1.5,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (_eligibleYears.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Divider(color: Color(0xFFF1F5F9), height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Icon(Icons.school_rounded, size: 13, color: Color(0xFF6366F1)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    allSelected
+                        ? 'All years are eligible for this internship'
+                        : '${_eligibleYears.length} of ${_allYears.length} years selected (${_eligibleYears.join(', ')})',
                     style: const TextStyle(
                       color: Color(0xFF6366F1),
                       fontSize: 11,

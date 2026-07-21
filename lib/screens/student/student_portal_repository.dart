@@ -773,6 +773,7 @@ class StudentPortalRepository {
       responsibilities: _stringList(item['responsibilities']),
       activeDays: _stringList(item['active_days']),
       eligibleDepartments: _stringList(item['eligible_departments']),
+      eligibleYears: _stringList(item['eligible_years']),
       notes: item['notes']?.toString() ?? '',
       applicationDurationDays: item['application_duration_days'] != null
           ? int.tryParse(item['application_duration_days'].toString()) ?? 7

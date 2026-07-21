@@ -471,7 +471,9 @@ class _JobIndustrialCard extends StatelessWidget {
 
   Widget _statusMenu(BuildContext context) {
     final status = posting['status'] as String? ?? 'INTERVIEWING';
-    final isInterviewing = status == 'INTERVIEWING';
+    final canEdit = status == 'INTERVIEWING' || status == 'UNDER_REVIEW';
+    final canShareQr = status != 'UNDER_REVIEW';
+
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF94A3B8)),
       onSelected: (val) {
@@ -487,12 +489,12 @@ class _JobIndustrialCard extends StatelessWidget {
       },
       itemBuilder: (context) => [
         ..._statusMenuItems(status),
-        if (isInterviewing)
+        if (canEdit)
           const PopupMenuItem(
             value: 'EDIT',
             child: Text('Edit Posting'),
           ),
-        if (!isInterviewing)
+        if (canShareQr)
           const PopupMenuItem(
             value: 'SHARE_QR',
             child: Text('Share QR Code'),
@@ -508,6 +510,8 @@ class _JobIndustrialCard extends StatelessWidget {
 
   List<PopupMenuEntry<String>> _statusMenuItems(String status) {
     switch (status) {
+      case 'UNDER_REVIEW':
+        return const [];
       case 'INTERVIEWING':
         return const [
           PopupMenuItem(value: 'ACTIVE', child: Text('Move to Active')),
@@ -525,9 +529,7 @@ class _JobIndustrialCard extends StatelessWidget {
           PopupMenuItem(value: 'ACTIVE', child: Text('Move to Active')),
         ];
       default:
-        return const [
-          PopupMenuItem(value: 'ACTIVE', child: Text('Move to Active')),
-        ];
+        return const [];
     }
   }
 

@@ -1065,6 +1065,7 @@ class _RolesTab extends StatelessWidget {
                                     responsibilities: List<String>.from(role['responsibilities'] ?? []),
                                     activeDays: List<String>.from(role['active_days'] ?? []),
                                     eligibleDepartments: List<String>.from(role['eligible_departments'] ?? []),
+                                    eligibleYears: List<String>.from(role['eligible_years'] ?? []),
                                     stipend: role['stipend']?.toString() ?? '',
                                     location: role['location']?.toString() ?? '',
                                     notes: role['notes']?.toString() ?? '',
