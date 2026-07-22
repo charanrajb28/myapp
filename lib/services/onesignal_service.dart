@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
+import '../screens/student/notifications/student_notifications_screen.dart';
 
 /// Centralized service to manage OneSignal SDK initialization, permissions,
 /// identity mapping, tags, and subscriptions.
@@ -26,10 +27,20 @@ class OneSignalService {
     // 2. SDK Initialization
     OneSignal.initialize(appId);
 
-    // 3. Configure foreground notifications to show in the system tray and prevent duplicates/in-app alerts
+    // 3. Configure foreground notifications
     OneSignal.Notifications.addForegroundWillDisplayListener((event) {
-      event.preventDefault();
-      event.notification.display();
+      // Allow default OneSignal behavior (shows notification in system tray)
+    });
+
+    // Handle notification clicks to push to the notification list
+    OneSignal.Notifications.addClickListener((event) {
+      if (context != null && context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const StudentNotificationsScreen(),
+          ),
+        );
+      }
     });
 
     // 4. Prompt for push notification permission
