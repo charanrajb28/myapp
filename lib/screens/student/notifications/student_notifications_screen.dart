@@ -274,6 +274,7 @@ class _NotificationCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -294,41 +295,24 @@ class _NotificationCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight:
-                                item.isRead ? FontWeight.w600 : FontWeight.w800,
-                            color: const Color(0xFF0F172A),
-                          ),
-                        ),
-                      ),
                       Text(
                         item.timeLabel,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: Color(0xFF94A3B8),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    item.message,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    item.title,
                     style: TextStyle(
-                      fontSize: 13,
-                      color: item.isRead
-                          ? const Color(0xFF64748B)
-                          : const Color(0xFF475569),
-                      height: 1.4,
+                      fontSize: 14,
                       fontWeight:
-                          item.isRead ? FontWeight.w400 : FontWeight.w500,
+                          item.isRead ? FontWeight.w500 : FontWeight.w900,
+                      color: const Color(0xFF0F172A),
                     ),
                   ),
                 ],
