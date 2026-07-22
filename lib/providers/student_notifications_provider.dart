@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/student_notification.dart';
 import '../screens/student/student_portal_repository.dart';
 
@@ -28,13 +28,46 @@ class StudentNotificationsState {
 
 class StudentNotificationsNotifier extends Notifier<StudentNotificationsState> {
   late final StudentPortalRepository _repository;
+  RealtimeChannel? _realtimeSubscription;
 
   @override
   StudentNotificationsState build() {
     _repository = ref.watch(studentPortalRepositoryProvider);
     // Fetch notifications asynchronously upon initialization
     Future.microtask(() => loadNotifications());
+    _setupRealtimeSubscription();
+
+    ref.onDispose(() {
+      _realtimeSubscription?.unsubscribe();
+    });
+
     return StudentNotificationsState(notifications: [], isLoading: false);
+  }
+
+  void _setupRealtimeSubscription() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      _realtimeSubscription = Supabase.instance.client
+          .channel('public:student_notifications:${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'student_notifications',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: user.id,
+            ),
+            callback: (payload) {
+              loadNotifications();
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      // Ignore if realtime connection fails
+    }
   }
 
   Future<void> loadNotifications() async {
