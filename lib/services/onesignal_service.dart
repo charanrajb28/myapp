@@ -6,7 +6,6 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 /// identity mapping, tags, and subscriptions.
 class OneSignalService {
   static const String appId = 'cc861caf-d431-4c34-973e-e4a00e631d76';
-  static bool _hasShownVerificationDialog = false;
 
   /// Check if the current platform is supported by onesignal_flutter (iOS & Android)
   static bool get isSupported {
@@ -15,7 +14,6 @@ class OneSignalService {
         defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  /// Initializes the OneSignal SDK, sets the logging level, and hooks up observers.
   static void initialize(BuildContext? context) {
     if (!isSupported) {
       debugPrint('OneSignal: Platform $defaultTargetPlatform is not supported by onesignal_flutter (Mobile iOS/Android only). Skipping initialization.');
@@ -25,56 +23,17 @@ class OneSignalService {
     // 1. Logging configuration
     OneSignal.Debug.setLogLevel(OSLogLevel.warn);
 
-    // 2. Register push subscription observer for verification dialog
-    _registerSubscriptionObserver(context);
-
-    // 3. SDK Initialization
+    // 2. SDK Initialization
     OneSignal.initialize(appId);
-  }
 
-  /// Register push subscription observer to verify subscription and present verification dialog.
-  static void _registerSubscriptionObserver(BuildContext? context) {
-    void checkSubscription(String? subscriptionId) {
-      if (subscriptionId == null ||
-          subscriptionId.isEmpty ||
-          subscriptionId.startsWith('local-')) {
-        return;
-      }
-
-      if (_hasShownVerificationDialog) return;
-      _hasShownVerificationDialog = true;
-
-      if (context != null && context.mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Your OneSignal SDK integration is complete!'),
-            content: const Text(
-              'You can now send Push Notifications & In-App Messages through OneSignal. Tap below to enable push notifications.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  requestPermission();
-                },
-                child: const Text('Got it'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-
-    // Check immediate current status
-    final currentId = OneSignal.User.pushSubscription.id;
-    checkSubscription(currentId);
-
-    // Observe changes
-    OneSignal.User.pushSubscription.addObserver((state) {
-      checkSubscription(state.current.id);
+    // 3. Configure foreground notifications to show in the system tray and prevent duplicates/in-app alerts
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+      event.preventDefault();
+      event.notification.display();
     });
+
+    // 4. Prompt for push notification permission
+    requestPermission();
   }
 
   /// Map the logged-in student's UUID to OneSignal's external user ID.
