@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import '../dashboard/more_options_screen.dart'; // for Sub-Admins Management Dialog if needed
 
 class AdminsListScreen extends StatefulWidget {

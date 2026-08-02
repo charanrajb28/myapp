@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import 'posting_details_screen.dart';
 import 'create_posting_screen.dart';
 import 'edit_posting_screen.dart';

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../services/auth_service.dart';
 import '../student_portal_repository.dart';
 import 'edit_profile_screen.dart';
 import 'security_password_screen.dart';
 import 'student_documents_screen.dart';
+import '../feedback/student_dynamic_feedback_screen.dart';
 
 class StudentProfileScreen extends StatefulWidget {
   const StudentProfileScreen({super.key});
@@ -280,7 +281,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   Widget _buildLogoutButton() {
     return InkWell(
       onTap: () async {
-        await Supabase.instance.client.auth.signOut();
+        await AuthService.instance.signOut();
         if (mounted) {
           Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }

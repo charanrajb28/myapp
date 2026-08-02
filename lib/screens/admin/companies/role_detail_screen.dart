@@ -3,7 +3,7 @@ import '../feedbacks/admin_form_builder_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
 import '../../company/postings/edit_posting_screen.dart';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 
 class RoleDetailScreen extends StatefulWidget {
   final String id;

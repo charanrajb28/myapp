@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import 'manage_postings_screen.dart';
 
 class CreatePostingScreen extends StatefulWidget {

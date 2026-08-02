@@ -3,7 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/auth_service.dart';
+import '../../services/supabase_compat.dart';
 
 import '../../config/mail_config.dart';
 
@@ -43,24 +44,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      final otp = _generateOtp();
-
-      await Supabase.instance.client.rpc(
-        'create_password_reset_otp',
-        params: {
-          'p_email': email,
-          'p_otp': otp,
-        },
-      );
-
-      await _sendOtpMail(email: email, otp: otp);
+      await AuthService.instance.sendPasswordResetEmail(email);
 
       if (!mounted) return;
-      setState(() => _codeSent = true);
-      _showSuccess('OTP sent to $email');
+      _showSuccess('Password reset link sent to $email. Please check your inbox.');
+      Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      _showError('Unable to send OTP: $e');
+      _showError('Unable to send password reset email: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

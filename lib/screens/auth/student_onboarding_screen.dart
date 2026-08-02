@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
+import '../../services/auth_service.dart';
 
 import '../student/student_shell.dart';
 
 class StudentOnboardingScreen extends StatefulWidget {
-  final String userId;
+  final String? userId;
   final String name;
   final String email;
+  final String password;
 
   const StudentOnboardingScreen({
     super.key,
-    required this.userId,
+    this.userId,
     required this.name,
     required this.email,
+    required this.password,
   });
 
   @override
@@ -122,8 +125,24 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen>
   Future<void> _submitProfile() async {
     setState(() => _isSaving = true);
     try {
+      String uid = widget.userId ?? '';
+
+      if (uid.isEmpty) {
+        // Create Firebase Auth user & initial DB records upon confirmation
+        final cred = await AuthService.instance.createStudentAccount(
+          email: widget.email,
+          password: widget.password,
+          name: widget.name,
+          enrollmentId: _enrollmentIdController.text.trim(),
+          college: _college,
+          department: _selectedDepartment,
+          semester: _selectedSemester,
+        );
+        uid = cred.user!.uid;
+      }
+
       await Supabase.instance.client.from('students').upsert({
-        'user_id': widget.userId,
+        'user_id': uid,
         'name': widget.name,
         'contact_email': widget.email,
         'college': _college,

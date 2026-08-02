@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
 import '../admins/admins_list_screen.dart';

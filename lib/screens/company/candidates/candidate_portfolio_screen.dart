@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 
 class CandidatePortfolioScreen extends StatefulWidget {
   final Map<String, dynamic> candidate;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:file_selector/file_selector.dart';
 import 'dart:typed_data';

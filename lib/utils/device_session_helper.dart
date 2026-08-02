@@ -4,7 +4,11 @@ import 'dart:math';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart' as material;
 import 'package:path_provider/path_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase_flutter;
+import '../services/auth_service.dart';
+import '../services/turso_database_service.dart';
+import 'web_token_helper.dart';
+
+String? _webDeviceToken;
 
 String generateSessionToken() {
   final random = Random.secure();
@@ -23,6 +27,15 @@ String getDeviceInfo() {
 }
 
 Future<String> getOrCreateDeviceToken() async {
+  if (kIsWeb) {
+    _webDeviceToken ??= getWebLocalStorageToken();
+    if (_webDeviceToken == null || _webDeviceToken!.isEmpty) {
+      _webDeviceToken = generateSessionToken();
+      saveWebLocalStorageToken(_webDeviceToken!);
+    }
+    return _webDeviceToken!;
+  }
+
   try {
     final directory = await getApplicationDocumentsDirectory();
     final file = File('${directory.path}/device_token.txt');
@@ -34,7 +47,8 @@ Future<String> getOrCreateDeviceToken() async {
       return token;
     }
   } catch (e) {
-    return 'fallback_${DateTime.now().millisecondsSinceEpoch}';
+    _webDeviceToken ??= generateSessionToken();
+    return _webDeviceToken!;
   }
 }
 
@@ -44,22 +58,22 @@ class SessionMonitor {
   void start(dynamic context) {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) async {
-      final user = supabase_flutter.Supabase.instance.client.auth.currentUser;
+      final user = AuthService.instance.currentUser;
       if (user == null) return;
 
       final token = await getOrCreateDeviceToken();
       try {
-        final activeSession = await supabase_flutter.Supabase.instance.client
-            .from('user_device_sessions')
-            .select()
-            .eq('user_id', user.id)
-            .eq('device_token', token)
-            .eq('is_active', true)
-            .maybeSingle();
+        final activeSession = await TursoDatabaseService.instance.querySingle(
+          '''
+          SELECT id FROM user_device_sessions
+          WHERE user_id = ? AND device_token = ? AND is_active = 1
+          ''',
+          [user.uid, token],
+        );
 
         if (activeSession == null) {
           timer.cancel();
-          await supabase_flutter.Supabase.instance.client.auth.signOut();
+          await AuthService.instance.signOut();
           if (context.mounted) {
             material.ScaffoldMessenger.of(context).showSnackBar(
               const material.SnackBar(

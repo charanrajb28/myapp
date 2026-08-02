@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../services/turso_database_service.dart';
 
 import '../../../config/mail_config.dart';
+import '../../../services/supabase_compat.dart';
 import '../../../utils/device_session_helper.dart';
 
 enum VerificationMode { password, otp }
@@ -19,7 +21,6 @@ class SecurityPasswordScreen extends StatefulWidget {
 }
 
 class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
-  final _supabase = Supabase.instance.client;
   final _currentPasswordController = TextEditingController();
   final _otpController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -60,28 +61,31 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
   }
 
   Future<void> _loadAccountState() async {
-    final user = _supabase.auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (!mounted) return;
 
     setState(() {
       _user = user;
       _email = user?.email ?? 'Not available';
-      _createdAt = _formatDateTime(user?.createdAt);
-      _lastSignInAt = _formatDateTime(user?.lastSignInAt);
+      _createdAt = _formatDateTime(user?.metadata.creationTime?.toIso8601String());
+      _lastSignInAt = _formatDateTime(user?.metadata.lastSignInTime?.toIso8601String());
       _isLoading = false;
     });
   }
 
   Future<void> _loadLoginHistory() async {
-    final user = _supabase.auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
-      final res = await _supabase
-          .from('user_device_sessions')
-          .select()
-          .eq('user_id', user.id)
-          .order('logged_in_at', ascending: false)
-          .limit(10);
+      final res = await TursoDatabaseService.instance.query(
+        '''
+        SELECT * FROM user_device_sessions
+        WHERE user_id = ?
+        ORDER BY logged_in_at DESC
+        LIMIT 10
+        ''',
+        [user.uid],
+      );
       if (!mounted) return;
       setState(() {
         _loginSessions = List<Map<String, dynamic>>.from(res);
@@ -116,10 +120,11 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
 
     setState(() => _isVerifying = true);
     try {
-      await _supabase.auth.signInWithPassword(
+      final credential = EmailAuthProvider.credential(
         email: user.email!,
         password: password,
       );
+      await user.reauthenticateWithCredential(credential);
 
       if (!mounted) return;
       setState(() {
@@ -127,10 +132,10 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
         _isVerifying = false;
       });
       _showMessage('Identity verified successfully.');
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() => _isVerifying = false);
-      _showMessage(e.message, isError: true);
+      _showMessage(e.message ?? 'Authentication failed', isError: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isVerifying = false);
@@ -148,67 +153,23 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
 
     setState(() => _isSendingOtp = true);
     try {
-      final otp = _generateOtp();
-      await _supabase.rpc(
-        'create_password_reset_otp',
-        params: {
-          'p_email': email,
-          'p_otp': otp,
-        },
-      );
-      await _sendOtpMail(email: email, otp: otp);
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
       if (!mounted) return;
       setState(() {
         _otpSent = true;
         _isSendingOtp = false;
       });
-      _showMessage('OTP sent to $email');
+      _showMessage('Password reset email sent to $email');
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSendingOtp = false);
-      _showMessage('Unable to send OTP: $e', isError: true);
+      _showMessage('Unable to send password reset email: $e', isError: true);
     }
   }
 
   Future<void> _verifyOtp() async {
-    final email = _user?.email?.trim() ?? '';
-    final otp = _otpController.text.trim();
-
-    if (email.isEmpty) {
-      _showMessage('Signed-in email is not available.', isError: true);
-      return;
-    }
-    if (!_otpSent) {
-      _showMessage('Send the OTP first.', isError: true);
-      return;
-    }
-    if (otp.isEmpty) {
-      _showMessage('Enter the OTP sent to your email.', isError: true);
-      return;
-    }
-
-    setState(() => _isVerifying = true);
-    try {
-      await _supabase.rpc(
-        'verify_password_reset_otp',
-        params: {
-          'p_email': email,
-          'p_otp': otp,
-        },
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _isVerified = true;
-        _isVerifying = false;
-      });
-      _showMessage('Email OTP verified successfully.');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isVerifying = false);
-      _showMessage('Unable to verify OTP: $e', isError: true);
-    }
+    _showMessage('Please check your email for the reset link.', isError: false);
   }
 
   Future<void> _updatePassword() async {
@@ -233,7 +194,8 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
 
     setState(() => _isUpdating = true);
     try {
-      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
+      final user = FirebaseAuth.instance.currentUser;
+      await user?.updatePassword(newPassword);
       if (!mounted) return;
       setState(() => _isUpdating = false);
       _showMessage('Password updated successfully.');

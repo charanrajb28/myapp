@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 
 import '../../main.dart' show suppressAuthRedirect;
+import '../../services/auth_service.dart';
 import 'student_onboarding_screen.dart';
 
 class StudentSignUpScreen extends StatefulWidget {
@@ -60,49 +61,16 @@ class _StudentSignUpScreenState extends State<StudentSignUpScreen> {
       final password = _passwordController.text;
       final name = _nameController.text.trim();
 
-      debugPrint('📧 [SignUp] Email: $email | Name: $name');
+      debugPrint('📧 [SignUp] Step 1 complete. Email: $email | Name: $name. Proceeding to onboarding...');
 
-      // 1. Create auth user — the handle_new_user DB trigger automatically
-      //    inserts rows into public.users and public.students.
-      debugPrint('🔐 [SignUp] Step 1: Calling auth.signUp...');
-      final res = await Supabase.instance.client.auth.signUp(
-        email: email,
-        password: password,
-        data: {'name': name, 'role': 'student'},
-      );
-
-      debugPrint('✅ [SignUp] auth.signUp response: user=${res.user?.id}, session=${res.session != null ? "present" : "null"}');
-
-      final user = res.user;
-      if (user == null) {
-        debugPrint('❌ [SignUp] user is null — aborting');
-        _showError('Registration failed. Please try again.');
-        return;
-      }
-
-      // NOTE: No manual DB inserts needed here.
-      // The handle_new_user trigger on auth.users fires automatically
-      // and inserts into public.users + public.students.
-      debugPrint('✅ [SignUp] DB rows handled by trigger — skipping manual inserts');
-
-      debugPrint('🔔 [SignUp] mounted=$mounted — showing success snackbar');
       if (!mounted) return;
 
-      _showSuccess('Account created! Let\'s set up your profile.');
-
-      // 2. Navigate to onboarding
-      debugPrint('⏳ [SignUp] Waiting 800ms before navigation...');
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      debugPrint('🧭 [SignUp] Navigating to StudentOnboardingScreen (mounted=$mounted)');
-      if (!mounted) return;
-
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => StudentOnboardingScreen(
-            userId: user.id,
             name: name,
             email: email,
+            password: password,
           ),
         ),
       );

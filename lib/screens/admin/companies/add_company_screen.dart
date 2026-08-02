@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import '../../../config/mail_config.dart';
 import 'company_detail_screen.dart';
 
@@ -147,7 +147,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
         final inviteClient = SupabaseClient(
           'https://nfurwspybtiaycqntzev.supabase.co',
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-          authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+          const AuthClientOptions(authFlowType: AuthFlowType.implicit),
         );
 
         final AuthResponse res = await inviteClient.auth.signUp(

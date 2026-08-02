@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import '../company_shell.dart';
 import '../postings/posting_details_screen.dart';
 import '../candidates/manage_candidates_screen.dart';

@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io' as io;
 import 'dart:convert';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../../utils/file_saver.dart';
 import 'semester_promotion_screen.dart';
@@ -706,7 +706,7 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
       final inviteClient = SupabaseClient(
         'https://nfurwspybtiaycqntzev.supabase.co',
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-        authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+        const AuthClientOptions(authFlowType: AuthFlowType.implicit),
       );
 
       final res = await inviteClient.auth.signUp(

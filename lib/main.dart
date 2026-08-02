@@ -3,7 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'services/turso_database_service.dart';
+import 'services/auth_service.dart';
+import 'services/supabase_compat.dart';
 
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/student_signup_screen.dart';
@@ -11,17 +16,33 @@ import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
-import 'utils/device_session_helper.dart';import 'services/onesignal_service.dart';
+import 'utils/device_session_helper.dart';
+import 'services/onesignal_service.dart';
 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // TODO: Replace with your actual Supabase URL and Anon Key
-  // Once you start your local Supabase instance (using 'supabase start')
-  await Supabase.initialize(
-    url: 'https://nfurwspybtiaycqntzev.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  TursoDatabaseService.instance.configure(
+    dbUrl: const String.fromEnvironment(
+      'TURSO_DATABASE_URL',
+      defaultValue: 'https://aaroha-sandhyashree.aws-ap-south-1.turso.io',
+    ),
+    authToken: const String.fromEnvironment(
+      'TURSO_AUTH_TOKEN',
+      defaultValue: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJnaWQiOiJhYWI2OGVkNS04OGFmLTQwMGQtOGI5Yi0yNjczMjcxMWNkMDciLCJpYXQiOjE3ODU2NjQ2MjEsImtpZCI6IjJCN2xEd3hVd3lKVWZRWnNZVEprNFFpMi1keWZncnV1cDN3TkdUQ1R6X2siLCJyaWQiOiI1ZjViZThhZi0xMjZiLTQzZDQtYWU4Zi1mZjQ3NDM0YTczNTMifQ.PQt6cPa_RM7VTaRuEK-Z3qgfpgRkkWTwJiLQ3GXWE9dB9b6QkHkgYA2ApQXRJCrugsBBCcvLBR-yVGxQRU-ZAw',
+    ),
+  );
+  await TursoDatabaseService.instance.ensureSchema();
+
+  // Ensure default admin user account exists
+  await AuthService.instance.ensureDefaultAdminAccount(
+    email: 'admin@aaroha.com',
+    password: 'adminpassword123',
   );
 
   runApp(
@@ -44,7 +65,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  late final StreamSubscription<AuthState> _authSubscription;
+  late final StreamSubscription<User?> _authSubscription;
 
   @override
   void initState() {
@@ -56,22 +77,13 @@ class _MyAppState extends State<MyApp> {
     });
 
     _authSubscription =
-        Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
-      final event = data.event;
-
-      // If a screen is actively managing navigation (e.g. signup / login),
-      // let it handle routing itself.
+        AuthService.instance.authStateChanges.listen((user) {
       if (suppressAuthRedirect) return;
 
-      if (session != null) {
-        OneSignalService.login(session.user.id);
+      if (user != null) {
+        OneSignalService.login(user.uid);
         return;
-      }
-
-      // Only redirect to login on explicit sign-out.
-      // (AuthChangeEvent.userDeleted is deprecated and never fired.)
-      if (event == AuthChangeEvent.signedOut) {
+      } else {
         OneSignalService.logout();
         _redirectToLogin();
       }
@@ -138,8 +150,8 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _checkAuth() async {
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session == null) {
+    final user = AuthService.instance.currentUser;
+    if (user == null) {
       if (mounted) {
         setState(() => _checking = false);
       }
@@ -147,13 +159,12 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     try {
-      final userData = await Supabase.instance.client
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
+      final userData = await TursoDatabaseService.instance.querySingle(
+        'SELECT role FROM users WHERE id = ?',
+        [user.uid],
+      );
 
-      final role = userData['role'];
+      final role = userData?['role'];
       if (!mounted) return;
 
       Widget destination;
@@ -244,19 +255,19 @@ class _LogoutScreenState extends State<LogoutScreen> {
 
   Future<void> _performLogout() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = AuthService.instance.currentUser;
       if (user != null) {
         final token = await getOrCreateDeviceToken();
-        await Supabase.instance.client
-            .from('user_device_sessions')
-            .update({
-              'is_active': false,
-              'logged_out_at': DateTime.now().toIso8601String(),
-            })
-            .eq('user_id', user.id)
-            .eq('device_token', token);
+        await TursoDatabaseService.instance.execute(
+          '''
+          UPDATE user_device_sessions
+          SET is_active = 0, logged_out_at = CURRENT_TIMESTAMP
+          WHERE user_id = ? AND device_token = ?
+          ''',
+          [user.uid, token],
+        );
       }
-      await Supabase.instance.client.auth.signOut();
+      await AuthService.instance.signOut();
     } catch (e) {
       debugPrint('Logout error: $e');
     }
@@ -491,19 +502,18 @@ class _LoginPageState extends State<LoginPage>
   }
 
   Future<void> _checkExistingSession() async {
-    final session = Supabase.instance.client.auth.currentSession;
-    if (session != null) {
+    final user = AuthService.instance.currentUser;
+    if (user != null) {
       setState(() => _isLoading = true);
       try {
-        final userData = await Supabase.instance.client
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-            
-        final role = userData['role'];
+        final userData = await TursoDatabaseService.instance.querySingle(
+          'SELECT role FROM users WHERE id = ?',
+          [user.uid],
+        );
+
+        final role = userData?['role'];
         if (!mounted) return;
-        
+
         if (role == 'admin' || role == 'sub_admin') {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
@@ -518,7 +528,6 @@ class _LoginPageState extends State<LoginPage>
           );
         }
       } catch (e) {
-        // Stay on login page if auto-login fails (e.g. JWT expired)
         if (mounted) setState(() => _isLoading = false);
       }
     }
@@ -774,22 +783,24 @@ class _LoginPageState extends State<LoginPage>
                             onPressed: _isLoading ? null : () async {
                               setState(() => _isLoading = true);
                               try {
-                                final res = await Supabase.instance.client.auth.signInWithPassword(
+                                final cred = await AuthService.instance.signInWithEmailAndPassword(
                                   email: _emailController.text.trim(),
                                   password: _passwordController.text,
                                 );
                                 
-                                final user = res.user;
+                                final user = cred.user;
                                 if (user != null) {
                                   final deviceToken = await getOrCreateDeviceToken();
                                   final deviceInfo = getDeviceInfo();
                                   
                                   // Check for active session(s)
-                                  final activeSessions = await Supabase.instance.client
-                                      .from('user_device_sessions')
-                                      .select()
-                                      .eq('user_id', user.id)
-                                      .eq('is_active', true);
+                                  final activeSessions = await TursoDatabaseService.instance.query(
+                                    '''
+                                    SELECT device_token, device_info FROM user_device_sessions
+                                    WHERE user_id = ? AND is_active = 1
+                                    ''',
+                                    [user.uid],
+                                  );
                                       
                                   bool proceed = true;
                                   if (activeSessions.isNotEmpty) {
@@ -797,60 +808,50 @@ class _LoginPageState extends State<LoginPage>
                                     final currentActiveInfo = activeSessions.first['device_info'];
                                     
                                     if (currentActiveToken != deviceToken) {
-                                      // Device conflict! Ask to logout other device
                                       if (!context.mounted) {
-                                        await Supabase.instance.client.auth.signOut();
+                                        await AuthService.instance.signOut();
                                         return;
                                       }
-                                      final shouldLogoutOther = await _showConflictDialog(context, currentActiveInfo);
+                                      final shouldLogoutOther = await _showConflictDialog(context, currentActiveInfo ?? 'Other device');
                                       if (shouldLogoutOther == true) {
-                                        // Mark previous sessions as inactive
-                                        await Supabase.instance.client
-                                            .from('user_device_sessions')
-                                            .update({
-                                              'is_active': false,
-                                              'logged_out_at': DateTime.now().toIso8601String(),
-                                            })
-                                            .eq('user_id', user.id)
-                                            .eq('is_active', true);
+                                        await TursoDatabaseService.instance.execute(
+                                          '''
+                                          UPDATE user_device_sessions
+                                          SET is_active = 0, logged_out_at = CURRENT_TIMESTAMP
+                                          WHERE user_id = ? AND is_active = 1
+                                          ''',
+                                          [user.uid],
+                                        );
                                             
-                                        // Log new session
-                                        await Supabase.instance.client
-                                            .from('user_device_sessions')
-                                            .insert({
-                                              'user_id': user.id,
-                                              'device_token': deviceToken,
-                                              'device_info': deviceInfo,
-                                              'is_active': true,
-                                              'logged_in_at': DateTime.now().toIso8601String(),
-                                            });
+                                        await TursoDatabaseService.instance.execute(
+                                          '''
+                                          INSERT INTO user_device_sessions (id, user_id, device_token, device_info, is_active)
+                                          VALUES (?, ?, ?, ?, 1)
+                                          ''',
+                                          ['session_${DateTime.now().millisecondsSinceEpoch}', user.uid, deviceToken, deviceInfo],
+                                        );
                                       } else {
                                         proceed = false;
-                                        await Supabase.instance.client.auth.signOut();
+                                        await AuthService.instance.signOut();
                                       }
                                     }
                                   } else {
-                                    // Log new session
-                                    await Supabase.instance.client
-                                        .from('user_device_sessions')
-                                        .insert({
-                                          'user_id': user.id,
-                                          'device_token': deviceToken,
-                                          'device_info': deviceInfo,
-                                          'is_active': true,
-                                          'logged_in_at': DateTime.now().toIso8601String(),
-                                        });
+                                    await TursoDatabaseService.instance.execute(
+                                      '''
+                                      INSERT INTO user_device_sessions (id, user_id, device_token, device_info, is_active)
+                                      VALUES (?, ?, ?, ?, 1)
+                                      ''',
+                                      ['session_${DateTime.now().millisecondsSinceEpoch}', user.uid, deviceToken, deviceInfo],
+                                    );
                                   }
 
                                   if (proceed) {
-                                    // Fetch role from public.users table
-                                    final userData = await Supabase.instance.client
-                                        .from('users')
-                                        .select('role')
-                                        .eq('id', user.id)
-                                        .single();
+                                    final userData = await TursoDatabaseService.instance.querySingle(
+                                      'SELECT role FROM users WHERE id = ?',
+                                      [user.uid],
+                                    );
                                         
-                                    final role = userData['role'];
+                                    final role = userData?['role'];
                                     
                                     if (!context.mounted) return;
                                     
@@ -865,6 +866,13 @@ class _LoginPageState extends State<LoginPage>
                                     } else if (role == 'company') {
                                       Navigator.of(context).pushReplacement(
                                         MaterialPageRoute(builder: (context) => const CompanyShell()),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('User role not found or not assigned.'),
+                                          backgroundColor: Colors.orange,
+                                        ),
                                       );
                                     }
                                   }
@@ -1134,7 +1142,7 @@ class _LoginPageState extends State<LoginPage>
                                     final inviteClient = SupabaseClient(
                                       'https://nfurwspybtiaycqntzev.supabase.co',
                                       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-                                      authOptions: const AuthClientOptions(authFlowType: AuthFlowType.implicit),
+                                      const AuthClientOptions(authFlowType: AuthFlowType.implicit),
                                     );
 
                                     await inviteClient.auth.signUp(

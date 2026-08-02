@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import '../companies/role_detail_screen.dart';
 
 class AdminInternshipsScreen extends StatefulWidget {

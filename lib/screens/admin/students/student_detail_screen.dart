@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:myapp/services/supabase_compat.dart';
 import 'add_student_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
 import '../../../utils/file_saver.dart';
