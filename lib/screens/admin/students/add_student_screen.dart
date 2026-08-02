@@ -45,6 +45,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   @override
   void initState() {
     super.initState();
+    _adminSmtpEmailController.text = MailConfig.senderEmail;
+    _adminSmtpPasswordController.text = MailConfig.senderAppPassword;
     if (widget.student != null) {
       final s = widget.student!;
       final nameParts = (s['name'] ?? '').split(' ');
@@ -217,15 +219,18 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   }
 
   Future<void> _dispatchEmailAutomation({required String email, required String name, required String tempPassword}) async {
-    final String senderEmail = _adminSmtpEmailController.text.trim();
-    final String senderPassword = _adminSmtpPasswordController.text.trim();
+    final String senderEmail = _adminSmtpEmailController.text.trim().isNotEmpty
+        ? _adminSmtpEmailController.text.trim()
+        : MailConfig.senderEmail;
+    final String senderPassword = _adminSmtpPasswordController.text.trim().isNotEmpty
+        ? _adminSmtpPasswordController.text.trim().replaceAll('"', '').replaceAll("'", '').replaceAll(' ', '').trim()
+        : MailConfig.senderAppPassword;
     
     if (senderEmail.isEmpty || senderPassword.isEmpty) {
       debugPrint('SMTP Credentials missing, skipping actual send.');
       return;
     }
 
-    // Configured for Gmail SMTP by default as it's the most common for Option C
     final smtpServer = gmail(senderEmail, senderPassword);
 
     final message = Message()

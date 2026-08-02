@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../services/turso_database_service.dart';
 import 'company_detail_screen.dart';
 import 'add_company_screen.dart';
 
@@ -46,119 +47,85 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
     _fetchCompanies();
   }
 
+  bool _parseBool(dynamic val) {
+    if (val is bool) return val;
+    if (val is num) return val == 1;
+    if (val is String) return val == '1' || val.toLowerCase() == 'true';
+    return false;
+  }
+
   Future<void> _fetchCompanies() async {
     try {
-      final client = Supabase.instance.client;
-      if (client.auth.currentUser == null) {
+      final res = await TursoDatabaseService.instance.query(
+        'SELECT * FROM companies ORDER BY created_at DESC',
+      );
+
+      if (res.isNotEmpty) {
         if (mounted) {
           setState(() {
-            _companies = [
-              _Company(
-                id: 'comp-1',
-                name: 'TechCorp Solutions',
-                industry: 'Information Technology',
-                location: 'San Francisco, CA',
-                activeInterns: 8,
-                totalPlacements: 24,
-                openRoles: 3,
-                rating: 4.8,
+            _companies = res.map((c) {
+              final nameStr = c['name']?.toString().trim() ?? 'Unknown Company';
+              final locStr = (c['location']?.toString().trim().isNotEmpty == true)
+                  ? c['location'].toString().trim()
+                  : 'Bangalore';
+
+              return _Company(
+                id: c['id']?.toString() ?? '',
+                name: nameStr,
+                industry: c['industry']?.toString() ?? 'General',
+                location: locStr,
+                activeInterns: 0,
+                totalPlacements: 0,
+                openRoles: 0,
+                rating: 4.5,
                 status: 'Approved',
                 logoColor: const Color(0xFF3B82F6),
-                logoInitial: 'T',
-                about: 'TechCorp Solutions is a leading provider of cloud infrastructure and modern enterprise software applications.',
-                isBlacklisted: false,
-              ),
-              _Company(
-                id: 'comp-2',
-                name: 'Google',
-                industry: 'Tech & Search',
-                location: 'Mountain View, CA',
-                activeInterns: 15,
-                totalPlacements: 45,
-                openRoles: 5,
-                rating: 4.9,
-                status: 'Approved',
-                logoColor: const Color(0xFFEA4335),
-                logoInitial: 'G',
-                about: 'Organizing the world\'s information and making it universally accessible and useful.',
-                isBlacklisted: false,
-              ),
-              _Company(
-                id: 'comp-3',
-                name: 'Stripe',
-                industry: 'Fintech',
-                location: 'South San Francisco, CA',
-                activeInterns: 6,
-                totalPlacements: 18,
-                openRoles: 2,
-                rating: 4.7,
-                status: 'Approved',
-                logoColor: const Color(0xFF635BFF),
-                logoInitial: 'S',
-                about: 'Stripe provides financial infrastructure for the internet, enabling payments and online billing globally.',
-                isBlacklisted: false,
-              ),
-              _Company(
-                id: 'comp-4',
-                name: 'Meta',
-                industry: 'Social Networking',
-                location: 'Menlo Park, CA',
-                activeInterns: 10,
-                totalPlacements: 30,
-                openRoles: 4,
-                rating: 4.6,
-                status: 'Approved',
-                logoColor: const Color(0xFF0080FF),
-                logoInitial: 'M',
-                about: 'Meta builds technologies that help people connect, find communities, and grow businesses.',
-                isBlacklisted: false,
-              ),
-              _Company(
-                id: 'comp-5',
-                name: 'Legacy Dynamics',
-                industry: 'Consulting',
-                location: 'Boston, MA',
-                activeInterns: 0,
-                totalPlacements: 12,
-                openRoles: 0,
-                rating: 3.5,
-                status: 'Approved',
-                logoColor: const Color(0xFF64748B),
-                logoInitial: 'L',
-                about: 'Legacy business consulting provider. Currently paused operations.',
-                isBlacklisted: true,
-              )
-            ];
+                logoInitial: nameStr.isNotEmpty ? nameStr[0].toUpperCase() : 'C',
+                about: c['description']?.toString() ?? 'No description provided.',
+                isBlacklisted: _parseBool(c['is_blacklisted']),
+              );
+            }).toList();
             _isLoading = false;
           });
         }
         return;
       }
 
-      final res = await client
-          .from('companies')
-          .select('*')
-          .order('created_at');
-
+      // Fallback mock companies if DB is completely empty
       if (mounted) {
         setState(() {
-          _companies = (res as List).map((c) {
-            return _Company(
-              id: c['id'] ?? '',
-              name: c['name'] ?? 'Unknown',
-              industry: c['industry'] ?? 'General',
-              location: 'Remote/Unspecified', // Dummy fallback as per schema
-              activeInterns: 0,
-              totalPlacements: 0,
-              openRoles: 0,
-              rating: 4.5,
+          _companies = [
+            const _Company(
+              id: 'comp-1',
+              name: 'TechCorp Solutions',
+              industry: 'Information Technology',
+              location: 'San Francisco, CA',
+              activeInterns: 8,
+              totalPlacements: 24,
+              openRoles: 3,
+              rating: 4.8,
               status: 'Approved',
-              logoColor: const Color(0xFF3B82F6),
-              logoInitial: (c['name'] != null && c['name'].isNotEmpty) ? c['name'][0].toUpperCase() : 'C',
-              about: c['description'] ?? 'No description provided.',
-              isBlacklisted: (c['is_blacklisted'] as bool?) ?? false,
-            );
-          }).toList();
+              logoColor: Color(0xFF3B82F6),
+              logoInitial: 'T',
+              about: 'TechCorp Solutions is a leading provider of cloud infrastructure and modern enterprise software applications.',
+              isBlacklisted: false,
+            ),
+            const _Company(
+              id: 'comp-2',
+              name: 'Google',
+              industry: 'Tech & Search',
+              location: 'Mountain View, CA',
+              activeInterns: 15,
+              totalPlacements: 45,
+              openRoles: 5,
+              rating: 4.9,
+              status: 'Approved',
+              logoColor: Color(0xFFEA4335),
+              logoInitial: 'G',
+              about: 'Organizing the world\'s information and making it universally accessible and useful.',
+              isBlacklisted: false,
+            ),
+          ];
           _isLoading = false;
         });
       }
@@ -196,42 +163,12 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
     if (confirmed != true) return;
 
     try {
-      final client = Supabase.instance.client;
-      if (client.auth.currentUser == null) {
-        setState(() {
-          final index = _companies.indexWhere((c) => c.id == id);
-          if (index != -1) {
-            final old = _companies[index];
-            _companies[index] = _Company(
-              id: old.id,
-              name: old.name,
-              industry: old.industry,
-              location: old.location,
-              activeInterns: old.activeInterns,
-              totalPlacements: old.totalPlacements,
-              openRoles: old.openRoles,
-              rating: old.rating,
-              status: old.status,
-              logoColor: old.logoColor,
-              logoInitial: old.logoInitial,
-              about: old.about,
-              isBlacklisted: !currentState,
-            );
-          }
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(currentState ? 'Company Whitelisted (Dev Mode)' : 'Company Blocked Successfully (Dev Mode)'))
-          );
-        }
-        return;
-      }
+      final nextStatus = !currentState ? 1 : 0;
+      await TursoDatabaseService.instance.execute(
+        'UPDATE companies SET is_blacklisted = ? WHERE id = ? OR user_id = ?',
+        [nextStatus, id, id],
+      );
 
-      await client
-          .from('companies')
-          .update({'is_blacklisted': !currentState})
-          .eq('id', id);
-          
       _fetchCompanies();
       
       if (mounted) {

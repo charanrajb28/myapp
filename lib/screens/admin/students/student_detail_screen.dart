@@ -63,20 +63,25 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       
       final realStudentId = studentRes?['id']?.toString() ?? widget.studentId;
 
-      // 2. Fetch all applications with details via SQL JOIN
-      final appsRows = await TursoDatabaseService.instance.query(
-        '''
-        SELECT 
-          a.id, a.student_id, a.internship_id, a.status, a.applied_date, a.mentor_name, a.mentor_email, a.progress, a.checkins, a.created_at,
-          i.title as role, i.description as job_description, i.location as job_location, i.stipend, i.duration, i.start_date, i.end_date,
-          c.name as company_name, c.industry as company_industry
-        FROM applications a
-        LEFT JOIN internships i ON a.internship_id = i.id
-        LEFT JOIN companies c ON i.company_id = c.id
-        WHERE a.student_id = ?
-        ''',
-        [realStudentId],
-      );
+      // 2. Fetch all applications with details via SQL JOIN using valid table columns
+      List<Map<String, dynamic>> appsRows = [];
+      try {
+        appsRows = await TursoDatabaseService.instance.query(
+          '''
+          SELECT 
+            a.id, a.student_id, a.internship_id, a.status, a.applied_at, a.progress, a.checkins, a.created_at,
+            i.title as role, i.description as job_description, i.location as job_location, i.stipend, i.duration, i.start_date, i.end_date,
+            c.name as company_name, c.industry as company_industry
+          FROM applications a
+          LEFT JOIN internships i ON a.internship_id = i.id
+          LEFT JOIN companies c ON i.company_id = c.id
+          WHERE a.student_id = ? OR a.student_id = ?
+          ''',
+          [realStudentId, widget.studentId],
+        );
+      } catch (appsErr) {
+        debugPrint('⚠️ Error fetching applications for student $realStudentId: $appsErr');
+      }
 
       final List<Map<String, dynamic>> apps = appsRows.map((row) {
         return {
@@ -84,9 +89,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           'student_id': row['student_id'],
           'internship_id': row['internship_id'],
           'status': row['status'],
-          'applied_date': row['applied_date'],
-          'mentor_name': row['mentor_name'],
-          'mentor_email': row['mentor_email'],
+          'applied_date': row['applied_at'] ?? row['created_at'],
+          'mentor_name': 'Unassigned',
+          'mentor_email': 'Unassigned',
           'progress': row['progress'],
           'checkins': row['checkins'],
           'created_at': row['created_at'],
@@ -384,9 +389,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     if (_isLoadingData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     
     // Dynamic mapping back to database fields
-    final studentName = _studentData?['name'] ?? widget.studentName;
-    final department = _studentData?['department'] ?? widget.department;
-    final semester = _studentData?['semester'] ?? 'Semester Not Set';
+    final studentName = _valOrFallback(_studentData?['name'], widget.studentName);
+    final department = _valOrFallback(_studentData?['department'], widget.department);
+    final semester = _valOrFallback(_studentData?['semester'], 'Semester Not Set');
     final status = widget.status;
 
     final isAlert = status == 'Red Alert';
@@ -1373,7 +1378,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
 
   Widget _buildAcademicProfileCard(bool isMobile, String department) {
-    final gpa = _studentData?['gpa']?.toString() ?? 'N/A';
+    final gpa = _valOrFallback(_studentData?['gpa'], 'N/A');
+    final createdAtRaw = _studentData?['created_at']?.toString();
+    final joinedDate = (createdAtRaw != null && createdAtRaw.length >= 10)
+        ? createdAtRaw.substring(0, 10)
+        : 'TBD';
     
     return Container(
       padding: EdgeInsets.all(isMobile ? 20 : 28),
@@ -1396,7 +1405,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           const SizedBox(height: 16),
           _buildInfoRow(Icons.grade_outlined, 'Cumulative GPA', '$gpa / 4.0'),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.calendar_month_outlined, 'Joined Date', _studentData?['created_at']?.toString().substring(0, 10) ?? 'TBD'),
+          _buildInfoRow(Icons.calendar_month_outlined, 'Joined Date', joinedDate),
         ],
       ),
     );

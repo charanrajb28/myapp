@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../services/turso_database_service.dart';
 import 'role_detail_screen.dart';
 import 'add_company_screen.dart';
 
@@ -62,60 +63,50 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
     super.dispose();
   }
 
+  bool _parseBool(dynamic val) {
+    if (val is bool) return val;
+    if (val is num) return val == 1;
+    if (val is String) return val == '1' || val.toLowerCase() == 'true';
+    return false;
+  }
+
   Future<void> _fetchCompanyData() async {
     try {
-      final supabase = Supabase.instance.client;
-      
-      final companyRes = await supabase
-          .from('companies')
-          .select('*')
-          .eq('id', widget.company.id)
-          .single();
-          
-      final rolesRes = await supabase
-          .from('internships')
-          .select('*, applications(*, students(*))')
-          .eq('company_id', widget.company.id);
+      final db = TursoDatabaseService.instance;
+      final companyRes = await db.querySingle(
+        'SELECT * FROM companies WHERE id = ? OR user_id = ?',
+        [widget.company.id, widget.company.id],
+      );
+
+      final realCompanyId = companyRes?['id']?.toString() ?? widget.company.id;
+
+      final rolesRes = await db.query(
+        'SELECT * FROM internships WHERE company_id = ?',
+        [realCompanyId],
+      );
 
       if (mounted) {
-        int activeInterns = 0;
-        int totalPlacements = 0;
-        int openRoles = 0;
-
-        for (final role in rolesRes as List) {
-          final roleStatus = (role['status'] ?? 'INTERVIEWING').toString().toUpperCase();
-          if (roleStatus == 'INTERVIEWING') {
-            openRoles++;
-          }
-          final apps = role['applications'] as List? ?? [];
-          for (final app in apps) {
-            final status = app['status']?.toString();
-            if (status == 'Active') {
-              activeInterns++;
-            }
-            if (status == 'Active' || status == 'Completed' || status == 'Accepted') {
-              totalPlacements++;
-            }
-          }
-        }
-
         setState(() {
-          _dynamicCompany = CompanyDetailArgs(
-            id: companyRes['id'].toString(),
-            name: companyRes['name'] ?? widget.company.name,
-            industry: companyRes['industry'] ?? widget.company.industry,
-            location: companyRes['location'] ?? widget.company.location,
-            activeInterns: activeInterns,
-            totalPlacements: totalPlacements,
-            openRoles: openRoles,
-            rating: widget.company.rating,
-            status: 'Approved',
-            logoColor: widget.company.logoColor,
-            logoInitial: widget.company.logoInitial,
-            about: companyRes['description'] ?? widget.company.about,
-            isBlacklisted: (companyRes['is_blacklisted'] as bool?) ?? false,
-          );
-          _openRoles = List<Map<String, dynamic>>.from(rolesRes);
+          if (companyRes != null) {
+            _dynamicCompany = CompanyDetailArgs(
+              id: companyRes['id']?.toString() ?? widget.company.id,
+              name: companyRes['name']?.toString() ?? widget.company.name,
+              industry: companyRes['industry']?.toString() ?? widget.company.industry,
+              location: companyRes['location']?.toString() ?? widget.company.location,
+              activeInterns: 0,
+              totalPlacements: 0,
+              openRoles: rolesRes.length,
+              rating: widget.company.rating,
+              status: 'Approved',
+              logoColor: widget.company.logoColor,
+              logoInitial: widget.company.logoInitial,
+              about: companyRes['description']?.toString() ?? widget.company.about,
+              isBlacklisted: _parseBool(companyRes['is_blacklisted']),
+            );
+          } else {
+            _dynamicCompany = widget.company;
+          }
+          _openRoles = rolesRes;
           _isLoading = false;
         });
       }

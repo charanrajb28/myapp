@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../services/turso_database_service.dart';
 
 class StudentsState {
   final List<Map<String, dynamic>> students;
@@ -36,79 +37,44 @@ class StudentsNotifier extends Notifier<StudentsState> {
   Future<void> loadStudents() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final client = Supabase.instance.client;
-      if (client.auth.currentUser == null) {
-        // Dev Mode Mock Data
-        final mockStudents = [
-          {
-            'id': 'stu-1',
-            'name': 'Alex Guest',
-            'department': 'Computer Science',
-            'college': 'Stanford University',
-            'semester': '8th Semester',
-            'contact_email': 'alex.guest@stanford.edu',
-            'phone_number': '+1-555-0199',
-            'is_blacklisted': false,
-            'created_at': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
-          },
-          {
-            'id': 'stu-2',
-            'name': 'Sarah Chen',
-            'department': 'Data Science',
-            'college': 'UC Berkeley',
-            'semester': '6th Semester',
-            'contact_email': 'schen@berkeley.edu',
-            'phone_number': '+1-555-0142',
-            'is_blacklisted': false,
-            'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
-          },
-          {
-            'id': 'stu-3',
-            'name': 'Michael Vance',
-            'department': 'Information Technology',
-            'college': 'MIT',
-            'semester': '7th Semester',
-            'contact_email': 'mvance@mit.edu',
-            'phone_number': '+1-555-0188',
-            'is_blacklisted': false,
-            'created_at': DateTime.now().subtract(const Duration(days: 8)).toIso8601String(),
-          },
-          {
-            'id': 'stu-4',
-            'name': 'Emily Watson',
-            'department': 'Data Science',
-            'college': 'Stanford University',
-            'semester': '8th Semester',
-            'contact_email': 'ewatson@stanford.edu',
-            'phone_number': '+1-555-0123',
-            'is_blacklisted': false,
-            'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-          },
-          {
-            'id': 'stu-5',
-            'name': 'James Miller',
-            'department': 'Computer Science',
-            'college': 'MIT',
-            'semester': '6th Semester',
-            'contact_email': 'jmiller@mit.edu',
-            'phone_number': '+1-555-0155',
-            'is_blacklisted': true,
-            'created_at': DateTime.now().subtract(const Duration(days: 12)).toIso8601String(),
-          }
-        ];
-        state = state.copyWith(students: mockStudents, isLoading: false);
+      final res = await TursoDatabaseService.instance.query(
+        'SELECT * FROM students ORDER BY created_at DESC',
+      );
+
+      if (res.isNotEmpty) {
+        state = state.copyWith(
+          students: res,
+          isLoading: false,
+        );
         return;
       }
 
-      final res = await client
-          .from('students')
-          .select('*')
-          .order('created_at');
-
-      state = state.copyWith(
-        students: List<Map<String, dynamic>>.from(res),
-        isLoading: false,
-      );
+      // Fallback to Mock Data if database is completely empty
+      final mockStudents = [
+        {
+          'id': 'stu-1',
+          'name': 'Alex Guest',
+          'department': 'Computer Science',
+          'college': 'Stanford University',
+          'semester': '8th Semester',
+          'contact_email': 'alex.guest@stanford.edu',
+          'phone_number': '+1-555-0199',
+          'is_blacklisted': false,
+          'created_at': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+        },
+        {
+          'id': 'stu-2',
+          'name': 'Sarah Chen',
+          'department': 'Data Science',
+          'college': 'UC Berkeley',
+          'semester': '6th Semester',
+          'contact_email': 'schen@berkeley.edu',
+          'phone_number': '+1-555-0142',
+          'is_blacklisted': false,
+          'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        },
+      ];
+      state = state.copyWith(students: mockStudents, isLoading: false);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
