@@ -92,15 +92,6 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
-  void _redirectToLogin() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final navigator = _navigatorKey.currentState;
-      if (navigator == null) return;
-
-      navigator.pushNamedAndRemoveUntil('/login', (route) => false);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

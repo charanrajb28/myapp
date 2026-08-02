@@ -63,6 +63,8 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
       _sendInvite = false; 
     }
   }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();

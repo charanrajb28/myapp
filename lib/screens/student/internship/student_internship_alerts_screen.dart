@@ -253,7 +253,7 @@ class _StudentInternshipAlertsScreenState
       raw['content'],
     );
 
-    if (title == null || message == null) {
+    if (message == null) {
       return null;
     }
 

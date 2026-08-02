@@ -13,15 +13,15 @@ class StudentDetailScreen extends StatefulWidget {
   final String department;
   final String company;
 
-  StudentDetailScreen({
-    Key? key,
+  const StudentDetailScreen({
+    super.key,
     required this.studentId,
     required this.studentName,
     required this.collegeId,
     required this.status,
     required this.department,
     required this.company,
-  }) : super(key: key);
+  });
 
   @override
   State<StudentDetailScreen> createState() => _StudentDetailScreenState();
@@ -39,6 +39,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   List<Map<String, dynamic>> _pastInternships = [];
   List<Map<String, dynamic>> _currentInternships = [];
   List<Map<String, dynamic>> _appliedInternships = [];
+
+  bool _parseBool(dynamic val) {
+    if (val is bool) return val;
+    if (val is num) return val == 1;
+    if (val is String) return val == '1' || val.toLowerCase() == 'true';
+    return false;
+  }
 
   @override
   void initState() {
@@ -378,14 +385,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     
     // Dynamic mapping back to database fields
     final studentName = _studentData?['name'] ?? widget.studentName;
-    final collegeId = _studentData?['college'] ?? widget.collegeId;
     final department = _studentData?['department'] ?? widget.department;
     final semester = _studentData?['semester'] ?? 'Semester Not Set';
     final status = widget.status;
-    final company = widget.company;
 
     final isAlert = status == 'Red Alert';
-    final isUnassigned = _currentInternships.isEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
