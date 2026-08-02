@@ -91,6 +91,13 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
     ref.read(studentsProvider.notifier).loadStudents();
   }
 
+  bool _parseBool(dynamic val) {
+    if (val is bool) return val;
+    if (val is num) return val == 1;
+    if (val is String) return val == '1' || val.toLowerCase() == 'true';
+    return false;
+  }
+
   List<Map<String, dynamic>> _getFilteredAndSortedStudents(List<Map<String, dynamic>> rawStudents) {
     List<Map<String, dynamic>> results = List.from(rawStudents);
 
@@ -124,7 +131,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
     // 4. Blacklist filter
     if (_filterBlacklisted != null) {
       results = results.where((student) {
-        final isBlacklisted = student['is_blacklisted'] ?? false;
+        final isBlacklisted = _parseBool(student['is_blacklisted']);
         return isBlacklisted == _filterBlacklisted;
       }).toList();
     }
@@ -150,8 +157,8 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
       });
     } else if (_sortBy == 'Status') {
       results.sort((a, b) {
-        final aBlack = a['is_blacklisted'] ?? false;
-        final bBlack = b['is_blacklisted'] ?? false;
+        final aBlack = _parseBool(a['is_blacklisted']);
+        final bBlack = _parseBool(b['is_blacklisted']);
         if (aBlack == bBlack) {
           final aName = (a['name'] ?? '').toString().toLowerCase();
           final bName = (b['name'] ?? '').toString().toLowerCase();
@@ -189,7 +196,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
           s['contact_email']?.toString() ?? '',
           s['phone_number']?.toString() ?? '',
           s['college']?.toString() ?? '',
-          (s['is_blacklisted'] ?? false) ? 'Yes' : 'No',
+          _parseBool(s['is_blacklisted']) ? 'Yes' : 'No',
           s['created_at']?.toString() ?? '',
         ];
       }).toList();
@@ -720,9 +727,9 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
                                 );
                                 if (result == true) _refreshStudents();
                               },
-                              onBlacklist: () => _toggleBlacklist(student['id'], student['is_blacklisted'] ?? false),
+                              onBlacklist: () => _toggleBlacklist(student['id'], _parseBool(student['is_blacklisted'])),
                               onDelete: () => _deleteStudent(student['id']),
-                              isBlacklisted: student['is_blacklisted'] ?? false,
+                              isBlacklisted: _parseBool(student['is_blacklisted']),
                             );
                           },
                         ),

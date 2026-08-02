@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
-import 'package:myapp/services/supabase_compat.dart';
 import '../../../config/mail_config.dart';
+import '../../../firebase_options.dart';
+import '../../../services/turso_database_service.dart';
 import 'company_detail_screen.dart';
 
 class AddCompanyScreen extends StatefulWidget {
@@ -16,13 +19,23 @@ class AddCompanyScreen extends StatefulWidget {
 class _AddCompanyScreenState extends State<AddCompanyScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Profile data
   String _companyName = '';
   String _industry = 'E-Commerce';
   String _location = '';
   String _about = '';
   String _website = '';
   final _customIndustryController = TextEditingController();
+  
+  // Credentials
+  String _hrEmail = '';
+  String _password = '';
+  String _phone = '';
+  
+  // Partnership data
+  String _mouDate = '';
+  String _partnerSince = DateTime.now().year.toString();
+
+  bool _isSubmitting = false;
 
   List<String> _industries = [
     'E-Commerce',
@@ -64,15 +77,13 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
 
   Future<void> _loadDynamicIndustries(String currentIndustry) async {
     try {
-      final response = await Supabase.instance.client
-          .from('companies')
-          .select('industry');
-      if (response != null && response is List) {
-        final dbIndustries = response
-            .map((item) => item['industry']?.toString().trim() ?? '')
-            .where((s) => s.isNotEmpty)
-            .toSet();
-        
+      final response = await TursoDatabaseService.instance.query('SELECT DISTINCT industry FROM companies');
+      final dbIndustries = response
+          .map((item) => item['industry']?.toString().trim() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toSet();
+      
+      if (mounted) {
         setState(() {
           _industries.remove('Other');
           for (final ind in dbIndustries) {
@@ -82,7 +93,6 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
           }
           _industries.add('Other');
 
-          // Re-evaluate selected industry now that list is updated
           if (_industries.contains(currentIndustry)) {
             _industry = currentIndustry;
             if (currentIndustry != 'Other') {
@@ -96,17 +106,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
     }
   }
 
-  // Contact & Partnership
-  String _phone = '';
-  String _mouDate = '';
-  String _partnerSince = '';
-
-  // Credentials
-  String _hrEmail = '';
-  String _password = '';
   bool _obscurePassword = true;
-
-  bool _isSubmitting = false;
 
   Future<void> _selectMOUDate() async {
     final DateTime? picked = await showDatePicker(
@@ -141,64 +141,96 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
       setState(() => _isSubmitting = true);
       
       try {
-        final supabase = Supabase.instance.client;
-        
-        // 1. Isolated client to prevent logging the Admin out during creation
-        final inviteClient = SupabaseClient(
-          'https://nfurwspybtiaycqntzev.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-          const AuthClientOptions(authFlowType: AuthFlowType.implicit),
-        );
+        String? userId;
 
-        final AuthResponse res = await inviteClient.auth.signUp(
-          email: _hrEmail.trim(),
-          password: _password,
-          data: {
-            'role': 'company',
-            'name': _companyName,
+        if (widget.company == null) {
+          // 1. Create company user in Firebase Auth via secondary app instance to preserve admin session
+          FirebaseApp secondaryApp;
+          try {
+            secondaryApp = Firebase.app('SecondaryApp');
+          } catch (_) {
+            secondaryApp = await Firebase.initializeApp(
+              name: 'SecondaryApp',
+              options: DefaultFirebaseOptions.currentPlatform,
+            );
           }
-        );
+          final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+          final cred = await secondaryAuth.createUserWithEmailAndPassword(
+            email: _hrEmail.trim(),
+            password: _password.trim(),
+          );
+          userId = cred.user?.uid;
+          await secondaryApp.delete();
 
-        if (res.user != null) {
-          // 2. Wait for trigger to create profile, then Update detailed attributes
-          final finalIndustry = _industry == 'Other'
-              ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
-              : _industry;
+          if (userId != null) {
+            final finalIndustry = _industry == 'Other'
+                ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
+                : _industry;
 
-          bool updated = false;
-          for (int i = 0; i < 5; i++) {
-            final updRes = await supabase.from('companies').update({
-              'industry': finalIndustry,
-              'location': _location,
-              'website': _website,
-              'phone': _phone,
-              'contact_email': _hrEmail,
-              'description': _about,
-              'mou_date': _mouDate,
-              'partner_since': int.tryParse(_partnerSince) ?? DateTime.now().year,
-            }).eq('user_id', res.user!.id).select();
+            await TursoDatabaseService.instance.execute(
+              'INSERT INTO users (id, role, email, name) VALUES (?, ?, ?, ?)',
+              [userId, 'company', _hrEmail.trim(), _companyName.trim()],
+            );
 
-            if ((updRes as List).isNotEmpty) {
-              updated = true;
-              break;
-            }
-            await Future.delayed(const Duration(milliseconds: 600));
-          }
+            final companyId = 'cmp_${DateTime.now().millisecondsSinceEpoch}';
+            await TursoDatabaseService.instance.execute(
+              '''
+              INSERT INTO companies (id, user_id, name, industry, location, website, phone, contact_email, description, mou_date, partner_since)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ''',
+              [
+                companyId,
+                userId,
+                _companyName.trim(),
+                finalIndustry,
+                _location.trim(),
+                _website.trim(),
+                _phone.trim(),
+                _hrEmail.trim(),
+                _about.trim(),
+                _mouDate,
+                int.tryParse(_partnerSince) ?? DateTime.now().year,
+              ],
+            );
 
-          if (updated && widget.company == null) {
             await _dispatchEmailAutomation(
               email: _hrEmail.trim(),
               name: _companyName,
               tempPassword: _password,
             );
           }
+        } else {
+          userId = widget.company!.id;
+          final finalIndustry = _industry == 'Other'
+              ? (_customIndustryController.text.trim().isNotEmpty ? _customIndustryController.text.trim() : 'Other')
+              : _industry;
 
-          if (mounted) {
-            Navigator.pop(context, true);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Company Profile & Access Point Created Successfully'), backgroundColor: Colors.green)
-            );
-          }
+          await TursoDatabaseService.instance.execute(
+            '''
+            UPDATE companies SET name = ?, industry = ?, location = ?, website = ?, phone = ?, contact_email = ?, description = ?, mou_date = ?, partner_since = ?
+            WHERE id = ? OR user_id = ?
+            ''',
+            [
+              _companyName.trim(),
+              finalIndustry,
+              _location.trim(),
+              _website.trim(),
+              _phone.trim(),
+              _hrEmail.trim(),
+              _about.trim(),
+              _mouDate,
+              int.tryParse(_partnerSince) ?? DateTime.now().year,
+              userId,
+              userId,
+            ],
+          );
+        }
+
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Company Profile & Access Point Created Successfully'), backgroundColor: Colors.green)
+          );
         }
       } catch (e) {
         if (mounted) {

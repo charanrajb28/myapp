@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import 'package:myapp/services/supabase_compat.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 
 import '../../../config/mail_config.dart';
+import '../../../firebase_options.dart';
+import '../../../services/turso_database_service.dart';
 
 class AddStudentScreen extends StatefulWidget {
   final Map<String, dynamic>? student;
@@ -100,68 +103,106 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     setState(() => _isSubmitting = true);
     
     try {
-      final supabase = Supabase.instance.client;
       String? userId;
 
       if (!isEdit) {
-        // 1. Isolated client to prevent logging the Admin out during creation
-        final inviteClient = SupabaseClient(
-          'https://nfurwspybtiaycqntzev.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-          const AuthClientOptions(authFlowType: AuthFlowType.implicit),
-        );
-        
-        final AuthResponse res = await inviteClient.auth.signUp(
+        // Create user in Firebase Auth via secondary app instance to preserve admin session
+        FirebaseApp secondaryApp;
+        try {
+          secondaryApp = Firebase.app('SecondaryApp');
+        } catch (_) {
+          secondaryApp = await Firebase.initializeApp(
+            name: 'SecondaryApp',
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        }
+        final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+        final cred = await secondaryAuth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
-          password: _passwordController.text,
-          data: {
-            'role': 'student',
-            'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-          }
+          password: _passwordController.text.trim(),
         );
-        userId = res.user?.id;
+        userId = cred.user?.uid;
+        await secondaryApp.delete();
+
+        if (userId != null) {
+          final fullName = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim();
+          await TursoDatabaseService.instance.execute(
+            'INSERT INTO users (id, role, email, name) VALUES (?, ?, ?, ?)',
+            [userId, 'student', _emailController.text.trim(), fullName],
+          );
+          final studentId = 'std_${DateTime.now().millisecondsSinceEpoch}';
+          final gpaVal = double.tryParse(_gpaController.text) ?? 0.0;
+          await TursoDatabaseService.instance.execute(
+            '''
+            INSERT INTO students (id, user_id, name, enrollment_id, college, contact_email, phone_number, parent_contact, parent_email, department, semester, gpa, graduation_year)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            [
+              studentId,
+              userId,
+              fullName,
+              _idController.text.trim(),
+              'Shesadripuram College',
+              _emailController.text.trim(),
+              _phoneController.text.trim(),
+              _parentContactController.text.trim(),
+              _parentEmailController.text.trim(),
+              _selectedDepartment,
+              _selectedSemester,
+              gpaVal,
+              int.tryParse(_expectedGradController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+            ],
+          );
+        }
       } else {
-        userId = widget.student!['user_id'];
+        final sId = widget.student!['id']?.toString();
+        final uId = widget.student!['user_id']?.toString();
+        final fullName = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim();
+        final gpaVal = double.tryParse(_gpaController.text) ?? 0.0;
+        await TursoDatabaseService.instance.execute(
+          '''
+          UPDATE students SET name = ?, enrollment_id = ?, contact_email = ?, phone_number = ?, parent_contact = ?, parent_email = ?, department = ?, semester = ?, gpa = ?, graduation_year = ?
+          WHERE id = ? OR user_id = ?
+          ''',
+          [
+            fullName,
+            _idController.text.trim(),
+            _emailController.text.trim(),
+            _phoneController.text.trim(),
+            _parentContactController.text.trim(),
+            _parentEmailController.text.trim(),
+            _selectedDepartment,
+            _selectedSemester,
+            gpaVal,
+            int.tryParse(_expectedGradController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+            sId,
+            uId ?? sId,
+          ],
+        );
+        if (uId != null) {
+          await TursoDatabaseService.instance.execute(
+            'UPDATE users SET name = ? WHERE id = ?',
+            [fullName, uId],
+          );
+        }
       }
       
-      if (userId != null) {
-        // 2. Update student profile
-        final gpaVal = double.tryParse(_gpaController.text) ?? 0.0;
-        final updRes = await supabase.from('students').update({
-          'name': '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}',
-          'enrollment_id': _idController.text.trim(),
-          'college': 'Shesadripuram College',
-          'contact_email': _emailController.text.trim(),
-          'phone_number': _phoneController.text.trim(),
-          'parent_contact': _parentContactController.text.trim(),
-          'parent_email': _parentEmailController.text.trim(),
-          'department': _selectedDepartment,
-          'semester': _selectedSemester,
-          'gpa': gpaVal,
-          'graduation_year': int.tryParse(_expectedGradController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
-        }).eq('user_id', userId).select();
-
-        if ((updRes as List).isEmpty) {
-          throw Exception("Failed to sync profile. Student record not found.");
-        }
-        
-        if (!isEdit && _sendInvite) {
-          await _dispatchEmailAutomation(
-            email: _emailController.text.trim(),
-            name: _firstNameController.text.trim(),
-            tempPassword: _passwordController.text,
-          );
-        }
-        
-        if (mounted) {
-          Navigator.pop(context, true); 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isEdit ? 'Student Profile Updated!' : 'Student Profile Created!'),
-              backgroundColor: const Color(0xFF16A34A),
-            ),
-          );
-        }
+      if (!isEdit && _sendInvite) {
+        await _dispatchEmailAutomation(
+          email: _emailController.text.trim(),
+          name: _firstNameController.text.trim(),
+          tempPassword: _passwordController.text,
+        );
+      }
+      
+      if (mounted) {
+        Navigator.pop(context, true); 
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isEdit ? 'Student Profile Updated!' : 'Student Profile Created!'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Error: $e');

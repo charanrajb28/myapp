@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../services/turso_database_service.dart';
 import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
 import '../admins/admins_list_screen.dart';
@@ -48,24 +49,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
 
       // Fetch total students
-      final studentsRes = await client.from('students').select('id').count(CountOption.exact);
-      final studentsCount = studentsRes.count;
+      final studentsRes = await TursoDatabaseService.instance.querySingle('SELECT COUNT(*) as count FROM students');
+      final studentsCount = (studentsRes?['count'] as num?)?.toInt() ?? 0;
 
       // Fetch partner companies
-      final companiesRes = await client.from('companies').select('id').count(CountOption.exact);
-      final companiesCount = companiesRes.count;
+      final companiesRes = await TursoDatabaseService.instance.querySingle('SELECT COUNT(*) as count FROM companies');
+      final companiesCount = (companiesRes?['count'] as num?)?.toInt() ?? 0;
 
       // Fetch total internships
-      final internshipsRes = await client.from('internships').select('id').count(CountOption.exact);
-      final internshipsCount = internshipsRes.count;
+      final internshipsRes = await TursoDatabaseService.instance.querySingle('SELECT COUNT(*) as count FROM internships');
+      final internshipsCount = (internshipsRes?['count'] as num?)?.toInt() ?? 0;
 
-      final redAlertsRes = await client
-          .from('applications')
-          .select('id')
-          .inFilter('status', ['Removed', 'Completed'])
-          .lt('progress', 1.0)
-          .count(CountOption.exact);
-      final redAlertsCount = redAlertsRes.count;
+      // Fetch red alerts
+      final redAlertsRes = await TursoDatabaseService.instance.querySingle(
+        "SELECT COUNT(*) as count FROM applications WHERE status IN ('Removed', 'Completed') AND progress < 1.0"
+      );
+      final redAlertsCount = (redAlertsRes?['count'] as num?)?.toInt() ?? 0;
 
       // Fetch current admin user role details
       String fetchedRole = 'sub_admin';

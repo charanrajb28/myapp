@@ -233,8 +233,8 @@ class StudentPortalRepository {
       '''
       SELECT a.id as app_id, a.status as app_status, a.progress as app_progress,
              a.checkins as app_checkins,
-             i.id as internship_id, i.role, i.industry, i.location, i.stipend,
-             i.duration, i.deadline, i.start_date, i.end_date, i.about,
+             i.id as internship_id, i.title as role, c.industry, i.location, i.stipend,
+             i.duration, i.end_date as deadline, i.start_date, i.end_date, i.description as about,
              i.is_active as internship_active, c.name as company_name
       FROM applications a
       JOIN internships i ON a.internship_id = i.id
@@ -343,8 +343,8 @@ class StudentPortalRepository {
 
     final rows = await _db.query(
       '''
-      SELECT i.id, i.role, i.industry, i.location, i.stipend, i.duration, i.deadline,
-             i.about, i.vacancies, i.is_active, c.name as company_name
+      SELECT i.id, i.title as role, c.industry, i.location, i.stipend, i.duration, i.end_date as deadline,
+             i.description as about, i.vacancies, i.is_active, c.name as company_name
       FROM internships i
       LEFT JOIN companies c ON i.company_id = c.id
       WHERE i.is_active = 1

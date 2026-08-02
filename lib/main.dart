@@ -78,14 +78,10 @@ class _MyAppState extends State<MyApp> {
 
     _authSubscription =
         AuthService.instance.authStateChanges.listen((user) {
-      if (suppressAuthRedirect) return;
-
       if (user != null) {
         OneSignalService.login(user.uid);
-        return;
       } else {
         OneSignalService.logout();
-        _redirectToLogin();
       }
     });
   }
@@ -142,6 +138,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _checking = true;
+  StreamSubscription<User?>? _authSub;
 
   @override
   void initState() {
@@ -149,15 +146,34 @@ class _AuthGateState extends State<AuthGate> {
     _checkAuth();
   }
 
-  Future<void> _checkAuth() async {
-    final user = AuthService.instance.currentUser;
-    if (user == null) {
-      if (mounted) {
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  void _checkAuth() {
+    _authSub = AuthService.instance.authStateChanges.listen((user) async {
+      if (user != null && _checking) {
+        _authSub?.cancel();
+        await _navigateToDashboard(user);
+      }
+    });
+
+    Future.delayed(const Duration(milliseconds: 600), () async {
+      if (!mounted) return;
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser != null && _checking) {
+        _authSub?.cancel();
+        await _navigateToDashboard(currentUser);
+      } else if (currentUser == null && _checking) {
+        _authSub?.cancel();
         setState(() => _checking = false);
       }
-      return;
-    }
+    });
+  }
 
+  Future<void> _navigateToDashboard(User user) async {
     try {
       final userData = await TursoDatabaseService.instance.querySingle(
         'SELECT role FROM users WHERE id = ?',
@@ -495,42 +511,6 @@ class _LoginPageState extends State<LoginPage>
       parent: _devAnimController,
       curve: Curves.easeInOut,
     );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkExistingSession();
-    });
-  }
-
-  Future<void> _checkExistingSession() async {
-    final user = AuthService.instance.currentUser;
-    if (user != null) {
-      setState(() => _isLoading = true);
-      try {
-        final userData = await TursoDatabaseService.instance.querySingle(
-          'SELECT role FROM users WHERE id = ?',
-          [user.uid],
-        );
-
-        final role = userData?['role'];
-        if (!mounted) return;
-
-        if (role == 'admin' || role == 'sub_admin') {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
-          );
-        } else if (role == 'student') {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const StudentShell()),
-          );
-        } else if (role == 'company') {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const CompanyShell()),
-          );
-        }
-      } catch (e) {
-        if (mounted) setState(() => _isLoading = false);
-      }
-    }
   }
 
   @override

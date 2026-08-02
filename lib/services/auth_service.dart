@@ -128,44 +128,67 @@ class AuthService {
   }
 
   /// Ensures the default admin account exists in Firebase Auth and Turso DB
+  /// without disrupting any existing user session in local storage.
   Future<void> ensureDefaultAdminAccount({
     required String email,
     required String password,
   }) async {
     try {
-      // 1. Try to sign in as admin
-      final cred = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password.trim(),
+      final cleanEmail = email.trim();
+      final cleanPassword = password.trim();
+
+      // 1. Check if the default admin user already exists in Turso DB
+      final existing = await _db.querySingle(
+        'SELECT id FROM users WHERE email = ?',
+        [cleanEmail],
       );
-      final uid = cred.user!.uid;
 
-      // Check if user row exists in Turso
-      final existing = await _db.querySingle('SELECT id FROM users WHERE id = ?', [uid]);
-      if (existing == null) {
-        await _db.execute(
-          'INSERT INTO users (id, role, email, name) VALUES (?, ?, ?, ?)',
-          [uid, 'admin', email.trim(), 'Platform Administrator'],
-        );
+      if (existing != null) {
+        debugPrint('✅ Default admin account already exists in database.');
+        return;
       }
-      debugPrint('✅ Default admin account ready (signed in): $email ($uid)');
-    } catch (e) {
-      // 2. If sign-in failed, try creating the account
+
+      // 2. If a user is already signed in, do NOT overwrite their session!
+      final currentUser = _firebaseAuth.currentUser;
+      if (currentUser != null) {
+        debugPrint('ℹ️ Active user session detected (${currentUser.email}). Skipping admin account seeding check.');
+        return;
+      }
+
+      // 3. If admin account is missing from DB and no user is signed in:
+      String? adminUid;
       try {
-        final cred = await _firebaseAuth.createUserWithEmailAndPassword(
-          email: email.trim(),
-          password: password.trim(),
+        final cred = await _firebaseAuth.signInWithEmailAndPassword(
+          email: cleanEmail,
+          password: cleanPassword,
         );
-        final uid = cred.user!.uid;
+        adminUid = cred.user?.uid;
+      } catch (_) {
+        try {
+          final cred = await _firebaseAuth.createUserWithEmailAndPassword(
+            email: cleanEmail,
+            password: cleanPassword,
+          );
+          adminUid = cred.user?.uid;
+        } catch (err) {
+          debugPrint('ℹ️ Admin account creation check: $err');
+        }
+      }
 
+      if (adminUid != null) {
         await _db.execute(
           'INSERT INTO users (id, role, email, name) VALUES (?, ?, ?, ?)',
-          [uid, 'admin', email.trim(), 'Platform Administrator'],
+          [adminUid, 'admin', cleanEmail, 'Platform Administrator'],
         );
-        debugPrint('✅ Default admin account created: $email ($uid)');
-      } catch (err) {
-        debugPrint('ℹ️ Admin setup check: $err');
+        debugPrint('✅ Default admin account seeded in Turso: $cleanEmail ($adminUid)');
       }
+
+      // 4. Clean up Firebase Auth state so the app starts in a logged-out state (LoginPage)
+      if (_firebaseAuth.currentUser != null) {
+        await _firebaseAuth.signOut();
+      }
+    } catch (e) {
+      debugPrint('Error in ensureDefaultAdminAccount: $e');
     }
   }
 }

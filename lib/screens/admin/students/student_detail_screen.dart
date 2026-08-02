@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../services/turso_database_service.dart';
 import 'add_student_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
 import '../../../utils/file_saver.dart';
@@ -47,25 +48,61 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
   Future<void> _fetchStudentAdditionalData() async {
     try {
-      // 1. Fetch Full Student Info
-      final studentRes = await Supabase.instance.client
-          .from('students')
-          .select('*')
-          .eq('id', widget.studentId)
-          .single();
+      // 1. Fetch Full Student Info from Turso DB
+      final studentRes = await TursoDatabaseService.instance.querySingle(
+        'SELECT * FROM students WHERE id = ? OR user_id = ?',
+        [widget.studentId, widget.studentId],
+      );
       
-      // 2. Fetch all applications and group by lifecycle
-      final appsRes = await Supabase.instance.client
-          .from('applications')
-          .select('*, internships(*, companies(*))')
-          .eq('student_id', widget.studentId);
-      
-      final List<Map<String, dynamic>> apps = List<Map<String, dynamic>>.from(appsRes);
+      final realStudentId = studentRes?['id']?.toString() ?? widget.studentId;
+
+      // 2. Fetch all applications with details via SQL JOIN
+      final appsRows = await TursoDatabaseService.instance.query(
+        '''
+        SELECT 
+          a.id, a.student_id, a.internship_id, a.status, a.applied_date, a.mentor_name, a.mentor_email, a.progress, a.checkins, a.created_at,
+          i.title as role, i.description as job_description, i.location as job_location, i.stipend, i.duration, i.start_date, i.end_date,
+          c.name as company_name, c.industry as company_industry
+        FROM applications a
+        LEFT JOIN internships i ON a.internship_id = i.id
+        LEFT JOIN companies c ON i.company_id = c.id
+        WHERE a.student_id = ?
+        ''',
+        [realStudentId],
+      );
+
+      final List<Map<String, dynamic>> apps = appsRows.map((row) {
+        return {
+          'id': row['id'],
+          'student_id': row['student_id'],
+          'internship_id': row['internship_id'],
+          'status': row['status'],
+          'applied_date': row['applied_date'],
+          'mentor_name': row['mentor_name'],
+          'mentor_email': row['mentor_email'],
+          'progress': row['progress'],
+          'checkins': row['checkins'],
+          'created_at': row['created_at'],
+          'internships': {
+            'role': row['role'],
+            'description': row['job_description'],
+            'location': row['job_location'],
+            'stipend': row['stipend'],
+            'duration': row['duration'],
+            'start_date': row['start_date'],
+            'end_date': row['end_date'],
+            'companies': {
+              'name': row['company_name'],
+              'industry': row['company_industry'],
+            }
+          }
+        };
+      }).toList();
 
       if (mounted) {
         setState(() {
           _studentData = studentRes;
-          _isBlacklisted = studentRes['is_blacklisted'] ?? false;
+          _isBlacklisted = _parseBool(studentRes?['is_blacklisted']);
           _appliedInternships = apps
               .where((a) =>
                   a['status'] != 'Completed' &&
@@ -114,10 +151,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     setState(() => _isBlacklisting = true);
     try {
-      await Supabase.instance.client
-          .from('students')
-          .update({'is_blacklisted': !_isBlacklisted})
-          .eq('id', widget.studentId);
+      final nextStatus = !_isBlacklisted ? 1 : 0;
+      await TursoDatabaseService.instance.execute(
+        'UPDATE students SET is_blacklisted = ? WHERE id = ? OR user_id = ?',
+        [nextStatus, widget.studentId, widget.studentId],
+      );
       
       if (mounted) {
         setState(() {
@@ -138,7 +176,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Student?'),
-        content: const Text('This will permanently remove the student profile and the associated Auth account. This action is irreversible.'),
+        content: const Text('This will permanently remove the student profile and the associated account. This action is irreversible.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
@@ -150,18 +188,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
 
     setState(() => _isDeleting = true);
     try {
-      // Note: We delete from 'users' (public) which handles 'students' via CASCADE. 
-      // Auth deletion requires admin API but we assume a trigger or direct access for MVP.
-      final studentRes = await Supabase.instance.client
-          .from('students')
-          .select('user_id')
-          .eq('id', widget.studentId)
-          .single();
-      
-      await Supabase.instance.client
-          .from('users')
-          .delete()
-          .eq('id', studentRes['user_id']);
+      final userId = _studentData?['user_id']?.toString();
+      if (userId != null && userId.isNotEmpty) {
+        await TursoDatabaseService.instance.execute('DELETE FROM users WHERE id = ?', [userId]);
+      }
+      await TursoDatabaseService.instance.execute(
+        'DELETE FROM students WHERE id = ? OR user_id = ?',
+        [widget.studentId, widget.studentId],
+      );
       
       if (mounted) {
         Navigator.pop(context, true); // Pop with refresh signal
@@ -1364,6 +1398,12 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     );
   }
 
+  String _valOrFallback(dynamic val, String fallback) {
+    if (val == null) return fallback;
+    final str = val.toString().trim();
+    return str.isEmpty ? fallback : str;
+  }
+
   Widget _buildPersonalDetailsCard(bool isMobile, String studentName) {
     final resumeUrl = _studentData?['resume_url'];
 
@@ -1382,15 +1422,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 24),
-          _buildInfoRow(Icons.badge_outlined, 'Enrollment ID', _studentData?['enrollment_id'] ?? 'N/A'),
+          _buildInfoRow(Icons.badge_outlined, 'Enrollment ID', _valOrFallback(_studentData?['enrollment_id'], 'N/A')),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.email_outlined, 'Contact Email', _studentData?['contact_email'] ?? 'Not Given'),
+          _buildInfoRow(Icons.email_outlined, 'Contact Email', _valOrFallback(_studentData?['contact_email'], 'Not Given')),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.phone_outlined, 'Phone Number', _studentData?['phone_number'] ?? 'N/A'),
+          _buildInfoRow(Icons.phone_outlined, 'Phone Number', _valOrFallback(_studentData?['phone_number'], 'N/A')),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.escalator_warning_outlined, 'Parent Contact', _studentData?['parent_contact'] ?? 'N/A'),
+          _buildInfoRow(Icons.escalator_warning_outlined, 'Parent Contact', _valOrFallback(_studentData?['parent_contact'], 'N/A')),
           const SizedBox(height: 16),
-          _buildInfoRow(Icons.alternate_email_outlined, 'Parent Email', _studentData?['parent_email'] ?? 'N/A'),
+          _buildInfoRow(Icons.alternate_email_outlined, 'Parent Email', _valOrFallback(_studentData?['parent_email'], 'N/A')),
           const SizedBox(height: 16),
           _buildInfoRow(Icons.location_on_outlined, 'City Location', 'Bangalore'),
           const SizedBox(height: 24),
