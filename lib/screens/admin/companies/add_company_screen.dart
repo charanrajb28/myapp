@@ -19,22 +19,18 @@ class AddCompanyScreen extends StatefulWidget {
 class _AddCompanyScreenState extends State<AddCompanyScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  String _companyName = '';
-  String _industry = 'E-Commerce';
-  String _location = '';
-  String _about = '';
-  String _website = '';
+  final _companyNameController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _aboutController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _mouDateController = TextEditingController();
+  final _partnerSinceController = TextEditingController(text: DateTime.now().year.toString());
+  final _hrEmailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _customIndustryController = TextEditingController();
-  
-  // Credentials
-  String _hrEmail = '';
-  String _password = '';
-  String _phone = '';
-  
-  // Partnership data
-  String _mouDate = '';
-  String _partnerSince = DateTime.now().year.toString();
 
+  String _industry = 'E-Commerce';
   bool _isSubmitting = false;
 
   List<String> _industries = [
@@ -62,15 +58,72 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
       _customIndustryController.text = rawIndustry;
     }
     if (c != null) {
-      _companyName = c.name;
-      _location = c.location;
-      _about = c.about;
+      _companyNameController.text = c.name;
+      _locationController.text = c.location;
+      _aboutController.text = c.about;
+      _fetchExistingCompanyDetails(c.id);
     }
     _loadDynamicIndustries(rawIndustry);
   }
 
+  Future<void> _fetchExistingCompanyDetails(String companyId) async {
+    try {
+      final res = await TursoDatabaseService.instance.querySingle(
+        'SELECT * FROM companies WHERE id = ? OR user_id = ?',
+        [companyId, companyId],
+      );
+      if (res != null && mounted) {
+        setState(() {
+          if (res['name'] != null && res['name'].toString().isNotEmpty) {
+            _companyNameController.text = res['name'].toString();
+          }
+          if (res['location'] != null && res['location'].toString().isNotEmpty) {
+            _locationController.text = res['location'].toString();
+          }
+          if (res['description'] != null && res['description'].toString().isNotEmpty) {
+            _aboutController.text = res['description'].toString();
+          }
+          if (res['website'] != null) {
+            _websiteController.text = res['website'].toString();
+          }
+          if (res['phone'] != null) {
+            _phoneController.text = res['phone'].toString();
+          }
+          if (res['mou_date'] != null) {
+            _mouDateController.text = res['mou_date'].toString();
+          }
+          if (res['partner_since'] != null) {
+            _partnerSinceController.text = res['partner_since'].toString();
+          }
+          if (res['contact_email'] != null) {
+            _hrEmailController.text = res['contact_email'].toString();
+          }
+
+          final String dbIndustry = res['industry']?.toString() ?? widget.company?.industry ?? 'E-Commerce';
+          if (_industries.contains(dbIndustry)) {
+            _industry = dbIndustry;
+          } else {
+            _industry = 'Other';
+            _customIndustryController.text = dbIndustry;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching existing company details: $e');
+    }
+  }
+
   @override
   void dispose() {
+    _companyNameController.dispose();
+    _locationController.dispose();
+    _aboutController.dispose();
+    _websiteController.dispose();
+    _phoneController.dispose();
+    _mouDateController.dispose();
+    _partnerSinceController.dispose();
+    _hrEmailController.dispose();
+    _passwordController.dispose();
     _customIndustryController.dispose();
     super.dispose();
   }
@@ -129,7 +182,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
     );
     if (picked != null) {
       setState(() {
-        _mouDate = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        _mouDateController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }
@@ -140,6 +193,16 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
       
       setState(() => _isSubmitting = true);
       
+      final companyName = _companyNameController.text.trim();
+      final location = _locationController.text.trim();
+      final about = _aboutController.text.trim();
+      final website = _websiteController.text.trim();
+      final phone = _phoneController.text.trim();
+      final mouDate = _mouDateController.text.trim();
+      final partnerSince = _partnerSinceController.text.trim();
+      final hrEmail = _hrEmailController.text.trim();
+      final password = _passwordController.text.trim();
+
       try {
         String? userId;
 
@@ -156,8 +219,8 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
           }
           final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
           final cred = await secondaryAuth.createUserWithEmailAndPassword(
-            email: _hrEmail.trim(),
-            password: _password.trim(),
+            email: hrEmail,
+            password: password,
           );
           userId = cred.user?.uid;
           await secondaryApp.delete();
@@ -169,7 +232,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
 
             await TursoDatabaseService.instance.execute(
               'INSERT INTO users (id, role, email, name) VALUES (?, ?, ?, ?)',
-              [userId, 'company', _hrEmail.trim(), _companyName.trim()],
+              [userId, 'company', hrEmail, companyName],
             );
 
             final companyId = 'cmp_${DateTime.now().millisecondsSinceEpoch}';
@@ -181,22 +244,22 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
               [
                 companyId,
                 userId,
-                _companyName.trim(),
+                companyName,
                 finalIndustry,
-                _location.trim(),
-                _website.trim(),
-                _phone.trim(),
-                _hrEmail.trim(),
-                _about.trim(),
-                _mouDate,
-                int.tryParse(_partnerSince) ?? DateTime.now().year,
+                location,
+                website,
+                phone,
+                hrEmail,
+                about,
+                mouDate,
+                int.tryParse(partnerSince) ?? DateTime.now().year,
               ],
             );
 
             await _dispatchEmailAutomation(
-              email: _hrEmail.trim(),
-              name: _companyName,
-              tempPassword: _password,
+              email: hrEmail,
+              name: companyName,
+              tempPassword: password,
             );
           }
         } else {
@@ -211,15 +274,15 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
             WHERE id = ? OR user_id = ?
             ''',
             [
-              _companyName.trim(),
+              companyName,
               finalIndustry,
-              _location.trim(),
-              _website.trim(),
-              _phone.trim(),
-              _hrEmail.trim(),
-              _about.trim(),
-              _mouDate,
-              int.tryParse(_partnerSince) ?? DateTime.now().year,
+              location,
+              website,
+              phone,
+              hrEmail,
+              about,
+              mouDate,
+              int.tryParse(partnerSince) ?? DateTime.now().year,
               userId,
               userId,
             ],
@@ -315,8 +378,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                 label: 'Company Name',
                 hint: 'ex. Acme Corp',
                 icon: Icons.business_rounded,
-                initialValue: _companyName,
-                onSaved: (v) => _companyName = v!,
+                controller: _companyNameController,
               ),
               const SizedBox(height: 20),
 
@@ -354,8 +416,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                     label: 'HQ Location',
                     hint: 'City, State',
                     icon: Icons.location_city_rounded,
-                    initialValue: _location,
-                    onSaved: (v) => _location = v!,
+                    controller: _locationController,
                   ),
                 ),
               ]),
@@ -367,8 +428,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                 icon: Icons.info_outline_rounded,
                 maxLines: 4,
                 required: false,
-                initialValue: _about,
-                onSaved: (v) => _about = v ?? '',
+                controller: _aboutController,
               ),
 
               const SizedBox(height: 48),
@@ -384,7 +444,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                     hint: 'www.acmecorp.com',
                     icon: Icons.language_rounded,
                     required: false,
-                    onSaved: (v) => _website = v ?? '',
+                    controller: _websiteController,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -395,7 +455,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                     icon: Icons.phone_rounded,
                     keyboardType: TextInputType.phone,
                     required: false,
-                    onSaved: (v) => _phone = v ?? '',
+                    controller: _phoneController,
                   ),
                 ),
               ]),
@@ -411,7 +471,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                       icon: Icons.handshake_rounded,
                       required: false,
                       enabled: false, // Prevents typing, forces use of calendar
-                      controller: TextEditingController(text: _mouDate),
+                      controller: _mouDateController,
                     ),
                   ),
                 ),
@@ -423,7 +483,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                     icon: Icons.calendar_month_rounded,
                     keyboardType: TextInputType.number,
                     required: false,
-                    onSaved: (v) => _partnerSince = v ?? '',
+                    controller: _partnerSinceController,
                   ),
                 ),
               ]),
@@ -449,7 +509,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                         hint: 'hr@acmecorp.com',
                         icon: Icons.email_rounded,
                         keyboardType: TextInputType.emailAddress,
-                        onSaved: (v) => _hrEmail = v!,
+                        controller: _hrEmailController,
                       ),
                       const SizedBox(height: 20),
                       _InputField(
@@ -457,7 +517,7 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                         hint: '••••••••',
                         icon: Icons.lock_rounded,
                         obscureText: _obscurePassword,
-                        onSaved: (v) => _password = v!,
+                        controller: _passwordController,
                         suffixIcon: IconButton(
                           icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                               color: const Color(0xFF94A3B8), size: 20),
@@ -492,14 +552,20 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
                   Expanded(
                     flex: 2,
                     child: FilledButton(
-                      onPressed: _submit,
+                      onPressed: _isSubmitting ? null : _submit,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: Text(widget.company == null ? 'Create Company Profile' : 'Save Changes',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(widget.company == null ? 'Create Company Profile' : 'Save Changes',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                     ),
                   ),
                 ],
