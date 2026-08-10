@@ -113,9 +113,9 @@ class FCMService {
     }
   }
 
-  /// Subscribe device to an FCM topic
+  /// Subscribe device to an FCM topic (Supported natively on Mobile iOS/Android)
   static Future<void> subscribeToTopic(String topic) async {
-    if (!isSupported) return;
+    if (!isSupported || kIsWeb) return;
     try {
       final formattedTopic =
           topic.replaceAll(' ', '_').replaceAll('-', '_').toLowerCase();
@@ -128,7 +128,7 @@ class FCMService {
 
   /// Unsubscribe device from an FCM topic
   static Future<void> unsubscribeFromTopic(String topic) async {
-    if (!isSupported) return;
+    if (!isSupported || kIsWeb) return;
     try {
       final formattedTopic =
           topic.replaceAll(' ', '_').replaceAll('-', '_').toLowerCase();
