@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/student_notifications_provider.dart';
 import '../../providers/student_internships_provider.dart';
+import '../../services/fcm_service.dart';
 import 'dashboard/student_dashboard_screen.dart';
 import 'internship/my_internship_screen.dart';
 import 'checkins/checkins_screen.dart';
@@ -32,6 +33,7 @@ class StudentShellState extends ConsumerState<StudentShell> {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
     _sessionMonitor = SessionMonitor()..start(context);
+    FCMService.subscribeStudentTopics();
   }
 
   @override

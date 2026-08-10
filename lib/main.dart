@@ -17,7 +17,8 @@ import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
 import 'utils/device_session_helper.dart';
-import 'services/onesignal_service.dart';
+import 'services/fcm_service.dart';
+import 'widgets/app_logo.dart';
 
 
 void main() async {
@@ -71,17 +72,17 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // Initialize OneSignal Push Notifications with navigator context
+    // Initialize Firebase Push Notifications with navigator context
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      OneSignalService.initialize(_navigatorKey.currentContext);
+      FCMService.initialize(_navigatorKey.currentContext);
     });
 
     _authSubscription =
         AuthService.instance.authStateChanges.listen((user) {
       if (user != null) {
-        OneSignalService.login(user.uid);
+        FCMService.login(user.uid);
       } else {
-        OneSignalService.logout();
+        FCMService.logout();
       }
     });
   }
@@ -204,12 +205,7 @@ class _AuthGateState extends State<AuthGate> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/logo.png',
-                width: 120,
-                height: 120,
-                fit: BoxFit.contain,
-              ),
+              const AppLogo(size: 120, heroTag: 'app_logo'),
               const SizedBox(height: 24),
               const Text(
                 'Aaroha',
@@ -547,12 +543,7 @@ class _LoginPageState extends State<LoginPage>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // ── Logo ──────────────────────────────────────────────
-                  Image.asset(
-                    'assets/logo.png',
-                    width: 96,
-                    height: 96,
-                    fit: BoxFit.contain,
-                  ),
+                  const AppLogo(size: 96, heroTag: 'app_logo'),
                   const SizedBox(height: 20),
                   Text(
                     'Aaroha',

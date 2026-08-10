@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_logo.dart';
 
 class LogoutScreen extends StatefulWidget {
   const LogoutScreen({super.key});
@@ -58,23 +59,8 @@ class _LogoutScreenState extends State<LogoutScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Animated Logout Icon
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFFECACA), width: 2),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.logout_rounded,
-                      color: Color(0xFFDC2626),
-                      size: 32,
-                    ),
-                  ),
-                ),
+                // App Logo
+                const AppLogo(size: 72, heroTag: 'app_logo'),
                 const SizedBox(height: 32),
                 
                 // Text
@@ -121,7 +107,7 @@ class _LogoutScreenState extends State<LogoutScreen> {
               child: Column(
                 children: [
                   Text(
-                    'ScholarBridge',
+                    'Aaroha',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,

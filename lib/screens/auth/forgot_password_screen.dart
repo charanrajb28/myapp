@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/supabase_compat.dart';
 
 import '../../config/mail_config.dart';
+import '../../widgets/app_logo.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -179,12 +180,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.contain,
-                  ),
+                  const AppLogo(size: 80, heroTag: 'app_logo'),
                   const SizedBox(height: 24),
                   const Text(
                     'Forgot Password',

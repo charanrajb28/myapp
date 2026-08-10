@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/app_logo.dart';
 
 import '../student/student_shell.dart';
 
@@ -258,18 +259,10 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen>
           // Brand row
           Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.school_rounded, size: 18, color: _accent),
-              ),
+              const AppLogo(size: 32),
               const SizedBox(width: 10),
               const Text(
-                'ScholarBridge',
+                'Aaroha',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,

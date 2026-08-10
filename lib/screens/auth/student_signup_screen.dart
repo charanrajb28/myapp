@@ -3,6 +3,7 @@ import 'package:myapp/services/supabase_compat.dart';
 
 import '../../main.dart' show suppressAuthRedirect;
 import '../../services/auth_service.dart';
+import '../../widgets/app_logo.dart';
 import 'student_onboarding_screen.dart';
 
 class StudentSignUpScreen extends StatefulWidget {
@@ -141,12 +142,7 @@ class _StudentSignUpScreenState extends State<StudentSignUpScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // ── Brand Header ──────────────────────────────────────
-                    Image.asset(
-                      'assets/logo.png',
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.contain,
-                    ),
+                    const AppLogo(size: 80, heroTag: 'app_logo'),
                     const SizedBox(height: 20),
                     const Text(
                       'Create Your Account',
