@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../utils/web_notification_helper.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -25,6 +26,10 @@ class FCMService {
 
     try {
       // 1. Request Push Notification Permission
+      if (kIsWeb) {
+        await requestWebNotificationPermission();
+      }
+
       final settings = await _messaging.requestPermission(
         alert: true,
         badge: true,
@@ -75,28 +80,10 @@ class FCMService {
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('FCM: Received foreground message: ${message.notification?.title}');
         final notification = message.notification;
-        final android = message.notification?.android;
-
-        if (notification != null && !kIsWeb) {
-          _localNotifications.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                androidChannel.id,
-                androidChannel.name,
-                channelDescription: androidChannel.description,
-                icon: android?.smallIcon ?? '@mipmap/ic_launcher',
-                importance: Importance.high,
-                priority: Priority.high,
-              ),
-              iOS: const DarwinNotificationDetails(
-                presentAlert: true,
-                presentBadge: true,
-                presentSound: true,
-              ),
-            ),
+        if (notification != null) {
+          showNotification(
+            title: notification.title ?? 'Aaroha Notification',
+            body: notification.body ?? '',
           );
         }
       });
@@ -110,6 +97,46 @@ class FCMService {
       await subscribeToTopic('all_students');
     } catch (e) {
       debugPrint('FCM Initialization Error: $e');
+    }
+  }
+
+  /// Displays an immediate Push / System / Web desktop notification popup
+  static Future<void> showNotification({
+    required String title,
+    required String body,
+  }) async {
+    try {
+      if (kIsWeb) {
+        showWebNotification(title, body);
+        return;
+      }
+
+      const androidDetails = AndroidNotificationDetails(
+        'high_importance_channel',
+        'High Importance Notifications',
+        channelDescription: 'Channel used for critical student and posting alerts.',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      );
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _localNotifications.show(
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title,
+        body,
+        details,
+      );
+    } catch (e) {
+      debugPrint('Error showing local notification: $e');
     }
   }
 

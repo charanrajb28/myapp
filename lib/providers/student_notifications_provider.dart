@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../models/student_notification.dart';
 import '../screens/student/student_portal_repository.dart';
+import '../services/fcm_service.dart';
 
 class StudentNotificationsState {
   final List<StudentNotification> notifications;
@@ -30,6 +33,8 @@ class StudentNotificationsState {
 class StudentNotificationsNotifier extends Notifier<StudentNotificationsState> {
   late final StudentPortalRepository _repository;
   RealtimeChannel? _realtimeSubscription;
+  Timer? _pollTimer;
+  bool _hasInitialLoaded = false;
 
   @override
   StudentNotificationsState build() {
@@ -37,12 +42,44 @@ class StudentNotificationsNotifier extends Notifier<StudentNotificationsState> {
     // Fetch notifications asynchronously upon initialization
     Future.microtask(() => loadNotifications());
     _setupRealtimeSubscription();
+    _startPollingTimer();
 
     ref.onDispose(() {
       _realtimeSubscription?.unsubscribe();
+      _pollTimer?.cancel();
     });
 
     return StudentNotificationsState(notifications: [], isLoading: false);
+  }
+
+  void _startPollingTimer() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _pollNotifications());
+  }
+
+  Future<void> _pollNotifications() async {
+    try {
+      final freshList = await _repository.fetchStudentNotifications();
+      if (!_hasInitialLoaded) {
+        _hasInitialLoaded = true;
+        state = state.copyWith(notifications: freshList);
+        return;
+      }
+
+      final existingIds = state.notifications.map((n) => n.id).toSet();
+      final brandNewUnread = freshList.where((n) => !n.isRead && !existingIds.contains(n.id)).toList();
+
+      for (final item in brandNewUnread) {
+        FCMService.showNotification(
+          title: item.title,
+          body: item.message,
+        );
+      }
+
+      state = state.copyWith(notifications: freshList);
+    } catch (e) {
+      debugPrint('Error polling notifications: $e');
+    }
   }
 
   void _setupRealtimeSubscription() {
@@ -75,6 +112,7 @@ class StudentNotificationsNotifier extends Notifier<StudentNotificationsState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final notifications = await _repository.fetchStudentNotifications();
+      _hasInitialLoaded = true;
       state = state.copyWith(notifications: notifications, isLoading: false);
     } catch (e) {
       state = state.copyWith(
