@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../feedbacks/admin_form_builder_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
 import '../../company/postings/edit_posting_screen.dart';
+import '../../../services/fcm_push_service.dart';
 
 import 'package:myapp/services/supabase_compat.dart';
 
@@ -104,6 +105,13 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           await Supabase.instance.client
               .from('student_notifications')
               .insert(notifications);
+
+          // Send native FCM broadcast to all subscribed students
+          FcmPushService.sendToTopic(
+            topic: 'all_students',
+            title: 'New Internship: $roleName',
+            body: '$companyName has posted a new opportunity. Apply now!',
+          );
         }
       }
 

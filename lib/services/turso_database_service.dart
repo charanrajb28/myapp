@@ -372,6 +372,8 @@ class TursoDatabaseService {
       'ALTER TABLE student_notifications ADD COLUMN user_id TEXT',
       'ALTER TABLE student_notifications ADD COLUMN notification_type TEXT',
       'ALTER TABLE student_notifications ADD COLUMN sender_name TEXT',
+      'ALTER TABLE user_device_sessions ADD COLUMN fcm_token TEXT',
+      'ALTER TABLE users ADD COLUMN fcm_token TEXT',
     ];
     for (final stmt in alterStatements) {
       try {

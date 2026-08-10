@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../../../services/turso_database_service.dart';
+import '../../../services/fcm_push_service.dart';
 import 'role_detail_screen.dart';
 import 'add_company_screen.dart';
 
@@ -332,6 +333,15 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       }).toList();
 
       await client.from('student_notifications').insert(notifications);
+
+      // Send native FCM push to each applicant's device
+      for (final uId in userIds) {
+        FcmPushService.sendToUser(
+          userId: uId,
+          title: titleController.text.trim(),
+          body: messageController.text.trim(),
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

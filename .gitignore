@@ -46,4 +46,6 @@ app.*.map.json
 
 # Local configuration files with credentials
 /.env
+/assets/service_account.json
+*.json.secret
 

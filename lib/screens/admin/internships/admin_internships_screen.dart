@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../services/fcm_push_service.dart';
 import '../companies/role_detail_screen.dart';
 
 class AdminInternshipsScreen extends StatefulWidget {
@@ -95,6 +96,13 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
           await Supabase.instance.client
               .from('student_notifications')
               .insert(notifications);
+
+          // Send native FCM broadcast to all subscribed students
+          FcmPushService.sendToTopic(
+            topic: 'all_students',
+            title: 'New Internship: $roleName',
+            body: '$companyName has posted a new opportunity. Apply now!',
+          );
         }
       }
 

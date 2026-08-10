@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../../../services/turso_database_service.dart';
+import '../../../services/fcm_push_service.dart';
 import 'add_student_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
 import '../../../utils/file_saver.dart';
@@ -363,6 +364,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         'is_read': 0,
         'sender_name': senderName,
       });
+
+      // Send native FCM push to student's device
+      FcmPushService.sendToUser(
+        userId: userId,
+        title: title,
+        body: message,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

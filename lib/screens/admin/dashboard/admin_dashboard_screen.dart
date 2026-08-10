@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../../../services/turso_database_service.dart';
+import '../../../services/fcm_push_service.dart';
 import '../alerts/red_alerts_screen.dart';
 import '../feedbacks/admin_feedbacks_screen.dart';
 import '../admins/admins_list_screen.dart';
@@ -263,6 +264,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }).toList();
 
       await client.from('student_notifications').insert(notifications);
+
+      // Send native FCM push broadcast to all students via topic
+      FcmPushService.sendToTopic(
+        topic: 'all_students',
+        title: title,
+        body: message,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
