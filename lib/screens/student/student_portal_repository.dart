@@ -233,9 +233,9 @@ class StudentPortalRepository {
       '''
       SELECT a.id as app_id, a.status as app_status, a.progress as app_progress,
              a.checkins as app_checkins,
-             i.id as internship_id, i.title as role, c.industry, i.location, i.stipend,
-             i.duration, i.end_date as deadline, i.start_date, i.end_date, i.description as about,
-             i.is_active as internship_active, c.name as company_name
+             i.id as internship_id, i.role, i.industry, i.location, i.stipend,
+             i.duration, i.deadline, i.start_date, i.end_date, i.about,
+             i.status as internship_active, c.name as company_name
       FROM applications a
       JOIN internships i ON a.internship_id = i.id
       LEFT JOIN companies c ON i.company_id = c.id
@@ -272,7 +272,7 @@ class StudentPortalRepository {
         progress: progress,
         daysLeft: 90,
         status: r['app_status']?.toString() ?? 'Applied',
-        internshipStatus: (r['internship_active'] == 1 || r['internship_active'] == '1') ? 'ONGOING' : 'COMPLETED',
+        internshipStatus: (r['internship_active']?.toString().toUpperCase() == 'ACTIVE' || r['internship_active']?.toString().toUpperCase() == 'INTERVIEWING') ? 'ONGOING' : 'COMPLETED',
         brandColor: const Color(0xFF6366F1),
         logoInitial: (r['company_name']?.toString().isNotEmpty == true) ? r['company_name'].toString()[0].toUpperCase() : 'C',
         stipend: (r['stipend'] != null) ? '\$${r['stipend']} / month' : 'Unpaid',
@@ -343,11 +343,11 @@ class StudentPortalRepository {
 
     final rows = await _db.query(
       '''
-      SELECT i.id, i.title as role, c.industry, i.location, i.stipend, i.duration, i.end_date as deadline,
-             i.description as about, i.vacancies, i.is_active, c.name as company_name
+      SELECT i.id, i.role, i.industry, i.location, i.stipend, i.duration, i.deadline,
+             i.about, i.vacancies, i.status as is_active, c.name as company_name
       FROM internships i
       LEFT JOIN companies c ON i.company_id = c.id
-      WHERE i.is_active = 1
+      WHERE i.status = 'ACTIVE'
       ORDER BY i.created_at DESC
       ''',
     );
