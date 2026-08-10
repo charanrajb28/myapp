@@ -342,12 +342,12 @@ class SupabaseQueryBuilder implements Future<dynamic> {
             return _insertData;
           }
         }
+      }
 
-        if (!_insertData!.containsKey('id') || _insertData!['id'] == null) {
-          _insertData = Map<String, dynamic>.from(_insertData!);
-          final prefix = table.length >= 3 ? table.substring(0, 3) : table;
-          _insertData!['id'] = '${prefix}_${DateTime.now().millisecondsSinceEpoch}';
-        }
+      if (!_insertData!.containsKey('id') || _insertData!['id'] == null) {
+        _insertData = Map<String, dynamic>.from(_insertData!);
+        final prefix = table.length >= 3 ? table.substring(0, 3) : table;
+        _insertData!['id'] = '${prefix}_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().microsecondsSinceEpoch % 1000)}';
       }
 
       final keys = _insertData!.keys.toList();
@@ -359,9 +359,15 @@ class SupabaseQueryBuilder implements Future<dynamic> {
     }
 
     if (_insertBatch != null && _insertBatch!.isNotEmpty) {
+      int idx = 0;
       for (final item in _insertBatch!) {
-        final keys = item.keys.toList();
-        final values = item.values.toList();
+        final Map<String, dynamic> itemMap = Map<String, dynamic>.from(item);
+        if (!itemMap.containsKey('id') || itemMap['id'] == null) {
+          final prefix = table.length >= 3 ? table.substring(0, 3) : table;
+          itemMap['id'] = '${prefix}_${DateTime.now().millisecondsSinceEpoch}_${idx++}';
+        }
+        final keys = itemMap.keys.toList();
+        final values = itemMap.values.toList();
         final placeholders = List.filled(keys.length, '?').join(', ');
         final sql = 'INSERT INTO $table (${keys.join(', ')}) VALUES ($placeholders)';
         await db.execute(sql, values);

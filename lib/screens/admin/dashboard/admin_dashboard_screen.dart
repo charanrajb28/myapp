@@ -218,28 +218,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final user = client.auth.currentUser;
       String senderName = 'System Admin';
       if (user != null) {
-        final adminRes = await client
-            .from('sub_admins')
-            .select('users!sub_admins_user_id_fkey(name)')
-            .eq('user_id', user.id)
+        final userRes = await client
+            .from('users')
+            .select('name')
+            .eq('id', user.id)
             .maybeSingle();
-        if (adminRes != null && adminRes['users'] != null) {
-          senderName = adminRes['users']['name']?.toString() ?? 'System Admin';
+        if (userRes != null && userRes['name'] != null) {
+          senderName = userRes['name']?.toString() ?? 'System Admin';
         }
       }
 
       final studentsRes = await client
           .from('students')
-          .select('user_id')
-          .not('user_id', 'is', null);
+          .select('id, user_id');
 
-      final userIds = (studentsRes as List)
-          .map((item) => item['user_id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty)
-          .toSet()
-          .toList();
+      final List<Map<String, dynamic>> studentsList = (studentsRes is List)
+          ? List<Map<String, dynamic>>.from(studentsRes)
+          : [];
 
-      if (userIds.isEmpty) {
+      if (studentsList.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -250,23 +247,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return;
       }
 
-      await Future.wait(
-        userIds.map(
-          (userId) => client.from('student_notifications').insert({
-            'user_id': userId,
-            'title': title,
-            'message': message,
-            'notification_type': type,
-            'is_read': false,
-            'sender_name': senderName,
-          }),
-        ),
-      );
+      final notifications = studentsList.map((st) {
+        final sId = st['id']?.toString() ?? st['user_id']?.toString() ?? '';
+        final uId = st['user_id']?.toString() ?? sId;
+        return {
+          'student_id': sId,
+          'user_id': uId,
+          'title': title,
+          'message': message,
+          'type': type,
+          'notification_type': type,
+          'is_read': 0,
+          'sender_name': senderName,
+        };
+      }).toList();
+
+      await client.from('student_notifications').insert(notifications);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Broadcast sent to ${userIds.length} students'),
+          content: Text('Broadcast sent to ${notifications.length} students'),
           backgroundColor: const Color(0xFF16A34A),
         ),
       );

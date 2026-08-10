@@ -449,26 +449,35 @@ class StudentPortalRepository {
     if (user == null) return const [];
 
     final student = await _db.querySingle(
-      'SELECT id FROM students WHERE user_id = ?',
-      [user.uid],
+      'SELECT id FROM students WHERE user_id = ? OR id = ?',
+      [user.uid, user.uid],
     );
-    if (student == null) return const [];
+    final studentId = student?['id']?.toString() ?? user.uid;
 
     final rows = await _db.query(
       '''
-      SELECT id, title, message, type, is_read, created_at
+      SELECT id, title, message, type, notification_type, is_read, sender_name, created_at
       FROM student_notifications
-      WHERE student_id = ?
+      WHERE student_id = ? OR student_id = ? OR user_id = ? OR user_id = ?
       ORDER BY created_at DESC
       ''',
-      [student['id'].toString()],
+      [studentId, user.uid, studentId, user.uid],
     );
 
     return rows.map((r) {
-      final typeStr = r['type']?.toString().toLowerCase() ?? '';
-      StudentNotificationType type = StudentNotificationType.interview;
-      if (typeStr.contains('academic')) type = StudentNotificationType.academic;
-      if (typeStr.contains('security')) type = StudentNotificationType.security;
+      final typeStr = (r['type'] ?? r['notification_type'])?.toString().toLowerCase() ?? '';
+      StudentNotificationType type = StudentNotificationType.general;
+      if (typeStr.contains('academic')) {
+        type = StudentNotificationType.academic;
+      } else if (typeStr.contains('security')) {
+        type = StudentNotificationType.security;
+      } else if (typeStr.contains('announcement')) {
+        type = StudentNotificationType.announcement;
+      } else if (typeStr.contains('message')) {
+        type = StudentNotificationType.message;
+      } else if (typeStr.contains('interview')) {
+        type = StudentNotificationType.interview;
+      }
 
       return StudentNotification(
         id: r['id'].toString(),
@@ -476,7 +485,8 @@ class StudentPortalRepository {
         message: r['message']?.toString() ?? '',
         timeLabel: r['created_at']?.toString() ?? 'Recently',
         type: type,
-        isRead: (r['is_read'] == 1 || r['is_read'] == '1'),
+        isRead: (r['is_read'] == 1 || r['is_read'] == '1' || r['is_read'] == true),
+        sender: r['sender_name']?.toString() ?? 'System Admin',
       );
     }).toList();
   }

@@ -310,28 +310,28 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
       final user = client.auth.currentUser;
       String senderName = 'System Admin';
       if (user != null) {
-        final adminRes = await client
-            .from('sub_admins')
-            .select('users!sub_admins_user_id_fkey(name)')
-            .eq('user_id', user.id)
+        final userRes = await client
+            .from('users')
+            .select('name')
+            .eq('id', user.id)
             .maybeSingle();
-        if (adminRes != null && adminRes['users'] != null) {
-          senderName = adminRes['users']['name']?.toString() ?? 'System Admin';
+        if (userRes != null && userRes['name'] != null) {
+          senderName = userRes['name']?.toString() ?? 'System Admin';
         }
       }
 
-      await Future.wait(
-        userIds.map(
-          (userId) => client.from('student_notifications').insert({
-            'user_id': userId,
-            'title': titleController.text.trim(),
-            'message': messageController.text.trim(),
-            'notification_type': selectedType,
-            'is_read': false,
-            'sender_name': senderName,
-          }),
-        ),
-      );
+      final notifications = userIds.map((uId) => {
+        'student_id': uId,
+        'user_id': uId,
+        'title': titleController.text.trim(),
+        'message': messageController.text.trim(),
+        'type': selectedType,
+        'notification_type': selectedType,
+        'is_read': 0,
+        'sender_name': senderName,
+      }).toList();
+
+      await client.from('student_notifications').insert(notifications);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

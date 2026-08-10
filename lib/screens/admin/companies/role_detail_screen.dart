@@ -153,13 +153,13 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
       final user = supabase.auth.currentUser;
       String senderName = 'System Admin';
       if (user != null) {
-        final adminRes = await supabase
-            .from('sub_admins')
-            .select('users!sub_admins_user_id_fkey(name)')
-            .eq('user_id', user.id)
+        final userRes = await supabase
+            .from('users')
+            .select('name')
+            .eq('id', user.id)
             .maybeSingle();
-        if (adminRes != null && adminRes['users'] != null) {
-          senderName = adminRes['users']['name']?.toString() ?? 'System Admin';
+        if (userRes != null && userRes['name'] != null) {
+          senderName = userRes['name']?.toString() ?? 'System Admin';
         }
       }
 

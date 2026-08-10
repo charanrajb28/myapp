@@ -328,11 +328,14 @@ class TursoDatabaseService {
       '''
       CREATE TABLE IF NOT EXISTS student_notifications (
         id TEXT PRIMARY KEY,
-        student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        student_id TEXT,
+        user_id TEXT,
         title TEXT NOT NULL,
         message TEXT NOT NULL,
         type TEXT,
+        notification_type TEXT,
         is_read INTEGER DEFAULT 0,
+        sender_name TEXT DEFAULT 'System Admin',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
       ''',
@@ -363,6 +366,17 @@ class TursoDatabaseService {
       } catch (e) {
         debugPrint('⚠️ Schema init warning: $e');
       }
+    }
+
+    final alterStatements = [
+      'ALTER TABLE student_notifications ADD COLUMN user_id TEXT',
+      'ALTER TABLE student_notifications ADD COLUMN notification_type TEXT',
+      'ALTER TABLE student_notifications ADD COLUMN sender_name TEXT',
+    ];
+    for (final stmt in alterStatements) {
+      try {
+        await execute(stmt);
+      } catch (_) {}
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:io' as io;
 import 'dart:convert';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../services/turso_database_service.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../../utils/file_saver.dart';
 import 'semester_promotion_screen.dart';
@@ -644,17 +645,21 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
         return;
       }
 
-      final res = await supabase
-          .from('sub_admins')
-          .select('*, users!sub_admins_user_id_fkey(name, email)')
-          .order('created_at', ascending: false);
-      
-      final mappedRes = List<Map<String, dynamic>>.from(res).map((item) {
-        final Map<String, dynamic> copy = Map.from(item);
-        if (copy.containsKey('users!sub_admins_user_id_fkey')) {
-          copy['users'] = copy['users!sub_admins_user_id_fkey'];
+      final rows = await TursoDatabaseService.instance.query('''
+        SELECT sa.id, sa.user_id, sa.created_at, u.name, u.email
+        FROM sub_admins sa
+        LEFT JOIN users u ON sa.user_id = u.id
+        ORDER BY sa.created_at DESC
+      ''');
+
+      final mappedRes = rows.map((r) => {
+        'id': r['id'],
+        'user_id': r['user_id'],
+        'created_at': r['created_at'],
+        'users': {
+          'name': r['name'] ?? 'Sub Admin',
+          'email': r['email'] ?? '',
         }
-        return copy;
       }).toList();
 
       setState(() {

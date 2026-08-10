@@ -325,8 +325,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     required String message,
     required String type,
   }) async {
-    final userId = _studentData?['user_id']?.toString();
-    if (userId == null || userId.isEmpty) {
+    final userId = _studentData?['user_id']?.toString() ?? widget.studentId;
+    final realStudentId = _studentData?['id']?.toString() ?? widget.studentId;
+    if (realStudentId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Student user mapping is missing.'),
@@ -342,22 +343,24 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       final user = supabase.auth.currentUser;
       String senderName = 'System Admin';
       if (user != null) {
-        final adminRes = await supabase
-            .from('sub_admins')
-            .select('users!sub_admins_user_id_fkey(name)')
-            .eq('user_id', user.id)
+        final userRes = await supabase
+            .from('users')
+            .select('name')
+            .eq('id', user.id)
             .maybeSingle();
-        if (adminRes != null && adminRes['users'] != null) {
-          senderName = adminRes['users']['name']?.toString() ?? 'System Admin';
+        if (userRes != null && userRes['name'] != null) {
+          senderName = userRes['name']?.toString() ?? 'System Admin';
         }
       }
 
       await supabase.from('student_notifications').insert({
+        'student_id': realStudentId,
         'user_id': userId,
         'title': title,
         'message': message,
+        'type': type,
         'notification_type': type,
-        'is_read': false,
+        'is_read': 0,
         'sender_name': senderName,
       });
 
