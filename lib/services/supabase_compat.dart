@@ -399,7 +399,14 @@ class SupabaseQueryBuilder implements Future<dynamic> {
     }
 
     // Handle SELECT
-    var sql = 'SELECT $_selectCols FROM $table';
+    // Replace relational syntaxes like `*, applications(id, status)` with just `*` for the base query.
+    String baseCols = _selectCols.replaceAll(RegExp(r',\s*[a-zA-Z0-9_]+\s*\([^)]*\)'), '');
+    baseCols = baseCols.replaceAll(RegExp(r'[a-zA-Z0-9_]+\s*\([^)]*\)\s*,?'), '');
+    if (baseCols.trim().isEmpty || baseCols.trim() == ',') {
+      baseCols = '*';
+    }
+    
+    var sql = 'SELECT $baseCols FROM $table';
     if (_whereClauses.isNotEmpty) {
       sql += ' WHERE ${_whereClauses.join(' AND ')}';
     }
@@ -411,6 +418,10 @@ class SupabaseQueryBuilder implements Future<dynamic> {
     }
 
     final rows = await db.query(sql, _params);
+
+    if (rows.isNotEmpty && _selectCols.contains('(')) {
+      await _populateRelations(db, table, rows, _selectCols);
+    }
 
     if (_isSingle) {
       if (rows.isEmpty) throw Exception('No row found for single() query on $table');
@@ -445,5 +456,63 @@ class SupabaseQueryBuilder implements Future<dynamic> {
   @override
   Future<dynamic> whenComplete(FutureOr<void> Function() action) {
     return _execute().whenComplete(action);
+  }
+
+  Future<void> _populateRelations(TursoDatabaseService db, String baseTable, List<Map<String, dynamic>> rows, String selectString) async {
+    // Extract relations like `companies(*)` or `applications(id, status)`
+    final regExp = RegExp(r'([a-zA-Z0-9_]+)\s*\(([^)]+)\)');
+    final matches = regExp.allMatches(selectString);
+    
+    for (final match in matches) {
+      final relationTable = match.group(1)!;
+      final relationCols = match.group(2)!;
+      
+      // Determine join condition
+      String? localCol;
+      String? foreignCol;
+      bool isList = false; // true = has_many, false = belongs_to
+
+      if (baseTable == 'internships' && relationTable == 'companies') {
+        localCol = 'company_id'; foreignCol = 'id'; isList = false;
+      } else if (baseTable == 'internships' && relationTable == 'applications') {
+        localCol = 'id'; foreignCol = 'internship_id'; isList = true;
+      } else if (baseTable == 'applications' && relationTable == 'students') {
+        localCol = 'student_id'; foreignCol = 'id'; isList = false;
+      } else if (baseTable == 'applications' && relationTable == 'internships') {
+        localCol = 'internship_id'; foreignCol = 'id'; isList = false;
+      }
+
+      if (localCol == null) continue;
+
+      // Check if there is a nested relation inside the relation cols (e.g. internships(..., companies(name)))
+      // For simplicity, we just fetch * if there's a nested relation, then recursive populate.
+      final hasNested = relationCols.contains('(');
+      final queryCols = hasNested ? '*' : relationCols;
+
+      final List<dynamic> localValues = rows.map((r) => r[localCol!]).where((v) => v != null).toSet().toList();
+      if (localValues.isEmpty) continue;
+
+      final placeholders = List.filled(localValues.length, '?').join(', ');
+      final relRows = await db.query('SELECT $queryCols FROM $relationTable WHERE $foreignCol IN ($placeholders)', localValues);
+
+      if (hasNested) {
+        await _populateRelations(db, relationTable, relRows, relationCols);
+      }
+
+      for (var row in rows) {
+        final localVal = row[localCol];
+        if (localVal == null) {
+          row[relationTable] = isList ? [] : null;
+          continue;
+        }
+
+        final matches = relRows.where((r) => r[foreignCol] == localVal).toList();
+        if (isList) {
+          row[relationTable] = matches;
+        } else {
+          row[relationTable] = matches.isNotEmpty ? matches.first : null;
+        }
+      }
+    }
   }
 }

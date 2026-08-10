@@ -347,7 +347,7 @@ class StudentPortalRepository {
              i.about, i.vacancies, i.status as is_active, c.name as company_name
       FROM internships i
       LEFT JOIN companies c ON i.company_id = c.id
-      WHERE i.status = 'ACTIVE'
+      WHERE i.status IN ('ACTIVE', 'INTERVIEWING')
       ORDER BY i.created_at DESC
       ''',
     );
