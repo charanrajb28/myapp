@@ -78,15 +78,18 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
         // Broadcast notification to all students
         final studentsRes = await Supabase.instance.client
             .from('students')
-            .select('user_id');
+            .select('id, user_id');
 
         if (studentsRes is List && studentsRes.isNotEmpty) {
           final notifications = studentsRes.map((s) => {
-            'user_id': s['user_id'],
+            'student_id': s['id']?.toString() ?? s['user_id']?.toString(),
+            'user_id': s['user_id']?.toString() ?? s['id']?.toString(),
             'title': 'New Internship Available: $roleName',
             'message': '$companyName has posted a new opportunity for "$roleName". Apply now in your Student Portal!',
+            'type': 'announcement',
             'notification_type': 'announcement',
-            'is_read': false,
+            'is_read': 0,
+            'sender_name': 'System Admin',
           }).toList();
 
           await Supabase.instance.client
