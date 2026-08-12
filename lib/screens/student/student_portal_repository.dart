@@ -7,6 +7,7 @@ import '../../models/internship.dart';
 import '../../models/student_notification.dart';
 import '../../services/auth_service.dart';
 import '../../services/turso_database_service.dart';
+import '../../utils/json_helpers.dart';
 
 class StudentProfileData {
   final String name;
@@ -368,10 +369,10 @@ class StudentPortalRepository {
         brandColor: const Color(0xFF0F172A),
         logoInitial: (r['company_name']?.toString().isNotEmpty == true) ? r['company_name'].toString()[0].toUpperCase() : 'C',
         about: r['about']?.toString() ?? '',
-        requirements: const [],
-        responsibilities: const [],
-        activeDays: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        eligibleDepartments: const [],
+        requirements: parseStringList(r['requirements']),
+        responsibilities: parseStringList(r['responsibilities']),
+        activeDays: parseStringList(r['active_days']).isNotEmpty ? parseStringList(r['active_days']) : const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+        eligibleDepartments: parseStringList(r['eligible_departments']),
         notes: '',
         vacancies: (r['vacancies'] is int) ? r['vacancies'] : 1,
         applicationDurationDays: 30,

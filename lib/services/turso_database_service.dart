@@ -68,6 +68,17 @@ class TursoDatabaseService {
     if (type == 'float') {
       return (value is num) ? value.toDouble() : (double.tryParse(value.toString()) ?? value);
     }
+    if (type == 'text' && value is String) {
+      final str = value.trim();
+      if ((str.startsWith('[') && str.endsWith(']')) ||
+          (str.startsWith('{') && str.endsWith('}'))) {
+        try {
+          return jsonDecode(str);
+        } catch (_) {
+          return value;
+        }
+      }
+    }
     return value;
   }
 
@@ -394,6 +405,11 @@ class TursoDatabaseService {
       'ALTER TABLE internships ADD COLUMN application_duration_days INTEGER DEFAULT 7',
       'ALTER TABLE internships ADD COLUMN eligible_departments TEXT DEFAULT \'[]\'',
       'ALTER TABLE internships ADD COLUMN eligible_years TEXT DEFAULT \'[]\'',
+      'ALTER TABLE feedbacks ADD COLUMN student_id TEXT',
+      'ALTER TABLE feedbacks ADD COLUMN company_id TEXT',
+      'ALTER TABLE feedbacks ADD COLUMN type TEXT',
+      'ALTER TABLE feedbacks ADD COLUMN comment TEXT',
+      'ALTER TABLE feedbacks ADD COLUMN form_responses TEXT DEFAULT \'{}\'',
     ];
     for (final stmt in alterStatements) {
       try {

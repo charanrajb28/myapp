@@ -5,6 +5,7 @@ import '../../../services/fcm_push_service.dart';
 import 'add_student_screen.dart';
 import '../../company/postings/posting_details_screen.dart';
 import '../../../utils/file_saver.dart';
+import '../../../utils/json_helpers.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final String studentId;
@@ -1168,7 +1169,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                       applicationId: app['id']?.toString() ?? '',
                       studentName: widget.studentName,
                       progress: progressVal,
-                      checkins: app['checkins'] as List? ?? [],
+                      checkins: parseDynamicList(app['checkins']),
                       showSendAlert: false,
                     ),
                   ),

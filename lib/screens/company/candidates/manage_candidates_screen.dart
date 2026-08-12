@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import 'package:intl/intl.dart';
 import 'student_history_dialog.dart';
+import '../../../utils/json_helpers.dart';
 
 class ManageCandidatesScreen extends StatefulWidget {
   const ManageCandidatesScreen({super.key});
@@ -46,7 +47,7 @@ class _ManageCandidatesScreenState extends State<ManageCandidatesScreen> {
           .order('created_at', ascending: true);
       
       final Map<String, Map<String, dynamic>> grouped = {};
-      for (var app in (res as List)) {
+      for (var app in parseDynamicList(res)) {
         if (app['internships'] == null) continue;
 
         final studentName = app['students']?['name'] ?? 'Unknown Student';
@@ -58,7 +59,7 @@ class _ManageCandidatesScreenState extends State<ManageCandidatesScreen> {
 
         if (grouped.containsKey(studentId)) {
           final existing = grouped[studentId]!;
-          final List<String> roles = List<String>.from(existing['roles']);
+          final List<String> roles = parseStringList(existing['roles']);
           if (!roles.contains(role)) {
             roles.add(role);
           }

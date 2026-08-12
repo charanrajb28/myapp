@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../utils/json_helpers.dart';
 
 class StudentHistoryDialog extends StatefulWidget {
   final String studentId;
@@ -40,7 +41,7 @@ class _StudentHistoryDialogState extends State<StudentHistoryDialog> {
       final List<Map<String, dynamic>> pastList = [];
       final List<Map<String, dynamic>> appliedList = [];
 
-      for (var app in (res as List)) {
+      for (var app in parseDynamicList(res)) {
         final status = (app['status'] ?? '').toString().toLowerCase();
         final internship = app['internships'] as Map<String, dynamic>?;
         if (internship == null) continue;

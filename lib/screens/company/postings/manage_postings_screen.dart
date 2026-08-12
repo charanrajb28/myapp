@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../../utils/json_helpers.dart';
 class ManagePostingsScreen extends StatefulWidget {
   const ManagePostingsScreen({super.key});
 
@@ -57,8 +58,8 @@ class _ManagePostingsScreenState extends State<ManagePostingsScreen> {
           .order('created_at', ascending: false);
 
       final List<Map<String, dynamic>> processed = [];
-      for (var p in (res as List)) {
-        final apps = p['applications'] as List;
+      for (var p in parseDynamicList(res)) {
+        final apps = parseDynamicList(p['applications']);
         final pool = apps.length;
         final String status = p['status'] ?? 'INTERVIEWING';
 
@@ -411,14 +412,14 @@ class _JobIndustrialCard extends StatelessWidget {
                 _statusMenu(context),
               ],
             ),
-            if (posting['eligible_departments'] is List && (posting['eligible_departments'] as List).isNotEmpty) ...[
+            if (parseStringList(posting['eligible_departments']).isNotEmpty) ...[
               const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: (posting['eligible_departments'] as List).map((dept) {
+                  children: parseStringList(posting['eligible_departments']).map((dept) {
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(

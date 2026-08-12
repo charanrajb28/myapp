@@ -4,6 +4,7 @@ import '../../../services/turso_database_service.dart';
 import '../../../services/fcm_push_service.dart';
 import 'role_detail_screen.dart';
 import 'add_company_screen.dart';
+import '../../../utils/json_helpers.dart';
 
 
 class CompanyDetailArgs {
@@ -163,7 +164,7 @@ class _CompanyDetailScreenState extends State<CompanyDetailScreen> {
   }
 
   Future<void> _sendNotificationToRoleApplicants(Map<String, dynamic> role) async {
-    final apps = role['applications'] as List? ?? [];
+    final apps = parseDynamicList(role['applications']);
     final validApps = apps.where((app) {
       final status = app['status']?.toString() ?? '';
       return status != 'Rejected' && status != 'Removed';
@@ -1015,7 +1016,7 @@ class _RolesTab extends StatelessWidget {
           ...List.generate(roles.length, (i) {
             final role = roles[i];
             final brandColor = _parseColor(role['brand_color'] ?? '#6366F1');
-            final apps = role['applications'] as List? ?? [];
+            final apps = parseDynamicList(role['applications']);
             final validApps = apps.where((app) {
               final status = app['status']?.toString() ?? '';
               return status != 'Rejected' && status != 'Removed';
@@ -1063,15 +1064,15 @@ class _RolesTab extends StatelessWidget {
                                     startDate: role['start_date'] ?? 'TBD',
                                     duration: '${role['duration'] ?? 3}',
                                     description: role['about'] ?? 'No description provided.',
-                                    responsibilities: List<String>.from(role['responsibilities'] ?? []),
-                                    activeDays: List<String>.from(role['active_days'] ?? []),
-                                    eligibleDepartments: List<String>.from(role['eligible_departments'] ?? []),
-                                    eligibleYears: List<String>.from(role['eligible_years'] ?? []),
+                                    responsibilities: parseStringList(role['responsibilities']),
+                                    activeDays: parseStringList(role['active_days']),
+                                    eligibleDepartments: parseStringList(role['eligible_departments']),
+                                    eligibleYears: parseStringList(role['eligible_years']),
                                     stipend: role['stipend']?.toString() ?? '',
                                     location: role['location']?.toString() ?? '',
                                     notes: role['notes']?.toString() ?? '',
                                     status: role['status']?.toString() ?? 'INTERVIEWING',
-                                    applicants: (role['applications'] as List? ?? []).map((app) {
+                                    applicants: parseDynamicList(role['applications']).map((app) {
                                       final student = app['students'] as Map<String, dynamic>? ?? {};
                                       return {
                                         'name': student['name']?.toString() ?? 'Unknown Student',
@@ -1080,7 +1081,7 @@ class _RolesTab extends StatelessWidget {
                                         'status': app['status']?.toString() ?? 'Applied',
                                         'application_id': app['id']?.toString() ?? '',
                                         'progress': double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
-                                        'checkins': app['checkins'] as List? ?? [],
+                                        'checkins': parseDynamicList(app['checkins']),
                                       };
                                     }).toList(),
                                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 
 import 'admin_form_responses_screen.dart';
+import '../../../utils/json_helpers.dart';
 
 class AdminGeneratedFormsScreen extends StatefulWidget {
   const AdminGeneratedFormsScreen({super.key});
@@ -68,8 +69,8 @@ class _AdminGeneratedFormsScreenState extends State<AdminGeneratedFormsScreen> {
                   itemCount: _forms.length,
                   itemBuilder: (context, index) {
                     final form = _forms[index];
-                    final schema = form['feedback_form_schema'] as List?;
-                    final numQuestions = schema?.length ?? 0;
+                    final schema = parseDynamicList(form['feedback_form_schema']);
+                    final numQuestions = schema.length;
                     final companyName = form['companies']?['name'] ?? 'Unknown Company';
                     final role = form['role'] ?? 'Unknown Role';
 

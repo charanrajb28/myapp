@@ -5,6 +5,7 @@ import '../../company/postings/edit_posting_screen.dart';
 import '../../../services/fcm_push_service.dart';
 
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../utils/json_helpers.dart';
 
 class RoleDetailScreen extends StatefulWidget {
   final String id;
@@ -78,28 +79,47 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           .eq('id', widget.id);
 
       if (newStatus == 'INTERVIEWING') {
-        // Fetch company name if available
+        // Fetch role, company, eligible_departments and eligible_years details to send notification
         final postingRes = await Supabase.instance.client
             .from('internships')
-            .select('role, companies(name)')
+            .select('role, eligible_departments, eligible_years, companies(name)')
             .eq('id', widget.id)
             .maybeSingle();
 
         final roleName = widget.title.isNotEmpty ? widget.title : (postingRes?['role']?.toString() ?? 'New Internship');
         final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
+        final depts = parseStringList(postingRes?['eligible_departments']);
+        final years = parseStringList(postingRes?['eligible_years']);
+
+        String eligibilityInfo = '';
+        if (depts.isNotEmpty) {
+          eligibilityInfo += ' | Depts: ${depts.join(", ")}';
+        }
+        if (years.isNotEmpty) {
+          eligibilityInfo += ' | Years: ${years.join(", ")}';
+        }
+
+        final msgText = '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo Apply now in your Student Portal!';
 
         // Broadcast notification to all students
         final studentsRes = await Supabase.instance.client
             .from('students')
-            .select('user_id');
+            .select('id, user_id');
 
         if (studentsRes is List && studentsRes.isNotEmpty) {
-          final notifications = studentsRes.map((s) => {
-            'user_id': s['user_id'],
-            'title': 'New Internship Available: $roleName',
-            'message': '$companyName has posted a new opportunity for "$roleName". Apply now in your Student Portal!',
-            'notification_type': 'announcement',
-            'is_read': false,
+          final notifications = studentsRes.map((s) {
+            final sId = s['id']?.toString() ?? s['user_id']?.toString() ?? '';
+            final uId = s['user_id']?.toString() ?? sId;
+            return {
+              'student_id': sId.isNotEmpty ? sId : uId,
+              'user_id': uId.isNotEmpty ? uId : sId,
+              'title': 'New Internship Available: $roleName',
+              'message': msgText,
+              'type': 'announcement',
+              'notification_type': 'announcement',
+              'is_read': 0,
+              'sender_name': 'System Admin',
+            };
           }).toList();
 
           await Supabase.instance.client
@@ -110,7 +130,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           FcmPushService.sendToTopic(
             topic: 'all_students',
             title: 'New Internship: $roleName',
-            body: '$companyName has posted a new opportunity. Apply now!',
+            body: '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo',
           );
         }
       }
@@ -196,10 +216,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
             .eq('id', appId)
             .maybeSingle();
 
-        List<dynamic> currentAlerts = [];
-        if (res != null && res['alerts'] is List) {
-          currentAlerts = List.from(res['alerts']);
-        }
+        List<dynamic> currentAlerts = parseDynamicList(res?['alerts']);
 
         currentAlerts.add({
           'title': title,
@@ -1203,7 +1220,7 @@ class _ApplicantRow extends StatelessWidget {
                         applicationId: appId,
                         studentName: name,
                         progress: double.tryParse(applicant['progress']?.toString() ?? '0') ?? 0.0,
-                        checkins: applicant['checkins'] as List? ?? [],
+                        checkins: parseDynamicList(applicant['checkins']),
                         showSendAlert: false,
                       ),
                     ),

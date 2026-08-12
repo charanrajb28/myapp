@@ -350,6 +350,16 @@ class SupabaseQueryBuilder implements Future<dynamic> {
         _insertData!['id'] = '${prefix}_${DateTime.now().millisecondsSinceEpoch}_${(DateTime.now().microsecondsSinceEpoch % 1000)}';
       }
 
+      if (table == 'student_notifications') {
+        _insertData = Map<String, dynamic>.from(_insertData!);
+        if (_insertData!['student_id'] == null || _insertData!['student_id'].toString().isEmpty) {
+          _insertData!['student_id'] = _insertData!['user_id'] ?? _insertData!['id'];
+        }
+        if (_insertData!['user_id'] == null || _insertData!['user_id'].toString().isEmpty) {
+          _insertData!['user_id'] = _insertData!['student_id'] ?? _insertData!['id'];
+        }
+      }
+
       final keys = _insertData!.keys.toList();
       final values = _insertData!.values.toList();
       final placeholders = List.filled(keys.length, '?').join(', ');
@@ -366,6 +376,16 @@ class SupabaseQueryBuilder implements Future<dynamic> {
           final prefix = table.length >= 3 ? table.substring(0, 3) : table;
           itemMap['id'] = '${prefix}_${DateTime.now().millisecondsSinceEpoch}_${idx++}';
         }
+
+        if (table == 'student_notifications') {
+          if (itemMap['student_id'] == null || itemMap['student_id'].toString().isEmpty) {
+            itemMap['student_id'] = itemMap['user_id'] ?? itemMap['id'];
+          }
+          if (itemMap['user_id'] == null || itemMap['user_id'].toString().isEmpty) {
+            itemMap['user_id'] = itemMap['student_id'] ?? itemMap['id'];
+          }
+        }
+
         final keys = itemMap.keys.toList();
         final values = itemMap.values.toList();
         final placeholders = List.filled(keys.length, '?').join(', ');
@@ -399,11 +419,14 @@ class SupabaseQueryBuilder implements Future<dynamic> {
     }
 
     // Handle SELECT
-    // Replace relational syntaxes like `*, applications(id, status)` with just `*` for the base query.
-    String baseCols = _selectCols.replaceAll(RegExp(r',\s*[a-zA-Z0-9_]+\s*\([^)]*\)'), '');
-    baseCols = baseCols.replaceAll(RegExp(r'[a-zA-Z0-9_]+\s*\([^)]*\)\s*,?'), '');
-    if (baseCols.trim().isEmpty || baseCols.trim() == ',') {
+    final parsedItems = _getTopLevelItems(_selectCols).map(ParsedSelectItem.parse).toList();
+    final plainCols = parsedItems.where((item) => !item.isRelation).map((item) => item.raw).toList();
+
+    String baseCols;
+    if (plainCols.isEmpty) {
       baseCols = '*';
+    } else {
+      baseCols = plainCols.join(', ');
     }
     
     var sql = 'SELECT $baseCols FROM $table';
@@ -419,8 +442,9 @@ class SupabaseQueryBuilder implements Future<dynamic> {
 
     final rows = await db.query(sql, _params);
 
-    if (rows.isNotEmpty && _selectCols.contains('(')) {
-      await _populateRelations(db, table, rows, _selectCols);
+    final relationItems = parsedItems.where((item) => item.isRelation).toList();
+    if (rows.isNotEmpty && relationItems.isNotEmpty) {
+      await _populateRelations(db, table, rows, relationItems);
     }
 
     if (_isSingle) {
@@ -457,61 +481,183 @@ class SupabaseQueryBuilder implements Future<dynamic> {
   Future<dynamic> whenComplete(FutureOr<void> Function() action) {
     return _execute().whenComplete(action);
   }
+}
 
-  Future<void> _populateRelations(TursoDatabaseService db, String baseTable, List<Map<String, dynamic>> rows, String selectString) async {
-    // Extract relations like `companies(*)` or `applications(id, status)`
-    final regExp = RegExp(r'([a-zA-Z0-9_]+)\s*\(([^)]+)\)');
-    final matches = regExp.allMatches(selectString);
-    
-    for (final match in matches) {
-      final relationTable = match.group(1)!;
-      final relationCols = match.group(2)!;
-      
-      // Determine join condition
-      String? localCol;
-      String? foreignCol;
-      bool isList = false; // true = has_many, false = belongs_to
+class ParsedSelectItem {
+  final String raw;
+  final bool isRelation;
+  final String? relationName;
+  final String? subSelect;
 
-      if (baseTable == 'internships' && relationTable == 'companies') {
-        localCol = 'company_id'; foreignCol = 'id'; isList = false;
-      } else if (baseTable == 'internships' && relationTable == 'applications') {
-        localCol = 'id'; foreignCol = 'internship_id'; isList = true;
-      } else if (baseTable == 'applications' && relationTable == 'students') {
-        localCol = 'student_id'; foreignCol = 'id'; isList = false;
-      } else if (baseTable == 'applications' && relationTable == 'internships') {
-        localCol = 'internship_id'; foreignCol = 'id'; isList = false;
-      }
+  ParsedSelectItem._({
+    required this.raw,
+    required this.isRelation,
+    this.relationName,
+    this.subSelect,
+  });
 
-      if (localCol == null) continue;
+  factory ParsedSelectItem.parse(String item) {
+    item = item.trim();
+    final firstParen = item.indexOf('(');
+    if (firstParen > 0 && item.endsWith(')')) {
+      final relName = item.substring(0, firstParen).trim();
+      final sub = item.substring(firstParen + 1, item.length - 1).trim();
+      return ParsedSelectItem._(
+        raw: item,
+        isRelation: true,
+        relationName: relName,
+        subSelect: sub,
+      );
+    }
+    return ParsedSelectItem._(raw: item, isRelation: false);
+  }
+}
 
-      // Check if there is a nested relation inside the relation cols (e.g. internships(..., companies(name)))
-      // For simplicity, we just fetch * if there's a nested relation, then recursive populate.
-      final hasNested = relationCols.contains('(');
-      final queryCols = hasNested ? '*' : relationCols;
+class RelationInfo {
+  final String localCol;
+  final String foreignCol;
+  final bool isList;
+  RelationInfo({required this.localCol, required this.foreignCol, required this.isList});
+}
 
-      final List<dynamic> localValues = rows.map((r) => r[localCol!]).where((v) => v != null).toSet().toList();
-      if (localValues.isEmpty) continue;
+List<String> _getTopLevelItems(String selectString) {
+  final items = <String>[];
+  int depth = 0;
+  int start = 0;
+  for (int i = 0; i < selectString.length; i++) {
+    final char = selectString[i];
+    if (char == '(') {
+      depth++;
+    } else if (char == ')') {
+      depth--;
+    } else if (char == ',' && depth == 0) {
+      items.add(selectString.substring(start, i).trim());
+      start = i + 1;
+    }
+  }
+  if (start < selectString.length) {
+    final tail = selectString.substring(start).trim();
+    if (tail.isNotEmpty) {
+      items.add(tail);
+    }
+  }
+  return items;
+}
 
-      final placeholders = List.filled(localValues.length, '?').join(', ');
-      final relRows = await db.query('SELECT $queryCols FROM $relationTable WHERE $foreignCol IN ($placeholders)', localValues);
+String _singular(String name) {
+  if (name.endsWith('ies')) return '${name.substring(0, name.length - 3)}y';
+  if (name.endsWith('s')) return name.substring(0, name.length - 1);
+  return name;
+}
 
-      if (hasNested) {
-        await _populateRelations(db, relationTable, relRows, relationCols);
-      }
+RelationInfo? _getRelationInfo(String baseTable, String relationTable) {
+  if (baseTable == 'internships' && relationTable == 'companies') {
+    return RelationInfo(localCol: 'company_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'internships' && relationTable == 'applications') {
+    return RelationInfo(localCol: 'id', foreignCol: 'internship_id', isList: true);
+  }
+  if (baseTable == 'applications' && relationTable == 'students') {
+    return RelationInfo(localCol: 'student_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'applications' && relationTable == 'internships') {
+    return RelationInfo(localCol: 'internship_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'companies' && relationTable == 'internships') {
+    return RelationInfo(localCol: 'id', foreignCol: 'company_id', isList: true);
+  }
+  if (baseTable == 'companies' && relationTable == 'users') {
+    return RelationInfo(localCol: 'user_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'students' && relationTable == 'users') {
+    return RelationInfo(localCol: 'user_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'students' && relationTable == 'applications') {
+    return RelationInfo(localCol: 'id', foreignCol: 'student_id', isList: true);
+  }
+  if (baseTable == 'students' && relationTable == 'student_documents') {
+    return RelationInfo(localCol: 'id', foreignCol: 'student_id', isList: true);
+  }
+  if (baseTable == 'feedbacks' && relationTable == 'students') {
+    return RelationInfo(localCol: 'student_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'feedbacks' && relationTable == 'companies') {
+    return RelationInfo(localCol: 'company_id', foreignCol: 'id', isList: false);
+  }
+  if (baseTable == 'feedbacks' && relationTable == 'users') {
+    return RelationInfo(localCol: 'user_id', foreignCol: 'id', isList: false);
+  }
 
+  final relSingular = _singular(relationTable);
+
+  return RelationInfo(
+    localCol: '${relSingular}_id',
+    foreignCol: 'id',
+    isList: false,
+  );
+}
+
+Future<void> _populateRelations(
+  TursoDatabaseService db,
+  String baseTable,
+  List<Map<String, dynamic>> rows,
+  List<ParsedSelectItem> relationItems,
+) async {
+  for (final relItem in relationItems) {
+    final relationTable = relItem.relationName!;
+    final subSelect = relItem.subSelect ?? '*';
+
+    final relInfo = _getRelationInfo(baseTable, relationTable);
+    if (relInfo == null) continue;
+
+    final localCol = relInfo.localCol;
+    final foreignCol = relInfo.foreignCol;
+    final isList = relInfo.isList;
+
+    final List<dynamic> localValues = rows
+        .map((r) => r[localCol])
+        .where((v) => v != null)
+        .toSet()
+        .toList();
+
+    if (localValues.isEmpty) {
       for (var row in rows) {
-        final localVal = row[localCol];
-        if (localVal == null) {
-          row[relationTable] = isList ? [] : null;
-          continue;
-        }
+        row[relationTable] = isList ? [] : null;
+      }
+      continue;
+    }
 
-        final matches = relRows.where((r) => r[foreignCol] == localVal).toList();
-        if (isList) {
-          row[relationTable] = matches;
-        } else {
-          row[relationTable] = matches.isNotEmpty ? matches.first : null;
-        }
+    final subParsedItems = _getTopLevelItems(subSelect).map(ParsedSelectItem.parse).toList();
+    final subPlainCols = subParsedItems.where((item) => !item.isRelation).map((item) => item.raw).toList();
+    String queryCols = subPlainCols.isEmpty ? '*' : subPlainCols.join(', ');
+
+    if (queryCols != '*' && !queryCols.split(',').map((c) => c.trim()).contains(foreignCol)) {
+      queryCols += ', $foreignCol';
+    }
+
+    final placeholders = List.filled(localValues.length, '?').join(', ');
+    final relRows = await db.query(
+      'SELECT $queryCols FROM $relationTable WHERE $foreignCol IN ($placeholders)',
+      localValues,
+    );
+
+    final subRelationItems = subParsedItems.where((item) => item.isRelation).toList();
+    if (relRows.isNotEmpty && subRelationItems.isNotEmpty) {
+      await _populateRelations(db, relationTable, relRows, subRelationItems);
+    }
+
+    for (var row in rows) {
+      final localVal = row[localCol];
+      if (localVal == null) {
+        row[relationTable] = isList ? [] : null;
+        continue;
+      }
+
+      final matches = relRows.where((r) => r[foreignCol]?.toString() == localVal?.toString()).toList();
+      if (isList) {
+        row[relationTable] = matches;
+      } else {
+        row[relationTable] = matches.isNotEmpty ? matches.first : null;
       }
     }
   }

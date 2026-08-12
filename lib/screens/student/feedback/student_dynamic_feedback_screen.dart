@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../../../models/internship.dart';
+import '../../../utils/json_helpers.dart';
 
 class StudentDynamicFeedbackScreen extends StatefulWidget {
   final StudentInternship internship;
@@ -200,7 +201,7 @@ class _StudentDynamicFeedbackScreenState extends State<StudentDynamicFeedbackScr
                       ),
                       const SizedBox(height: 16),
                       if (q['type'] == 'multiple_choice')
-                        ...((q['options'] as List?) ?? []).map((opt) {
+                        ...parseDynamicList(q['options']).map((opt) {
                           final optText = opt.toString();
                           return RadioListTile<String>(
                             title: Text(optText, style: const TextStyle(fontSize: 14, color: Color(0xFF334155))),

@@ -13,6 +13,7 @@ import '../../../utils/qr_payload_security.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import '../../../utils/json_helpers.dart';
 class PostingDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
   const PostingDetailsScreen({super.key, required this.posting});
@@ -356,10 +357,7 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
                                     .eq('id', appId)
                                     .maybeSingle();
 
-                                List<dynamic> currentAlerts = [];
-                                if (res != null && res['alerts'] is List) {
-                                  currentAlerts = List.from(res['alerts']);
-                                }
+                                List<dynamic> currentAlerts = parseDynamicList(res?['alerts']);
 
                                 currentAlerts.add({
                                   'title': title,
@@ -1640,15 +1638,9 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
   }
 
   Widget _buildDescription(Color color) {
-    final tasks = (widget.posting['responsibilities'] as List? ?? [])
-        .map((t) => t.toString())
-        .where((t) => t.isNotEmpty)
-        .toList();
+    final tasks = parseStringList(widget.posting['responsibilities']);
     final notes = widget.posting['notes']?.toString() ?? '';
-    final rawDays = widget.posting['active_days'];
-    final days = rawDays is List
-        ? rawDays.map((d) => d.toString()).toList()
-        : <String>[];
+    final days = parseStringList(widget.posting['active_days']);
 
     const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final sortedDays = allDays.where((d) => days.contains(d)).toList();
@@ -1874,11 +1866,11 @@ class _PostingDetailsScreenState extends State<PostingDetailsScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: (widget.posting['eligible_departments'] is List && (widget.posting['eligible_departments'] as List).isNotEmpty)
+            child: parseStringList(widget.posting['eligible_departments']).isNotEmpty
                 ? Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: (widget.posting['eligible_departments'] as List).map((dept) {
+                    children: parseStringList(widget.posting['eligible_departments']).map((dept) {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
@@ -2407,10 +2399,7 @@ class _StudentInfoScreenState extends State<StudentInfoScreen> {
           .eq('id', widget.applicationId)
           .maybeSingle();
 
-      List<dynamic> currentAlerts = [];
-      if (res != null && res['alerts'] is List) {
-        currentAlerts = List.from(res['alerts']);
-      }
+      List<dynamic> currentAlerts = parseDynamicList(res?['alerts']);
 
       currentAlerts.add({
         'title': title,

@@ -3,6 +3,7 @@ import 'package:myapp/services/supabase_compat.dart';
 import '../company_shell.dart';
 import '../postings/posting_details_screen.dart';
 import '../candidates/manage_candidates_screen.dart';
+import '../../../utils/json_helpers.dart';
 
 class CompanyDashboardScreen extends StatefulWidget {
   const CompanyDashboardScreen({super.key});
@@ -108,10 +109,10 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
           .eq('company_id', companyId)
           .order('created_at', ascending: false);
       
-      final List<String> postingIds = (postingsRes as List).map((p) => p['id'].toString()).toList();
+      final List<String> postingIds = parseDynamicList(postingsRes).map((p) => p['id'].toString()).toList();
       
       int pool = 0;
-      int postingsCount = (postingsRes as List).length;
+      int postingsCount = parseDynamicList(postingsRes).length;
       int activeInterns = 0;
 
       if (postingIds.isNotEmpty) {
@@ -120,18 +121,18 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
             .select('status')
             .inFilter('internship_id', postingIds);
             
-        final apps = appsRes as List;
+        final apps = parseDynamicList(appsRes);
         pool = apps.length;
         activeInterns = apps.where((a) => a['status'] == 'Active').length;
       }
 
       // 3. Prepare Display List (Top 3 Postings)
       final List<Map<String, dynamic>> displayPostings = [];
-      for (var p in (postingsRes as List).take(3)) {
+      for (var p in parseDynamicList(postingsRes).take(3)) {
         int count = 0;
         if (postingIds.isNotEmpty) {
            final specApps = await supabase.from('applications').select('id').eq('internship_id', p['id']);
-           count = (specApps as List).length;
+           count = parseDynamicList(specApps).length;
         }
         
         displayPostings.add({

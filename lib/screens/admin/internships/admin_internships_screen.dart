@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import '../../../services/fcm_push_service.dart';
 import '../companies/role_detail_screen.dart';
+import '../../../utils/json_helpers.dart';
 
 class AdminInternshipsScreen extends StatefulWidget {
   const AdminInternshipsScreen({super.key});
@@ -66,15 +67,27 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
           .eq('id', id);
 
       if (status == 'INTERVIEWING') {
-        // Fetch role and company details to send notification
+        // Fetch role, company, eligible_departments and eligible_years details to send notification
         final postingRes = await Supabase.instance.client
             .from('internships')
-            .select('role, companies(name)')
+            .select('role, eligible_departments, eligible_years, companies(name)')
             .eq('id', id)
             .maybeSingle();
 
         final roleName = postingRes?['role']?.toString() ?? 'New Internship';
         final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
+        final depts = parseStringList(postingRes?['eligible_departments']);
+        final years = parseStringList(postingRes?['eligible_years']);
+
+        String eligibilityInfo = '';
+        if (depts.isNotEmpty) {
+          eligibilityInfo += ' | Depts: ${depts.join(", ")}';
+        }
+        if (years.isNotEmpty) {
+          eligibilityInfo += ' | Years: ${years.join(", ")}';
+        }
+
+        final msgText = '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo Apply now in your Student Portal!';
 
         // Broadcast notification to all students
         final studentsRes = await Supabase.instance.client
@@ -82,15 +95,19 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
             .select('id, user_id');
 
         if (studentsRes is List && studentsRes.isNotEmpty) {
-          final notifications = studentsRes.map((s) => {
-            'student_id': s['id']?.toString() ?? s['user_id']?.toString(),
-            'user_id': s['user_id']?.toString() ?? s['id']?.toString(),
-            'title': 'New Internship Available: $roleName',
-            'message': '$companyName has posted a new opportunity for "$roleName". Apply now in your Student Portal!',
-            'type': 'announcement',
-            'notification_type': 'announcement',
-            'is_read': 0,
-            'sender_name': 'System Admin',
+          final notifications = studentsRes.map((s) {
+            final sId = s['id']?.toString() ?? s['user_id']?.toString() ?? '';
+            final uId = s['user_id']?.toString() ?? sId;
+            return {
+              'student_id': sId.isNotEmpty ? sId : uId,
+              'user_id': uId.isNotEmpty ? uId : sId,
+              'title': 'New Internship Available: $roleName',
+              'message': msgText,
+              'type': 'announcement',
+              'notification_type': 'announcement',
+              'is_read': 0,
+              'sender_name': 'System Admin',
+            };
           }).toList();
 
           await Supabase.instance.client
@@ -101,7 +118,7 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
           FcmPushService.sendToTopic(
             topic: 'all_students',
             title: 'New Internship: $roleName',
-            body: '$companyName has posted a new opportunity. Apply now!',
+            body: '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo',
           );
         }
       }
@@ -216,15 +233,15 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
                                   startDate: role['start_date'] ?? 'TBD',
                                   duration: '${role['duration'] ?? 3} Months',
                                   description: role['about'] ?? 'No description provided.',
-                                  responsibilities: List<String>.from(role['responsibilities'] ?? []),
-                                  activeDays: List<String>.from(role['active_days'] ?? []),
-                                  eligibleDepartments: List<String>.from(role['eligible_departments'] ?? []),
-                                  eligibleYears: List<String>.from(role['eligible_years'] ?? []),
+                                  responsibilities: parseStringList(role['responsibilities']),
+                                  activeDays: parseStringList(role['active_days']),
+                                  eligibleDepartments: parseStringList(role['eligible_departments']),
+                                  eligibleYears: parseStringList(role['eligible_years']),
                                   stipend: role['stipend']?.toString() ?? '',
                                   location: role['location']?.toString() ?? '',
                                   notes: role['notes']?.toString() ?? '',
                                   status: role['status']?.toString() ?? 'INTERVIEWING',
-                                  applicants: (role['applications'] as List? ?? []).map((app) {
+                                  applicants: parseDynamicList(role['applications']).map((app) {
                                     final student = app['students'] as Map<String, dynamic>? ?? {};
                                     return {
                                       'name': student['name']?.toString() ?? 'Unknown Student',
@@ -233,7 +250,7 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
                                       'status': app['status']?.toString() ?? 'Applied',
                                       'application_id': app['id']?.toString() ?? '',
                                       'progress': double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
-                                      'checkins': app['checkins'] as List? ?? [],
+                                      'checkins': parseDynamicList(app['checkins']),
                                     };
                                   }).toList(),
                                 ),

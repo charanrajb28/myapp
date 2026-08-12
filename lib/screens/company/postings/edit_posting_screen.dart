@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:myapp/services/supabase_compat.dart';
+import '../../../utils/json_helpers.dart';
 
 class EditPostingScreen extends StatefulWidget {
   final Map<String, dynamic> posting;
@@ -91,10 +92,7 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
         text: widget.posting['vacancies']?.toString() ?? '1');
 
     // Pre-populate tasks from responsibilities array
-    final rawTasks = widget.posting['responsibilities'];
-    _tasks = rawTasks is List
-        ? rawTasks.map((t) => t.toString()).where((t) => t.isNotEmpty).toList()
-        : [];
+    _tasks = parseStringList(widget.posting['responsibilities']);
 
     // Location
     isRemote = (widget.posting['location']?.toString().toLowerCase() ?? 'remote') == 'remote';
@@ -114,21 +112,21 @@ class _EditPostingScreenState extends State<EditPostingScreen> {
     _expectedStartDate = parsedStartDate ?? DateTime.now().add(const Duration(days: 15));
 
     // Pre-populate active days (default Mon–Fri if absent)
-    final rawDays = widget.posting['active_days'];
-    _activeDays = (rawDays is List && rawDays.isNotEmpty)
-        ? rawDays.map((d) => d.toString()).toSet()
+    final parsedDays = parseStringList(widget.posting['active_days']);
+    _activeDays = parsedDays.isNotEmpty
+        ? parsedDays.toSet()
         : {'Mon', 'Tue', 'Wed', 'Thu', 'Fri'};
 
     // Pre-populate eligible departments (default all if absent)
-    final rawDepts = widget.posting['eligible_departments'];
-    _eligibleDepartments = (rawDepts is List && rawDepts.isNotEmpty)
-        ? rawDepts.map((d) => d.toString()).toSet()
+    final parsedDepts = parseStringList(widget.posting['eligible_departments']);
+    _eligibleDepartments = parsedDepts.isNotEmpty
+        ? parsedDepts.toSet()
         : _allDepartments.toSet();
 
     // Pre-populate eligible years (default all if absent)
-    final rawYears = widget.posting['eligible_years'];
-    _eligibleYears = (rawYears is List && rawYears.isNotEmpty)
-        ? rawYears.map((y) => y.toString()).toSet()
+    final parsedYears = parseStringList(widget.posting['eligible_years']);
+    _eligibleYears = parsedYears.isNotEmpty
+        ? parsedYears.toSet()
         : _allYears.toSet();
 
     // Industry / Category setup
