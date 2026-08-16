@@ -1059,7 +1059,7 @@ class _RolesTab extends StatelessWidget {
                                     id: role['id']?.toString() ?? '',
                                     title: role['role'] ?? 'Intern Role',
                                     type: role['location'] ?? 'Full-time',
-                                    deadline: role['deadline'] ?? 'TBD',
+                                    deadline: formatDisplayDate(role['deadline']),
                                     slots: role['vacancies']?.toString() ?? role['total_slots']?.toString() ?? '0',
                                     startDate: role['start_date'] ?? 'TBD',
                                     duration: '${role['duration'] ?? 3}',
@@ -1128,7 +1128,10 @@ class _RolesTab extends StatelessWidget {
                                                 const SizedBox(width: 4),
                                                 Flexible(
                                                   child: Text(
-                                                    role['deadline'] ?? 'No Deadline',
+                                                    formatDisplayDate(
+                                                      role['deadline'],
+                                                      fallback: 'No Deadline',
+                                                    ),
                                                     style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                                                     overflow: TextOverflow.ellipsis,
                                                   ),

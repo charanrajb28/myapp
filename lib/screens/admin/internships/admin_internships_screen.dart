@@ -59,7 +59,84 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
     }
   }
 
+  Future<void> _sendApprovalNotifications(String id) async {
+    try {
+      final postingRes = await Supabase.instance.client
+          .from('internships')
+          .select('role, eligible_departments, eligible_years, companies(name)')
+          .eq('id', id)
+          .maybeSingle();
+
+      final roleName = postingRes?['role']?.toString() ?? 'New Internship';
+      final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
+      final depts = parseStringList(postingRes?['eligible_departments']);
+      final years = parseStringList(postingRes?['eligible_years']);
+
+      String eligibilityInfo = '';
+      if (depts.isNotEmpty) {
+        eligibilityInfo += ' | Depts: ${depts.join(", ")}';
+      }
+      if (years.isNotEmpty) {
+        eligibilityInfo += ' | Years: ${years.join(", ")}';
+      }
+
+      final msgText = '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo Apply now in your Student Portal!';
+
+      final studentsRes = await Supabase.instance.client
+          .from('students')
+          .select('id, user_id');
+
+      if (studentsRes is List && studentsRes.isNotEmpty) {
+        final notifications = studentsRes.map((s) {
+          final sId = s['id']?.toString() ?? s['user_id']?.toString() ?? '';
+          final uId = s['user_id']?.toString() ?? sId;
+          return {
+            'student_id': sId.isNotEmpty ? sId : uId,
+            'user_id': uId.isNotEmpty ? uId : sId,
+            'title': 'New Internship Available: $roleName',
+            'message': msgText,
+            'type': 'announcement',
+            'notification_type': 'announcement',
+            'is_read': 0,
+            'sender_name': 'System Admin',
+          };
+        }).toList();
+
+        await Supabase.instance.client
+            .from('student_notifications')
+            .insert(notifications);
+
+        FcmPushService.sendToTopic(
+          topic: 'all_students',
+          title: 'New Internship: $roleName',
+          body: '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error sending approval notifications: $e');
+    }
+  }
+
   Future<void> _updatePostingStatus(String id, String status) async {
+    // Optimistic UI state update immediately
+    setState(() {
+      for (var item in _internships) {
+        if (item['id']?.toString() == id) {
+          item['status'] = status;
+        }
+      }
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(status == 'INTERVIEWING' ? 'Posting Approved & Notification Sent!' : 'Posting Rejected.'),
+          backgroundColor: status == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
     try {
       await Supabase.instance.client
           .from('internships')
@@ -67,74 +144,11 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
           .eq('id', id);
 
       if (status == 'INTERVIEWING') {
-        // Fetch role, company, eligible_departments and eligible_years details to send notification
-        final postingRes = await Supabase.instance.client
-            .from('internships')
-            .select('role, eligible_departments, eligible_years, companies(name)')
-            .eq('id', id)
-            .maybeSingle();
-
-        final roleName = postingRes?['role']?.toString() ?? 'New Internship';
-        final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
-        final depts = parseStringList(postingRes?['eligible_departments']);
-        final years = parseStringList(postingRes?['eligible_years']);
-
-        String eligibilityInfo = '';
-        if (depts.isNotEmpty) {
-          eligibilityInfo += ' | Depts: ${depts.join(", ")}';
-        }
-        if (years.isNotEmpty) {
-          eligibilityInfo += ' | Years: ${years.join(", ")}';
-        }
-
-        final msgText = '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo Apply now in your Student Portal!';
-
-        // Broadcast notification to all students
-        final studentsRes = await Supabase.instance.client
-            .from('students')
-            .select('id, user_id');
-
-        if (studentsRes is List && studentsRes.isNotEmpty) {
-          final notifications = studentsRes.map((s) {
-            final sId = s['id']?.toString() ?? s['user_id']?.toString() ?? '';
-            final uId = s['user_id']?.toString() ?? sId;
-            return {
-              'student_id': sId.isNotEmpty ? sId : uId,
-              'user_id': uId.isNotEmpty ? uId : sId,
-              'title': 'New Internship Available: $roleName',
-              'message': msgText,
-              'type': 'announcement',
-              'notification_type': 'announcement',
-              'is_read': 0,
-              'sender_name': 'System Admin',
-            };
-          }).toList();
-
-          await Supabase.instance.client
-              .from('student_notifications')
-              .insert(notifications);
-
-          // Send native FCM broadcast to all subscribed students
-          FcmPushService.sendToTopic(
-            topic: 'all_students',
-            title: 'New Internship: $roleName',
-            body: '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo',
-          );
-        }
-      }
-
-      _fetchInternships();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(status == 'INTERVIEWING' ? 'Posting Approved & Notification Sent to Students!' : 'Posting Rejected.'),
-            backgroundColor: status == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-          ),
-        );
+        _sendApprovalNotifications(id);
       }
     } catch (e) {
       debugPrint('Error updating posting status: $e');
+      _fetchInternships();
     }
   }
 
@@ -221,41 +235,44 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => RoleDetailScreen(
-                                  id: role['id']?.toString() ?? '',
-                                  title: role['role'] ?? 'Intern Role',
-                                  type: role['location'] ?? 'Full-time',
-                                  deadline: role['deadline'] ?? 'TBD',
-                                  slots: role['vacancies']?.toString() ?? role['total_slots']?.toString() ?? '0',
-                                  startDate: role['start_date'] ?? 'TBD',
-                                  duration: '${role['duration'] ?? 3} Months',
-                                  description: role['about'] ?? 'No description provided.',
-                                  responsibilities: parseStringList(role['responsibilities']),
-                                  activeDays: parseStringList(role['active_days']),
-                                  eligibleDepartments: parseStringList(role['eligible_departments']),
-                                  eligibleYears: parseStringList(role['eligible_years']),
-                                  stipend: role['stipend']?.toString() ?? '',
-                                  location: role['location']?.toString() ?? '',
-                                  notes: role['notes']?.toString() ?? '',
-                                  status: role['status']?.toString() ?? 'INTERVIEWING',
-                                  applicants: parseDynamicList(role['applications']).map((app) {
-                                    final student = app['students'] as Map<String, dynamic>? ?? {};
-                                    return {
-                                      'name': student['name']?.toString() ?? 'Unknown Student',
-                                      'id': student['enrollment_id']?.toString() ?? student['id']?.toString() ?? 'N/A',
-                                      'dept': student['department']?.toString() ?? 'CS',
-                                      'status': app['status']?.toString() ?? 'Applied',
-                                      'application_id': app['id']?.toString() ?? '',
-                                      'progress': double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
-                                      'checkins': parseDynamicList(app['checkins']),
-                                    };
-                                  }).toList(),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RoleDetailScreen(
+                                    id: role['id']?.toString() ?? '',
+                                    title: role['role'] ?? 'Intern Role',
+                                    type: role['location'] ?? 'Full-time',
+                                    deadline: formatDisplayDate(role['deadline']),
+                                    slots: role['vacancies']?.toString() ?? role['total_slots']?.toString() ?? '0',
+                                    startDate: role['start_date'] ?? 'TBD',
+                                    duration: '${role['duration'] ?? 3} Months',
+                                    description: role['about'] ?? 'No description provided.',
+                                    responsibilities: parseStringList(role['responsibilities']),
+                                    activeDays: parseStringList(role['active_days']),
+                                    eligibleDepartments: parseStringList(role['eligible_departments']),
+                                    eligibleYears: parseStringList(role['eligible_years']),
+                                    stipend: role['stipend']?.toString() ?? '',
+                                    location: role['location']?.toString() ?? '',
+                                    notes: role['notes']?.toString() ?? '',
+                                    status: role['status']?.toString() ?? 'INTERVIEWING',
+                                    applicants: parseDynamicList(role['applications']).map((app) {
+                                      final student = app['students'] as Map<String, dynamic>? ?? {};
+                                      return {
+                                        'name': student['name']?.toString() ?? 'Unknown Student',
+                                        'id': student['enrollment_id']?.toString() ?? student['id']?.toString() ?? 'N/A',
+                                        'dept': student['department']?.toString() ?? 'CS',
+                                        'status': app['status']?.toString() ?? 'Applied',
+                                        'application_id': app['id']?.toString() ?? '',
+                                        'progress': double.tryParse(app['progress']?.toString() ?? '0') ?? 0.0,
+                                        'checkins': parseDynamicList(app['checkins']),
+                                      };
+                                    }).toList(),
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                              _fetchInternships();
+                            },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                               child: Row(
@@ -327,7 +344,10 @@ class _AdminInternshipsScreenState extends State<AdminInternshipsScreen> {
                                             const SizedBox(width: 4),
                                             Flexible(
                                               child: Text(
-                                                role['deadline'] ?? 'No Deadline',
+                                                formatDisplayDate(
+                                                  role['deadline'],
+                                                  fallback: 'No Deadline',
+                                                ),
                                                 style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                                                 overflow: TextOverflow.ellipsis,
                                               ),

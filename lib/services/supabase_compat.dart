@@ -370,6 +370,7 @@ class SupabaseQueryBuilder implements Future<dynamic> {
 
     if (_insertBatch != null && _insertBatch!.isNotEmpty) {
       int idx = 0;
+      final List<Map<String, dynamic>> requests = [];
       for (final item in _insertBatch!) {
         final Map<String, dynamic> itemMap = Map<String, dynamic>.from(item);
         if (!itemMap.containsKey('id') || itemMap['id'] == null) {
@@ -390,8 +391,9 @@ class SupabaseQueryBuilder implements Future<dynamic> {
         final values = itemMap.values.toList();
         final placeholders = List.filled(keys.length, '?').join(', ');
         final sql = 'INSERT INTO $table (${keys.join(', ')}) VALUES ($placeholders)';
-        await db.execute(sql, values);
+        requests.add({'sql': sql, 'params': values});
       }
+      await db.batch(requests);
       return _insertBatch;
     }
 

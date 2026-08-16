@@ -69,9 +69,83 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     _checkForm();
   }
 
+  Future<void> _sendApprovalNotifications() async {
+    try {
+      final postingRes = await Supabase.instance.client
+          .from('internships')
+          .select('role, eligible_departments, eligible_years, companies(name)')
+          .eq('id', widget.id)
+          .maybeSingle();
+
+      final roleName = widget.title.isNotEmpty ? widget.title : (postingRes?['role']?.toString() ?? 'New Internship');
+      final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
+      final depts = parseStringList(postingRes?['eligible_departments']);
+      final years = parseStringList(postingRes?['eligible_years']);
+
+      String eligibilityInfo = '';
+      if (depts.isNotEmpty) {
+        eligibilityInfo += ' | Depts: ${depts.join(", ")}';
+      }
+      if (years.isNotEmpty) {
+        eligibilityInfo += ' | Years: ${years.join(", ")}';
+      }
+
+      final msgText = '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo Apply now in your Student Portal!';
+
+      final studentsRes = await Supabase.instance.client
+          .from('students')
+          .select('id, user_id');
+
+      if (studentsRes is List && studentsRes.isNotEmpty) {
+        final notifications = studentsRes.map((s) {
+          final sId = s['id']?.toString() ?? s['user_id']?.toString() ?? '';
+          final uId = s['user_id']?.toString() ?? sId;
+          return {
+            'student_id': sId.isNotEmpty ? sId : uId,
+            'user_id': uId.isNotEmpty ? uId : sId,
+            'title': 'New Internship Available: $roleName',
+            'message': msgText,
+            'type': 'announcement',
+            'notification_type': 'announcement',
+            'is_read': 0,
+            'sender_name': 'System Admin',
+          };
+        }).toList();
+
+        await Supabase.instance.client
+            .from('student_notifications')
+            .insert(notifications);
+
+        FcmPushService.sendToTopic(
+          topic: 'all_students',
+          title: 'New Internship: $roleName',
+          body: '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error sending approval notifications: $e');
+    }
+  }
+
   Future<void> _updatePostingStatus(String newStatus) async {
     if (widget.id.isEmpty) return;
-    setState(() => _isUpdatingStatus = true);
+
+    // Optimistic UI state update immediately
+    setState(() {
+      _currentStatus = newStatus;
+      _isUpdatingStatus = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newStatus == 'INTERVIEWING' ? 'Posting Approved & Notification Sent!' : 'Posting Rejected.'),
+          backgroundColor: newStatus == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
     try {
       await Supabase.instance.client
           .from('internships')
@@ -79,82 +153,10 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
           .eq('id', widget.id);
 
       if (newStatus == 'INTERVIEWING') {
-        // Fetch role, company, eligible_departments and eligible_years details to send notification
-        final postingRes = await Supabase.instance.client
-            .from('internships')
-            .select('role, eligible_departments, eligible_years, companies(name)')
-            .eq('id', widget.id)
-            .maybeSingle();
-
-        final roleName = widget.title.isNotEmpty ? widget.title : (postingRes?['role']?.toString() ?? 'New Internship');
-        final companyName = postingRes?['companies']?['name']?.toString() ?? 'Partner Company';
-        final depts = parseStringList(postingRes?['eligible_departments']);
-        final years = parseStringList(postingRes?['eligible_years']);
-
-        String eligibilityInfo = '';
-        if (depts.isNotEmpty) {
-          eligibilityInfo += ' | Depts: ${depts.join(", ")}';
-        }
-        if (years.isNotEmpty) {
-          eligibilityInfo += ' | Years: ${years.join(", ")}';
-        }
-
-        final msgText = '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo Apply now in your Student Portal!';
-
-        // Broadcast notification to all students
-        final studentsRes = await Supabase.instance.client
-            .from('students')
-            .select('id, user_id');
-
-        if (studentsRes is List && studentsRes.isNotEmpty) {
-          final notifications = studentsRes.map((s) {
-            final sId = s['id']?.toString() ?? s['user_id']?.toString() ?? '';
-            final uId = s['user_id']?.toString() ?? sId;
-            return {
-              'student_id': sId.isNotEmpty ? sId : uId,
-              'user_id': uId.isNotEmpty ? uId : sId,
-              'title': 'New Internship Available: $roleName',
-              'message': msgText,
-              'type': 'announcement',
-              'notification_type': 'announcement',
-              'is_read': 0,
-              'sender_name': 'System Admin',
-            };
-          }).toList();
-
-          await Supabase.instance.client
-              .from('student_notifications')
-              .insert(notifications);
-
-          // Send native FCM broadcast to all subscribed students
-          FcmPushService.sendToTopic(
-            topic: 'all_students',
-            title: 'New Internship: $roleName',
-            body: '$companyName has posted a new opportunity for "$roleName".$eligibilityInfo',
-          );
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _currentStatus = newStatus;
-          _isUpdatingStatus = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(newStatus == 'INTERVIEWING' ? 'Posting Approved & Notification Sent to Students!' : 'Posting Rejected.'),
-            backgroundColor: newStatus == 'INTERVIEWING' ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-          ),
-        );
+        _sendApprovalNotifications();
       }
     } catch (e) {
       debugPrint('Error updating posting status: $e');
-      if (mounted) {
-        setState(() => _isUpdatingStatus = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update status: $e'), backgroundColor: const Color(0xFFEF4444)),
-        );
-      }
     }
   }
 
@@ -718,7 +720,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                         const SizedBox(width: 12),
                         Expanded(child: _MetaBox(icon: Icons.timer_rounded, label: 'Duration', value: widget.duration, color: const Color(0xFF8B5CF6))),
                         const SizedBox(width: 12),
-                        Expanded(child: _MetaBox(icon: Icons.event_busy_rounded, label: 'Deadline', value: widget.deadline, color: const Color(0xFFF43F5E))),
+                        Expanded(child: _MetaBox(icon: Icons.event_busy_rounded, label: 'Deadline', value: formatDisplayDate(widget.deadline), color: const Color(0xFFF43F5E))),
                       ],
                     ),
                   ],

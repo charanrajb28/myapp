@@ -1,4 +1,20 @@
 import 'dart:convert';
+import 'package:intl/intl.dart';
+
+/// Formats database dates for presentation without exposing their ISO time.
+///
+/// Turso stores some date-only values as ISO timestamps (for example,
+/// `2026-09-12T00:00:00.000`). Keep non-date text intact so legacy values
+/// such as `TBD` remain useful to the UI.
+String formatDisplayDate(dynamic value, {String fallback = 'TBD'}) {
+  final raw = value?.toString().trim() ?? '';
+  if (raw.isEmpty) return fallback;
+
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return raw;
+
+  return DateFormat('dd MMM yyyy').format(parsed.toLocal());
+}
 
 /// Safely converts dynamic input (List, JSON String, null, etc.) into a `List<dynamic>`.
 List<dynamic> parseDynamicList(dynamic input) {
