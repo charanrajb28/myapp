@@ -257,6 +257,18 @@ class StudentPortalRepository {
         } catch (_) {}
       }
 
+      // Older builds accidentally wrote the check-in timestamp into both
+      // fields. Treat that legacy value as an open check-in so the student can
+      // perform the required second scan for checkout.
+      for (final entry in checkinsList) {
+        if (entry is Map &&
+            entry['check_in_at'] != null &&
+            entry['check_out_at'] != null &&
+            entry['check_in_at'].toString() == entry['check_out_at'].toString()) {
+          entry['check_out_at'] = null;
+        }
+      }
+
       final progressVal = r['app_progress'];
       final double progress = (progressVal is num)
           ? progressVal.toDouble()
@@ -552,7 +564,11 @@ class StudentPortalRepository {
         if (checkins[idx]['check_in_at'] == null) {
           throw Exception('Check in before checking out.');
         }
-        if (checkins[idx]['check_out_at'] != null) {
+        final checkInAt = checkins[idx]['check_in_at']?.toString();
+        final checkOutAt = checkins[idx]['check_out_at']?.toString();
+        // A previous release wrote the same timestamp to both fields during
+        // check-in; allow that legacy record to be completed by checkout.
+        if (checkOutAt != null && checkOutAt != checkInAt) {
           throw Exception('You have already checked out for today.');
         }
         checkins[idx]['check_out_at'] = nowIso;
