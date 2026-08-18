@@ -144,21 +144,9 @@ class _CheckinsScreenState extends State<CheckinsScreen>
   }
 
   Future<void> _submitCheckOut() async {
-    // Refresh before opening checkout so a tab switch, app resume, or a
-    // legacy check-in record cannot leave this action with stale state.
-    await _loadInternships();
     final active = _activeInternships;
     if (active.isEmpty) return;
     final internship = active[_selectedInternshipIndex.clamp(0, active.length - 1)];
-    final checkins = _checkinEntries[internship.applicationId] ?? internship.checkins;
-    if (!_hasTodayCheckIn(checkins)) {
-      _showSnackBar('Scan once to check in before checking out.', const Color(0xFFDC2626));
-      return;
-    }
-    if (_hasTodayCheckOut(checkins)) {
-      _showSnackBar('You have already checked out for today.', const Color(0xFF64748B));
-      return;
-    }
 
     showGeneralDialog(
       context: context,
