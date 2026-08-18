@@ -136,6 +136,41 @@ class StudentPortalRepository {
     }).toList();
   }
 
+  DateTime? _parseDate(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  int _inclusiveDays(dynamic startValue, dynamic endValue) {
+    final start = _parseDate(startValue);
+    final end = _parseDate(endValue);
+    if (start == null || end == null || end.isBefore(start)) return 0;
+    final startDay = DateTime(start.year, start.month, start.day);
+    final endDay = DateTime(end.year, end.month, end.day);
+    return endDay.difference(startDay).inDays + 1;
+  }
+
+  int _presentDays(List<Map<String, dynamic>> checkins) {
+    final dates = <String>{};
+    for (final checkin in checkins) {
+      final date = checkin['checkin_date']?.toString().trim() ?? '';
+      if (date.isNotEmpty && checkin['check_in_at'] != null) {
+        dates.add(date);
+      }
+    }
+    return dates.length;
+  }
+
+  int _daysRemaining(dynamic endValue) {
+    final end = _parseDate(endValue);
+    if (end == null) return 0;
+    final today = DateTime.now();
+    final todayDay = DateTime(today.year, today.month, today.day);
+    final endDay = DateTime(end.year, end.month, end.day);
+    return endDay.isBefore(todayDay) ? 0 : endDay.difference(todayDay).inDays + 1;
+  }
+
   Future<StudentProfileData> fetchProfile() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -228,7 +263,7 @@ class StudentPortalRepository {
           internshipStatus: 'ONGOING',
           brandColor: const Color(0xFF6366F1),
           logoInitial: 'T',
-          stipend: '\$4,500 / month',
+          stipend: '₹4,500 / month',
           mentorName: 'Sarah Jenkins',
           mentorEmail: 'sarah.j@techcorp.com',
           offerLetterId: 'TC-2026-9921',
@@ -252,7 +287,7 @@ class StudentPortalRepository {
 
     final rows = await _db.query(
       '''
-      SELECT a.id as app_id, a.status as app_status, a.progress as app_progress,
+             SELECT a.id as app_id, a.status as app_status,
              a.checkins as app_checkins,
              i.id as internship_id, i.role, i.industry, i.location, i.stipend,
              i.duration, i.deadline, i.start_date, i.end_date, i.about,
@@ -283,10 +318,11 @@ class StudentPortalRepository {
         }
       }
 
-      final progressVal = r['app_progress'];
-      final double progress = (progressVal is num)
-          ? progressVal.toDouble()
-          : (double.tryParse(progressVal?.toString() ?? '0') ?? 0.0);
+      final totalDays = _inclusiveDays(r['start_date'], r['end_date']);
+      final presentDays = _presentDays(checkinsList);
+      final progress = totalDays == 0
+          ? 0.0
+          : (presentDays / totalDays).clamp(0.0, 1.0).toDouble();
 
       return StudentInternship(
         applicationId: r['app_id'].toString(),
@@ -299,12 +335,12 @@ class StudentPortalRepository {
         endDate: r['end_date']?.toString() ?? '',
         deadline: r['deadline']?.toString() ?? '',
         progress: progress,
-        daysLeft: 90,
+        daysLeft: _daysRemaining(r['end_date']),
         status: r['app_status']?.toString() ?? 'Applied',
         internshipStatus: (r['internship_active']?.toString().toUpperCase() == 'ACTIVE' || r['internship_active']?.toString().toUpperCase() == 'INTERVIEWING') ? 'ONGOING' : 'COMPLETED',
         brandColor: const Color(0xFF6366F1),
         logoInitial: (r['company_name']?.toString().isNotEmpty == true) ? r['company_name'].toString()[0].toUpperCase() : 'C',
-        stipend: (r['stipend'] != null) ? '\$${r['stipend']} / month' : 'Unpaid',
+        stipend: (r['stipend'] != null) ? '₹${r['stipend']} / month' : 'Unpaid',
         mentorName: 'Mentor',
         mentorEmail: '',
         offerLetterId: 'OFFER-${r['app_id']}',
@@ -347,8 +383,8 @@ class StudentPortalRepository {
     final appId = 'app_${DateTime.now().millisecondsSinceEpoch}';
     await _db.execute(
       '''
-      INSERT INTO applications (id, student_id, internship_id, status, progress, checkins)
-      VALUES (?, ?, ?, 'Applied', 0.0, '[]')
+      INSERT INTO applications (id, student_id, internship_id, status, checkins)
+      VALUES (?, ?, ?, 'Applied', '[]')
       ''',
       [appId, studentId, opportunity.id],
     );
@@ -398,7 +434,7 @@ class StudentPortalRepository {
         role: r['role']?.toString() ?? 'Internship',
         industry: r['industry']?.toString() ?? 'General',
         location: r['location']?.toString() ?? 'Remote',
-        stipend: (r['stipend'] != null) ? '\$${r['stipend']}/mo' : 'Unpaid',
+        stipend: (r['stipend'] != null) ? '₹${r['stipend']}/mo' : 'Unpaid',
         duration: r['duration']?.toString() ?? '3 Months',
         deadline: r['deadline']?.toString() ?? 'Open',
         brandColor: const Color(0xFF0F172A),

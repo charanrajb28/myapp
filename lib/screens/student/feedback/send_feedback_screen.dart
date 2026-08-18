@@ -52,6 +52,9 @@ class _SendFeedbackScreenState extends State<SendFeedbackScreen> {
         'company_id': internship['company_id'],
         'type': _selectedType,
         'comment': _commentController.text.trim(),
+        // `message` is required by the original Turso feedbacks schema.
+        // Keep it populated for compatibility with existing databases.
+        'message': _commentController.text.trim(),
       });
 
       if (!mounted) return;

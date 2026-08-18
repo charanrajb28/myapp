@@ -80,6 +80,8 @@ class _StudentDynamicFeedbackScreenState extends State<StudentDynamicFeedbackScr
         'company_id': companyRes['company_id'],
         'type': 'Final Feedback',
         'comment': 'Final Internship Feedback form submitted.',
+        // `message` is required by the original Turso feedbacks schema.
+        'message': 'Final Internship Feedback form submitted.',
         'form_responses': _responses,
       });
 

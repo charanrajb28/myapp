@@ -307,12 +307,6 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
             childAspectRatio: 2.0,
             children: [
               _StatGridCard(
-                title: 'Progress',
-                value: '${(currentIntern.progress * 100).round()}%',
-                icon: Icons.timelapse_rounded,
-                color: const Color(0xFF10B981),
-              ),
-              _StatGridCard(
                 title: 'Alerts',
                 value: 'View',
                 icon: Icons.error_outline_rounded,
@@ -344,13 +338,6 @@ class _InternshipCarouselState extends State<_InternshipCarousel> {
                       ),
                     );
                   },
-                )
-              else
-                _StatGridCard(
-                  title: 'Remaining',
-                  value: '${currentIntern.daysLeft}D',
-                  icon: Icons.hourglass_bottom_rounded,
-                  color: const Color(0xFFF59E0B),
                 ),
               _StatGridCard(
                 title: 'Feedback',
@@ -549,14 +536,6 @@ class _CompanyHeaderCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Text(
-                            '${(internship.progress * 100).round()}%',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF10B981),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -587,19 +566,19 @@ class _CompanyHeaderCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: internship.progress,
+                minHeight: 5,
+                backgroundColor: Colors.white.withValues(alpha: 0.12),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+              ),
+            ),
+            const SizedBox(height: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: internship.progress,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
-                    minHeight: 5,
-                  ),
-                ),
-                const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -610,14 +589,6 @@ class _CompanyHeaderCard extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 11,
-                      ),
-                    ),
-                    Text(
-                      'Overall Progress',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],

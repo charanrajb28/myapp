@@ -367,23 +367,16 @@ class _NotificationDetailScreen extends StatelessWidget {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accent.withValues(alpha: 0.14),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: accent.withValues(alpha: 0.18)),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: accent.withValues(alpha: 0.25)),
                 boxShadow: [
                   BoxShadow(
-                    color: accent.withValues(alpha: 0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
@@ -394,17 +387,16 @@ class _NotificationDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 54,
-                        height: 54,
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: accent.withValues(alpha: 0.20)),
+                          color: accent.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           _typeIcon(item.type),
                           color: accent,
-                          size: 24,
+                          size: 21,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -415,7 +407,7 @@ class _NotificationDetailScreen extends StatelessWidget {
                             Text(
                               item.title,
                               style: const TextStyle(
-                                fontSize: 24,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFF0F172A),
                                 letterSpacing: -0.5,
@@ -499,19 +491,19 @@ class _NotificationDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 8),
+           Icon(icon, size: 13, color: color),
+           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+               fontSize: 10,
               fontWeight: FontWeight.w800,
               color: color,
             ),
@@ -522,24 +514,14 @@ class _NotificationDetailScreen extends StatelessWidget {
   }
 
   Widget _sectionLabel(String label) {
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          color: const Color(0xFF0F172A),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF94A3B8),
-            letterSpacing: 1.1,
-          ),
-        ),
-      ],
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+        color: Color(0xFF94A3B8),
+        letterSpacing: 1.1,
+      ),
     );
   }
 
