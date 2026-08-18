@@ -23,6 +23,8 @@ class StudentInternship {
   final String about;
   final List<String> responsibilities;
   final List<String> activeDays;
+  final List<String> eligibleDepartments;
+  final List<String> eligibleYears;
   final String notes;
   final List<Map<String, dynamic>> alerts;
   final List<Map<String, dynamic>> checkins;
@@ -52,6 +54,8 @@ class StudentInternship {
     required this.about,
     this.responsibilities = const [],
     this.activeDays = const [],
+    this.eligibleDepartments = const [],
+    this.eligibleYears = const [],
     this.notes = '',
     this.alerts = const [],
     this.checkins = const [],

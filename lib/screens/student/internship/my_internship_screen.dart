@@ -1466,6 +1466,54 @@ class InternshipDetailScreen extends StatelessWidget {
                       color: internship.brandColor,
                       child: _RoleSection(internship: internship),
                     ),
+                    const SizedBox(height: 36),
+                    _DetailSectionCard(
+                      title: 'Tasks & Responsibilities',
+                      icon: Icons.checklist_rounded,
+                      color: const Color(0xFF6366F1),
+                      child: internship.responsibilities.isEmpty
+                          ? const Text('No tasks specified.', style: TextStyle(color: Color(0xFF64748B)))
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: internship.responsibilities.map((task) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 5),
+                                      child: Icon(Icons.circle, size: 7, color: Color(0xFF6366F1)),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: Text(task, style: const TextStyle(color: Color(0xFF475569), height: 1.4))),
+                                  ],
+                                ),
+                              )).toList(),
+                            ),
+                    ),
+                    const SizedBox(height: 36),
+                    _DetailSectionCard(
+                      title: 'Eligibility',
+                      icon: Icons.school_rounded,
+                      color: const Color(0xFF0EA5E9),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Departments: ${internship.eligibleDepartments.isEmpty ? 'Open to all' : internship.eligibleDepartments.join(', ')}', style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+                          const SizedBox(height: 8),
+                          Text('Years of study: ${internship.eligibleYears.isEmpty ? 'Open to all' : internship.eligibleYears.join(', ')}', style: const TextStyle(color: Color(0xFF475569), height: 1.4)),
+                        ],
+                      ),
+                    ),
+                    if (internship.notes.trim().isNotEmpty) ...[
+                      const SizedBox(height: 36),
+                      _DetailSectionCard(
+                        title: 'Important Notes',
+                        icon: Icons.info_rounded,
+                        color: const Color(0xFFF59E0B),
+                        child: Text(internship.notes, style: const TextStyle(color: Color(0xFF92400E), height: 1.5)),
+                      ),
+                    ],
                     if (internship.feedbackFormSchema != null &&
                         internship.feedbackFormSchema!.isNotEmpty &&
                         internship.feedbackFormSchema!.first is Map &&
@@ -3044,4 +3092,3 @@ class _CountdownTimerWidgetState extends State<_CountdownTimerWidget> {
     );
   }
 }
-

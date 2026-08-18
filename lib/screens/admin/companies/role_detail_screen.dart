@@ -160,6 +160,55 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
     }
   }
 
+  Future<void> _notifyApplicationStatus(String applicationId, String status) async {
+    try {
+      final application = await Supabase.instance.client
+          .from('applications')
+          .select('student_id, students(user_id)')
+          .eq('id', applicationId)
+          .maybeSingle();
+      if (application == null) return;
+
+      final studentId = application['student_id']?.toString() ?? '';
+      final student = application['students'] as Map<String, dynamic>? ?? {};
+      final userId = student['user_id']?.toString() ?? studentId;
+      if (studentId.isEmpty && userId.isEmpty) return;
+
+      final accepted = status.toLowerCase() == 'accepted';
+      await Supabase.instance.client.from('student_notifications').insert({
+        'student_id': studentId.isNotEmpty ? studentId : userId,
+        'user_id': userId.isNotEmpty ? userId : studentId,
+        'title': accepted ? 'Application Accepted' : 'Application Rejected',
+        'message': accepted
+            ? 'Your application for ${widget.title} has been accepted.'
+            : 'Your application for ${widget.title} was not selected for this internship.',
+        'type': 'application_status',
+        'notification_type': 'application_status',
+        'is_read': 0,
+        'sender_name': 'Admin',
+      });
+
+      // Persist the in-app notification and send the same native push used by
+      // admin announcements, so the student is notified even when the app is
+      // backgrounded.
+      await FcmPushService.sendToUser(
+        userId: userId,
+        title: accepted ? 'Application Accepted' : 'Application Rejected',
+        body: accepted
+            ? 'Your application for ${widget.title} has been accepted.'
+            : 'Your application for ${widget.title} was not selected for this internship.',
+        data: {
+          'type': 'application_status',
+          'application_id': applicationId,
+          'status': status,
+          'internship_id': widget.id,
+        },
+      );
+    } catch (e) {
+      debugPrint('Error sending application status notification: $e');
+    }
+  }
+
   @override
   void dispose() {
     _broadcastTitleController.dispose();
@@ -1107,6 +1156,7 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                                 setState(() {
                                   a['status'] = newStatus;
                                 });
+                                await _notifyApplicationStatus(appId, newStatus);
                               } catch (e) {
                                 debugPrint('Error updating status: $e');
                               }

@@ -236,6 +236,8 @@ class StudentPortalRepository {
              a.checkins as app_checkins,
              i.id as internship_id, i.role, i.industry, i.location, i.stipend,
              i.duration, i.deadline, i.start_date, i.end_date, i.about,
+             i.requirements, i.responsibilities, i.active_days,
+             i.eligible_departments, i.eligible_years, i.notes,
              i.status as internship_active, c.name as company_name
       FROM applications a
       JOIN internships i ON a.internship_id = i.id
@@ -281,6 +283,11 @@ class StudentPortalRepository {
         mentorEmail: '',
         offerLetterId: 'OFFER-${r['app_id']}',
         about: r['about']?.toString() ?? '',
+        responsibilities: parseStringList(r['responsibilities']),
+        activeDays: parseStringList(r['active_days']),
+        eligibleDepartments: parseStringList(r['eligible_departments']),
+        eligibleYears: parseStringList(r['eligible_years']),
+        notes: r['notes']?.toString() ?? '',
         alerts: const [],
         checkins: checkinsList.cast<Map<String, dynamic>>(),
       );
@@ -345,10 +352,12 @@ class StudentPortalRepository {
     final rows = await _db.query(
       '''
       SELECT i.id, i.role, i.industry, i.location, i.stipend, i.duration, i.deadline,
-             i.about, i.vacancies, i.status as is_active, c.name as company_name
+             i.about, i.requirements, i.responsibilities, i.active_days,
+             i.eligible_departments, i.eligible_years, i.notes,
+             i.vacancies, i.status as is_active, c.name as company_name
       FROM internships i
       LEFT JOIN companies c ON i.company_id = c.id
-      WHERE i.status IN ('ACTIVE', 'INTERVIEWING')
+      WHERE UPPER(i.status) = 'INTERVIEWING'
       ORDER BY i.created_at DESC
       ''',
     );
@@ -373,7 +382,8 @@ class StudentPortalRepository {
         responsibilities: parseStringList(r['responsibilities']),
         activeDays: parseStringList(r['active_days']).isNotEmpty ? parseStringList(r['active_days']) : const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
         eligibleDepartments: parseStringList(r['eligible_departments']),
-        notes: '',
+        eligibleYears: parseStringList(r['eligible_years']),
+        notes: r['notes']?.toString() ?? '',
         vacancies: (r['vacancies'] is int) ? r['vacancies'] : 1,
         applicationDurationDays: 30,
         isApplied: isApplied,

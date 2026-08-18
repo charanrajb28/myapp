@@ -57,8 +57,9 @@ class _CheckinsScreenState extends State<CheckinsScreen>
         _activeInternships =
             internships
                 .where((internship) =>
-                    internship.status == 'Active' &&
-                    internship.internshipStatus.toUpperCase() == 'ACTIVE')
+                    internship.status.trim().toUpperCase() == 'ACTIVE' &&
+                    (internship.internshipStatus.trim().toUpperCase() == 'ACTIVE' ||
+                        internship.internshipStatus.trim().toUpperCase() == 'ONGOING'))
                 .toList();
         _syncCheckinState(_activeInternships);
         _isLoading = false;
