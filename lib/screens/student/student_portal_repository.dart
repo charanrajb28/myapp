@@ -548,18 +548,30 @@ class StudentPortalRepository {
 
     final idx = checkins.indexWhere((c) => c['checkin_date']?.toString() == todayLabel);
     if (idx >= 0) {
-      checkins[idx]['status'] = 'Present';
       if (isCheckout) {
+        if (checkins[idx]['check_in_at'] == null) {
+          throw Exception('Check in before checking out.');
+        }
+        if (checkins[idx]['check_out_at'] != null) {
+          throw Exception('You have already checked out for today.');
+        }
         checkins[idx]['check_out_at'] = nowIso;
       } else {
+        if (checkins[idx]['check_in_at'] != null) {
+          throw Exception('You have already checked in for today.');
+        }
         checkins[idx]['check_in_at'] = nowIso;
       }
+      checkins[idx]['status'] = 'Present';
     } else {
+      if (isCheckout) {
+        throw Exception('Check in before checking out.');
+      }
       checkins.add({
         'checkin_date': todayLabel,
         'status': 'Present',
-        'check_in_at': isCheckout ? null : nowIso,
-        'check_out_at': isCheckout ? null : nowIso,
+        'check_in_at': nowIso,
+        'check_out_at': null,
         'notes': '',
       });
     }
