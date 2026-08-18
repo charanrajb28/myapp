@@ -116,6 +116,26 @@ class StudentPortalRepository {
       : _db = db ?? TursoDatabaseService.instance,
         _auth = auth ?? AuthService.instance;
 
+  /// Turso may return JSON columns as either raw text or an already-decoded
+  /// Dart list. Normalize both representations before using check-in data.
+  List<Map<String, dynamic>> _decodeCheckins(dynamic raw) {
+    dynamic decoded = raw;
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        decoded = jsonDecode(raw);
+      } catch (_) {
+        return [];
+      }
+    }
+
+    if (decoded is! List) return [];
+    return decoded.whereType<Map>().map((entry) {
+      return entry.map<String, dynamic>(
+        (key, value) => MapEntry<String, dynamic>(key.toString(), value),
+      );
+    }).toList();
+  }
+
   Future<StudentProfileData> fetchProfile() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -249,13 +269,7 @@ class StudentPortalRepository {
     );
 
     return rows.map((r) {
-      final checkinsRaw = r['app_checkins'];
-      List<dynamic> checkinsList = [];
-      if (checkinsRaw is String && checkinsRaw.isNotEmpty) {
-        try {
-          checkinsList = jsonDecode(checkinsRaw);
-        } catch (_) {}
-      }
+      final checkinsList = _decodeCheckins(r['app_checkins']);
 
       // Older builds accidentally wrote the check-in timestamp into both
       // fields. Treat that legacy value as an open check-in so the student can
@@ -301,7 +315,7 @@ class StudentPortalRepository {
         eligibleYears: parseStringList(r['eligible_years']),
         notes: r['notes']?.toString() ?? '',
         alerts: const [],
-        checkins: checkinsList.cast<Map<String, dynamic>>(),
+      checkins: checkinsList,
       );
     }).toList();
   }
@@ -543,16 +557,7 @@ class StudentPortalRepository {
     );
     if (app == null) return [];
 
-    List<Map<String, dynamic>> checkins = [];
-    final raw = app['checkins'];
-    if (raw is String && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          checkins = decoded.cast<Map<String, dynamic>>();
-        }
-      } catch (_) {}
-    }
+    final checkins = _decodeCheckins(app['checkins']);
 
     final today = DateTime.now();
     final todayLabel = DateFormat('yyyy-MM-dd').format(today);
