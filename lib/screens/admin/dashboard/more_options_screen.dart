@@ -15,7 +15,6 @@ class MoreOptionsScreen extends StatefulWidget {
 }
 
 class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
-  final String _academicYear = '2024 – 2025';
   bool _notificationsEnabled = true;
   bool _autoRemindersEnabled = true;
 
@@ -295,27 +294,6 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
             onTap: () => _showSuccessSnack('Cache cleared successfully'),
           ),
 
-          const SizedBox(height: 28),
-
-          // ── Account ──
-          const _SectionHeader(label: 'Account', icon: Icons.person_rounded, color: Color(0xFF0F172A)),
-          const SizedBox(height: 12),
-
-          _ActionTile(
-            icon: Icons.manage_accounts_rounded,
-            color: const Color(0xFF475569),
-            title: 'Account Settings',
-            subtitle: 'Edit admin profile and preferences',
-            onTap: () {},
-          ),
-          const SizedBox(height: 10),
-          _ActionTile(
-            icon: Icons.shield_rounded,
-            color: const Color(0xFF475569),
-            title: 'Security Overview',
-            subtitle: 'Password reset and active sessions',
-            onTap: () {},
-          ),
 
           const SizedBox(height: 28),
 
@@ -394,30 +372,6 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isSubAdmin ? const Color(0xFFFBBF24) : Colors.white)),
           ),
         ]),
-        const SizedBox(height: 18),
-        Container(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-        const SizedBox(height: 14),
-        Row(children: [
-          _statPill(Icons.calendar_month_rounded, _academicYear),
-          const SizedBox(width: 10),
-          _statPill(Icons.swap_vert_circle_rounded, 'Tap to manage semesters'),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _statPill(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 13, color: Colors.white.withValues(alpha: 0.6)),
-        const SizedBox(width: 6),
-        Text(label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.85))),
       ]),
     );
   }
