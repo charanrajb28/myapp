@@ -418,22 +418,13 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage>
-    with SingleTickerProviderStateMixin {
-  // ── DEV-ONLY: used for frontend testing. Removed when real auth lands. ──
-  String _devRole = 'Student';
-  bool _devPanelOpen = false;
-  // ────────────────────────────────────────────────────────────────────────
-
+class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isLoading = false;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  late final AnimationController _devAnimController;
-  late final Animation<double> _devPanelAnim;
 
   Future<bool?> _showConflictDialog(BuildContext context, String otherDeviceName) {
     return showDialog<bool>(
@@ -488,35 +479,10 @@ class _LoginPageState extends State<LoginPage>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _devAnimController = AnimationController(
-      duration: const Duration(milliseconds: 250),
-      vsync: this,
-    );
-    _devPanelAnim = CurvedAnimation(
-      parent: _devAnimController,
-      curve: Curves.easeInOut,
-    );
-  }
-
-  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _devAnimController.dispose();
     super.dispose();
-  }
-
-  void _toggleDevPanel() {
-    setState(() {
-      _devPanelOpen = !_devPanelOpen;
-      if (_devPanelOpen) {
-        _devAnimController.forward();
-      } else {
-        _devAnimController.reverse();
-      }
-    });
   }
 
   @override
@@ -936,261 +902,9 @@ class _LoginPageState extends State<LoginPage>
                     ],
                   ),
 
-                  const SizedBox(height: 36),
-
-                  // ── 🛠 DEV ONLY — Role Switcher (collapsed by default) ──
-                  // TODO: Remove this entire block before production / backend integration.
-                  GestureDetector(
-                    onTap: _toggleDevPanel,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF9C3), // amber-50
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: const Color(0xFFFBBF24), width: 1), // amber-400
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.developer_mode_rounded,
-                              size: 16, color: Color(0xFF92400E)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Dev Tools — $_devRole',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF92400E),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          RotationTransition(
-                            turns: Tween(begin: 0.0, end: 0.5)
-                                .animate(_devPanelAnim),
-                            child: const Icon(Icons.keyboard_arrow_down,
-                                size: 16, color: Color(0xFF92400E)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Animated collapsible dev panel
-                  SizeTransition(
-                    sizeFactor: _devPanelAnim,
-                    axisAlignment: -1,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF9C3),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: const Color(0xFFFBBF24), width: 1),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.offline_bolt_rounded, size: 16, color: Color(0xFF92400E)),
-                                SizedBox(width: 6),
-                                Text(
-                                  '🛠️  DEV TOOLS & OFFLINE BYPASS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF92400E),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'SELECT TEST ROLE:',
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: Color(0xFF92400E),
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _devRoleChip('Student', Icons.school_rounded, textPrimary),
-                                const SizedBox(width: 8),
-                                _devRoleChip('Company', Icons.business_center_rounded, textPrimary),
-                                const SizedBox(width: 8),
-                                _devRoleChip('Admin', Icons.admin_panel_settings_rounded, textPrimary),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  if (_devRole == 'Student') {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (context) => const StudentShell(),
-                                      ),
-                                    );
-                                  } else if (_devRole == 'Company') {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (context) => const CompanyShell(),
-                                      ),
-                                    );
-                                  } else if (_devRole == 'Admin') {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (context) => const AdminShell(
-                                          child: AdminDashboardScreen(),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.bolt_rounded, color: Colors.white),
-                                label: const Text(
-                                  'Instant Guest Login (Bypass Auth)',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD97706), // premium amber-600
-                                  foregroundColor: Colors.white,
-                                  elevation: 2,
-                                  shadowColor: const Color(0xFFD97706).withValues(alpha: 0.3),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            const Divider(color: Color(0xFFFBBF24), thickness: 0.5),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 38,
-                              child: OutlinedButton.icon(
-                                onPressed: _isLoading ? null : () async {
-                                  setState(() => _isLoading = true);
-                                  final client = Supabase.instance.client;
-                                  try {
-                                    // 1. Wipe public tables via RPC function (If created)
-                                    try {
-                                      await client.rpc('reset_demo_db');
-                                    } catch (e) {
-                                      debugPrint('RPC Reset failed (Function might not exist yet): $e');
-                                      // Fallback if the user hasn't run the SQL yet
-                                      await client.from('applications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                                      await client.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                                      await client.from('companies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                                    }
-
-                                    // 2. Create Fresh Demo Auth Accounts with Isolated Client
-                                    // We use a temporary client to batch create WITHOUT logging the current user out.
-                                    final inviteClient = SupabaseClient(
-                                      'https://nfurwspybtiaycqntzev.supabase.co',
-                                      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mdXJ3c3B5YnRpYXljcW50emV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg4NzcsImV4cCI6MjA5MDg2NDg3N30.IoOwVWFQDNtA5ZIz48G_Zm-VIbzX91MDdMqJ-fy58v0',
-                                      const AuthClientOptions(authFlowType: AuthFlowType.implicit),
-                                    );
-
-                                    await inviteClient.auth.signUp(
-                                      email: 'admin@scholarbridge.com',
-                                      password: 'adminpassword123',
-                                      data: {'role': 'admin', 'name': 'System Admin'},
-                                    );
-                                    await inviteClient.auth.signUp(
-                                      email: 'student@college.edu',
-                                      password: 'studentpassword123',
-                                      data: {'role': 'student', 'name': 'Alex Student', 'semester': '6th Semester'},
-                                    );
-                                    await inviteClient.auth.signUp(
-                                      email: 'hr@techcorp.com',
-                                      password: 'companypassword123',
-                                      data: {'role': 'company', 'name': 'TechCorp HR'},
-                                    );
-
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Database Reset & Demo Users Created!')));
-                                    }
-                                  } catch(e) {
-                                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Note: Some Auth users might already exist. Proceed to login.')));
-                                  } finally {
-                                    if (mounted) setState(() => _isLoading = false);
-                                  }
-                                },
-                                icon: _isLoading 
-                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF92400E)))
-                                  : const Icon(Icons.settings_backup_restore_rounded, size: 16),
-                                label: const Text('Wipe DB & Generate Online Credentials', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF92400E),
-                                  side: const BorderSide(color: Color(0xFFFBBF24)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _devRoleChip(String role, IconData icon, Color textPrimary) {
-    final selected = _devRole == role;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _devRole = role),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFF0F172A) : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color:
-                  selected ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon,
-                  size: 20,
-                  color: selected ? Colors.white : const Color(0xFF64748B)),
-              const SizedBox(height: 4),
-              Text(
-                role,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : textPrimary,
-                ),
-              ),
-            ],
           ),
         ),
       ),
