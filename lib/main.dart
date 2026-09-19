@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'services/turso_database_service.dart';
 import 'services/auth_service.dart';
-import 'services/supabase_compat.dart';
 
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/student_signup_screen.dart';
