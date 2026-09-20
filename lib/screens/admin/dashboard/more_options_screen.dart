@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'dart:io' as io;
 import 'dart:convert';
 import 'package:myapp/services/supabase_compat.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
+import '../../../config/mail_config.dart';
 import '../../../services/turso_database_service.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../../utils/file_saver.dart';
@@ -653,10 +656,20 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
         };
         SubAdminsManagementDialog.mockAdmins.insert(0, mockAdmin);
         
+        final emailSent = await _dispatchEmailAutomation(
+          email: email,
+          name: name,
+          password: password,
+        );
+        
         _emailController.clear();
         _passwordController.clear();
         _nameController.clear();
-        widget.onSuccess('Sub-Admin registered successfully! (Dev Mode)');
+        widget.onSuccess(
+          emailSent
+              ? 'Sub-Admin registered & login credentials sent to $email!'
+              : 'Sub-Admin registered! (Email delivery failed. Please share password manually)',
+        );
         _fetchSubAdmins();
         return;
       }
@@ -697,11 +710,22 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
         'created_by': currentUser.id,
       });
 
+      // 4. Send email with login credentials to the sub-admin
+      final emailSent = await _dispatchEmailAutomation(
+        email: email,
+        name: name,
+        password: password,
+      );
+
       _emailController.clear();
       _passwordController.clear();
       _nameController.clear();
 
-      widget.onSuccess('Sub-Admin registered successfully!');
+      widget.onSuccess(
+        emailSent
+            ? 'Sub-Admin registered & login credentials sent to $email!'
+            : 'Sub-Admin registered! (Note: Email delivery failed. Please share password manually)',
+      );
       _fetchSubAdmins();
     } catch (e) {
       if (mounted) {
@@ -711,6 +735,48 @@ class _SubAdminsManagementDialogState extends State<SubAdminsManagementDialog> {
       }
     } finally {
       if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  Future<bool> _dispatchEmailAutomation({
+    required String email,
+    required String name,
+    required String password,
+  }) async {
+    final String senderEmail = MailConfig.senderEmail;
+    final String senderPassword = MailConfig.senderAppPassword;
+
+    if (senderEmail.isEmpty || senderPassword.isEmpty) {
+      debugPrint('SMTP Credentials missing, skipping sub-admin mail send.');
+      return false;
+    }
+
+    final smtpServer = gmail(senderEmail, senderPassword);
+
+    final message = Message()
+      ..from = Address(senderEmail, MailConfig.senderName)
+      ..recipients.add(email)
+      ..subject = 'Welcome to ScholarBridge - Sub-Admin Access Credentials'
+      ..html = """
+        <div style='font-family: sans-serif; padding: 24px; color: #0F172A; max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px;'>
+          <h2 style='color: #0F172A; margin-top: 0;'>Welcome to ScholarBridge, $name!</h2>
+          <p>You have been assigned <strong>Sub-Admin</strong> access permissions for the ScholarBridge Control Center.</p>
+          <div style='background: #F8FAFC; padding: 18px; border-radius: 10px; border: 1px solid #E2E8F0; margin: 20px 0;'>
+            <p style='margin: 6px 0; font-size: 14px;'><strong>Username / Email:</strong> $email</p>
+            <p style='margin: 6px 0; font-size: 14px;'><strong>Password:</strong> $password</p>
+            <p style='margin: 6px 0; font-size: 14px;'><strong>Role:</strong> Sub-Admin</p>
+          </div>
+          <p style='font-size: 12px; color: #64748B;'>Please log in to the admin portal using the credentials above. Keep your credentials secure.</p>
+        </div>
+      """;
+
+    try {
+      final sendReport = await send(message, smtpServer);
+      debugPrint('Sub-admin credentials email sent successfully: $sendReport');
+      return true;
+    } catch (e) {
+      debugPrint('Sub-admin email error: $e');
+      return false;
     }
   }
 
