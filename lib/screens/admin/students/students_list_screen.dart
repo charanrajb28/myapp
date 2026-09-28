@@ -498,15 +498,61 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
   }
 
   Future<void> _deleteStudent(String id) async {
+    final confirmCtrl = TextEditingController();
+    bool canDelete = false;
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Student'),
-        content: const Text('Are you sure you want to permanently delete this student profile and their associated user account? This cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Delete Student'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Are you sure you want to permanently delete this student profile and their associated user account? This cannot be undone.'),
+                const SizedBox(height: 14),
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(color: Colors.black87, fontSize: 13),
+                    children: [
+                      TextSpan(text: 'Type '),
+                      TextSpan(text: '"delete"', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                      TextSpan(text: ' to confirm deletion:'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: confirmCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Type "delete" here',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  onChanged: (val) {
+                    setDialogState(() {
+                      canDelete = val.trim().toLowerCase() == 'delete';
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: canDelete ? () => Navigator.pop(context, true) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
       ),
     );
 

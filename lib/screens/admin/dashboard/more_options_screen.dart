@@ -9,6 +9,7 @@ import '../../../config/mail_config.dart';
 import '../../../services/turso_database_service.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../../utils/file_saver.dart';
+import '../students/verify_students_screen.dart';
 import 'semester_promotion_screen.dart';
 
 class MoreOptionsScreen extends StatefulWidget {
@@ -205,6 +206,17 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
           const _SectionHeader(label: 'Academic Configuration', icon: Icons.school_rounded, color: Color(0xFF6366F1)),
           const SizedBox(height: 12),
 
+          _ActionTile(
+            icon: Icons.upload_file_rounded,
+            color: const Color(0xFF6366F1),
+            title: 'Upload Students (Excel/CSV)',
+            subtitle: 'Bulk upload and verify student records',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VerifyStudentsScreen()),
+            ),
+          ),
+          
           _ActionTile(
             icon: _userRole == 'sub_admin' ? Icons.lock_outline_rounded : Icons.swap_vert_circle_rounded,
             color: _userRole == 'sub_admin' ? Colors.grey : const Color(0xFF6366F1),

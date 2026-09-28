@@ -377,6 +377,16 @@ class TursoDatabaseService {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
       ''',
+      '''
+      CREATE TABLE IF NOT EXISTS pending_students_verification (
+        usn TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        department TEXT NOT NULL,
+        semester TEXT NOT NULL,
+        uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'pending'
+      );
+      ''',
     ];
 
     for (final stmt in ddlStatements) {
