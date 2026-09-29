@@ -48,7 +48,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await AuthService.instance.sendPasswordResetEmail(email);
 
       if (!mounted) return;
-      _showSuccess('Password reset link sent to $email. Please check your inbox.');
+      _showSuccess('Password reset link sent. Open it to create a new password.');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
@@ -195,7 +195,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   Text(
                     _codeSent
                         ? 'Enter the OTP from your email and choose a new password.'
-                        : 'We will send a 6-digit OTP to your registered email using your configured Gmail sender.',
+                        : 'We will send a secure password-reset link to your registered email.',
                     style: const TextStyle(
                       fontSize: 14,
                       color: textSecondary,
@@ -301,7 +301,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             child: TextButton(
                               onPressed: _isSubmitting ? null : _sendVerificationCode,
                               child: const Text(
-                                'Resend OTP',
+                                'Resend reset link',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),
@@ -334,8 +334,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   )
                                 : Text(
                                     _codeSent
-                                        ? 'Verify OTP & Reset Password'
-                                        : 'Send OTP',
+                                        ? 'Reset Password'
+                                        : 'Send reset link',
                                     style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,

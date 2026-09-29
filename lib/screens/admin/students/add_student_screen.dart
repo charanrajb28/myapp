@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,11 +32,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   
-  final TextEditingController _adminSmtpEmailController =
-      TextEditingController(text: MailConfig.senderEmail);
-  final TextEditingController _adminSmtpPasswordController =
-      TextEditingController(text: MailConfig.senderAppPassword);
-
   String _selectedDepartment = 'B.Com LSCM';
   String _selectedSemester = '6th Semester';
   String _selectedGender = 'Male';
@@ -45,8 +41,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   @override
   void initState() {
     super.initState();
-    _adminSmtpEmailController.text = MailConfig.senderEmail;
-    _adminSmtpPasswordController.text = MailConfig.senderAppPassword;
     if (widget.student != null) {
       final s = widget.student!;
       final nameParts = (s['name'] ?? '').split(' ');
@@ -78,8 +72,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     _expectedGradController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _adminSmtpEmailController.dispose();
-    _adminSmtpPasswordController.dispose();
     super.dispose();
   }
 
@@ -191,10 +183,11 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         }
       }
       
-      if (!isEdit && _sendInvite) {
+      final inviteSkippedOnWeb = !isEdit && _sendInvite && kIsWeb;
+      if (!isEdit && _sendInvite && !kIsWeb) {
         await _dispatchEmailAutomation(
           email: _emailController.text.trim(),
-          name: _firstNameController.text.trim(),
+          name: '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
           tempPassword: _passwordController.text,
         );
       }
@@ -203,8 +196,14 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         Navigator.pop(context, true); 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isEdit ? 'Student Profile Updated!' : 'Student Profile Created!'),
-            backgroundColor: const Color(0xFF16A34A),
+            content: Text(
+              inviteSkippedOnWeb
+                  ? 'Student created. Email cannot be sent from the website; please use the mobile/desktop app.'
+                  : (isEdit ? 'Student Profile Updated!' : 'Student Profile Created!'),
+            ),
+            backgroundColor: inviteSkippedOnWeb
+                ? Colors.orange
+                : const Color(0xFF16A34A),
           ),
         );
       }
@@ -218,21 +217,19 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     }
   }
 
-  Future<void> _dispatchEmailAutomation({required String email, required String name, required String tempPassword}) async {
-    final String senderEmail = _adminSmtpEmailController.text.trim().isNotEmpty
-        ? _adminSmtpEmailController.text.trim()
-        : MailConfig.senderEmail;
-    final String senderPassword = _adminSmtpPasswordController.text.trim().isNotEmpty
-        ? _adminSmtpPasswordController.text.trim().replaceAll('"', '').replaceAll("'", '').replaceAll(' ', '').trim()
-        : MailConfig.senderAppPassword;
-    
+  Future<void> _dispatchEmailAutomation({
+    required String email,
+    required String name,
+    required String tempPassword,
+  }) async {
+    final senderEmail = MailConfig.senderEmail;
+    final senderPassword = MailConfig.senderAppPassword;
     if (senderEmail.isEmpty || senderPassword.isEmpty) {
-      debugPrint('SMTP Credentials missing, skipping actual send.');
+      debugPrint('SMTP credentials missing; welcome email was not sent.');
       return;
     }
 
     final smtpServer = gmail(senderEmail, senderPassword);
-
     final message = Message()
       ..from = Address(senderEmail, 'ScholarBridge Admin')
       ..recipients.add(email)
@@ -242,9 +239,13 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
           <h2 style='color: #2563EB;'>Welcome to the Program, $name!</h2>
           <p>Your internship tracking account has been successfully created by the administration.</p>
           <div style='background: #F1F5F9; padding: 15px; border-radius: 8px; margin: 20px 0;'>
-            <p style='margin: 5px 0;'><strong>Portal Link:</strong> <a href='#'>Open ScholarBridge</a></p>
-            <p style='margin: 5px 0;'><strong>Username:</strong> $email</p>
-            <p style='margin: 5px 0;'><strong>One-Time Password:</strong> $tempPassword</p>
+            <p><strong>Portal Link:</strong> <a href='#'>Open ScholarBridge</a></p>
+            <p><strong>Username:</strong> $email</p>
+            <p><strong>One-Time Password:</strong> $tempPassword</p>
+            <p><strong>Enrollment ID:</strong> ${_idController.text.trim()}</p>
+            <p><strong>Department:</strong> $_selectedDepartment</p>
+            <p><strong>Semester:</strong> $_selectedSemester</p>
+            <p><strong>Phone:</strong> ${_phoneController.text.trim()}</p>
           </div>
           <p style='font-size: 12px; color: #64748B;'>Please change your password immediately upon your first login.</p>
         </div>
@@ -252,12 +253,12 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
 
     try {
       final sendReport = await send(message, smtpServer);
-      debugPrint('Message sent: $sendReport');
+      debugPrint('Student welcome email sent successfully: $sendReport');
     } catch (e) {
-      debugPrint('Email error: $e');
+      debugPrint('SMTP email error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Mailing failed: Check your SMTP credentials'), backgroundColor: Colors.orange)
+          SnackBar(content: Text('Welcome email failed in the app: $e'), backgroundColor: Colors.orange)
         );
       }
     }
@@ -489,7 +490,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                                       children: [
                                         Text('Send System Invite Email', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                                         SizedBox(height: 4),
-                                        Text('Automatically dispatch an email containing the secure generated credentials and portal link to the student.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4)),
+                                        Text('Automatically email the student their account credentials and profile details.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4)),
                                       ],
                                     ),
                                   ),

@@ -34,7 +34,10 @@ class StudentsNotifier extends Notifier<StudentsState> {
     return StudentsState(students: [], isLoading: false);
   }
 
-  Future<void> loadStudents() async {
+  Future<void> loadStudents({bool force = false}) async {
+    if (!force && (state.students.isNotEmpty || state.isLoading)) {
+      return;
+    }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final res = await TursoDatabaseService.instance.query(

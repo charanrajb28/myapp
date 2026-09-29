@@ -10,6 +10,7 @@ import 'services/turso_database_service.dart';
 import 'services/auth_service.dart';
 
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/student_signup_screen.dart';
 import 'screens/company/company_shell.dart';
 import 'screens/admin/admin_shell.dart';
@@ -94,6 +95,10 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final uri = Uri.base;
+    final isResetLink = uri.queryParameters['mode'] == 'resetPassword' &&
+        (uri.queryParameters['oobCode']?.isNotEmpty ?? false);
+
     return MaterialApp(
       navigatorKey: _navigatorKey,
       title: 'Aaroha',
@@ -109,7 +114,9 @@ class _MyAppState extends State<MyApp> {
         textTheme: GoogleFonts.figtreeTextTheme(ThemeData.light().textTheme),
         useMaterial3: true,
       ),
-      home: const AuthGate(),
+      home: isResetLink
+          ? ResetPasswordScreen(oobCode: uri.queryParameters['oobCode']!)
+          : const AuthGate(),
       routes: {
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/login': (context) => const LoginPage(),

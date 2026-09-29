@@ -1,10 +1,7 @@
 import 'dart:convert';
-import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_selector/file_selector.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:myapp/services/supabase_compat.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/file_saver.dart';
@@ -88,7 +85,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
   }
 
   void _refreshStudents() {
-    ref.read(studentsProvider.notifier).loadStudents();
+    ref.read(studentsProvider.notifier).loadStudents(force: true);
   }
 
   bool _parseBool(dynamic val) {
@@ -944,17 +941,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
     );
   }
 
-  Widget _headerText(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w900,
-        color: Color(0xFF64748B),
-        letterSpacing: 0.8,
-      ),
-    );
-  }
+
 
   Widget _buildStudentDashboardTile({
     required String name,
@@ -1092,39 +1079,5 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildStatusBadge(String status) {
-    if (status == 'Red Alert') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF2F2),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFFECACA)),
-        ),
-        child: const Text('RED ALERT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
-      );
-    } else if (status == 'Unassigned') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: const Text('UNASSIGNED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-      );
-    } else {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFBBF7D0)),
-        ),
-        child: const Text('ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
-      );
-    }
   }
 }

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS students (
     contact_email TEXT,
     phone_number VARCHAR(20),
     avatar_url TEXT,
+    parent_name VARCHAR(255),
     parent_contact VARCHAR(20),
   parent_email VARCHAR(255),
   resume_url TEXT,
@@ -816,4 +817,3 @@ CREATE TABLE IF NOT EXISTS public.sub_admins (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
 );
-

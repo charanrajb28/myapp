@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS students (
   contact_email TEXT,
   phone_number TEXT,
   avatar_url TEXT,
+  parent_name TEXT,
   parent_contact TEXT,
   parent_email TEXT,
   resume_url TEXT,
