@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
-import '../../services/auth_service.dart';
+import '../../services/mail_server_service.dart';
 import '../../services/supabase_compat.dart';
 
 import '../../config/mail_config.dart';
@@ -45,7 +45,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await AuthService.instance.sendPasswordResetEmail(email);
+      await MailServerService.sendPasswordResetEmail(email);
 
       if (!mounted) return;
       _showSuccess('Password reset link sent. Open it to create a new password.');
