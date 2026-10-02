@@ -39,6 +39,6 @@ x-api-key: your-server-api-key
 Available endpoints:
 
 - `POST /api/send-password-reset` with `{ "email": "student@example.com" }`
-- `POST /api/send-student-welcome` with the student profile and credentials fields
+- `POST /api/send-welcome` with `accountType` (`student` or `company`), profile, and credentials fields
 
 Never commit `.env`, service-account JSON, SMTP passwords, or API keys. Configure those as environment variables on the deployment platform.

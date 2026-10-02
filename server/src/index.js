@@ -113,6 +113,20 @@ function validateEmail(value) {
   return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function toCustomActionLink(firebaseLink, appUrl) {
+  const generatedUrl = new URL(firebaseLink);
+  const customUrl = new URL(`${appUrl.replace(/\/$/, '')}/auth/reset-password`);
+
+  // Preserve Firebase's one-time action parameters (mode, oobCode, apiKey,
+  // language, and continueUrl) while changing only the page that renders the
+  // reset form.
+  generatedUrl.searchParams.forEach((value, key) => {
+    customUrl.searchParams.set(key, value);
+  });
+
+  return customUrl.toString();
+}
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'aaroha-mail-server' });
 });
@@ -125,10 +139,11 @@ app.post('/api/send-password-reset', requireApiKey, async (req, res) => {
 
   try {
     const appUrl = requiredEnv('PUBLIC_APP_URL').replace(/\/$/, '');
-    const link = await admin.auth().generatePasswordResetLink(email, {
+    const firebaseLink = await admin.auth().generatePasswordResetLink(email, {
       url: `${appUrl}/auth/reset-password`,
       handleCodeInApp: false,
     });
+    const link = toCustomActionLink(firebaseLink, appUrl);
 
     await transporter.sendMail({
       from: `\"${process.env.MAIL_FROM_NAME || 'aaroha'}\" <${requiredEnv('SMTP_USER')}>`,
@@ -150,26 +165,29 @@ app.post('/api/send-password-reset', requireApiKey, async (req, res) => {
   }
 });
 
-app.post('/api/send-student-welcome', requireApiKey, async (req, res) => {
+app.post('/api/send-welcome', requireApiKey, async (req, res) => {
   const data = req.body || {};
   const email = String(data.email || '').trim();
-  if (!validateEmail(email) || !data.name || !data.tempPassword) {
+  const accountType = String(data.accountType || 'student').toLowerCase();
+  if (!validateEmail(email) || !data.name || !data.tempPassword || !['student', 'company'].includes(accountType)) {
     return res.status(400).json({ error: 'Email, name, and temporary password are required.' });
   }
 
   try {
     const appUrl = requiredEnv('PUBLIC_APP_URL').replace(/\/$/, '');
+    const isStudent = accountType === 'student';
     await transporter.sendMail({
       from: `\"${process.env.MAIL_FROM_NAME || 'aaroha'}\" <${requiredEnv('SMTP_USER')}>`,
       to: email,
-      subject: 'Welcome to aaroha',
+      subject: isStudent ? 'Welcome to aaroha' : 'Welcome to aaroha - Company Access',
       html: `
         <div style="font-family:Arial,sans-serif;color:#0F172A;max-width:640px">
           <h2 style="color:#2563EB">Welcome to aaroha, ${escapeHtml(data.name)}!</h2>
-          <p>Your student account has been created.</p>
+          <p>${isStudent ? 'Your student internship account has been created.' : 'Your company partner account has been created.'}</p>
           <p><strong>Portal:</strong> <a href="${escapeHtml(appUrl)}">Open aaroha</a></p>
           <p><strong>Login email:</strong> ${escapeHtml(email)}</p>
           <p><strong>Temporary password:</strong> ${escapeHtml(data.tempPassword)}</p>
+          ${isStudent ? `
           <p><strong>Enrollment ID:</strong> ${escapeHtml(data.enrollmentId)}</p>
           <p><strong>College:</strong> ${escapeHtml(data.college)}</p>
           <p><strong>Department:</strong> ${escapeHtml(data.department)}</p>
@@ -177,7 +195,8 @@ app.post('/api/send-student-welcome', requireApiKey, async (req, res) => {
           <p><strong>Phone:</strong> ${escapeHtml(data.phone)}</p>
           <p><strong>Parent/guardian:</strong> ${escapeHtml(data.parentName)}</p>
           <p><strong>Parent contact:</strong> ${escapeHtml(data.parentContact)}</p>
-          <p><strong>Parent email:</strong> ${escapeHtml(data.parentEmail)}</p>
+          <p><strong>Parent email:</strong> ${escapeHtml(data.parentEmail)}</p>` : `
+          <p>Please sign in to manage internship postings and candidate applications.</p>`}
           <p style="font-size:12px;color:#64748B">Please change your password after your first sign-in.</p>
         </div>
       `,
@@ -189,6 +208,7 @@ app.post('/api/send-student-welcome', requireApiKey, async (req, res) => {
     return res.status(500).json({ error: 'Unable to send welcome email.' });
   }
 });
+
 
 app.listen(port, '127.0.0.1', () => {
   console.log(`aaroha mail server listening on port ${port}`);

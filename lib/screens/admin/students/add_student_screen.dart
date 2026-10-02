@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
 
-import '../../../config/mail_config.dart';
 import '../../../firebase_options.dart';
+import '../../../services/mail_server_service.dart';
 import '../../../services/turso_database_service.dart';
 
 class AddStudentScreen extends StatefulWidget {
@@ -183,8 +180,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         }
       }
       
-      final inviteSkippedOnWeb = !isEdit && _sendInvite && kIsWeb;
-      if (!isEdit && _sendInvite && !kIsWeb) {
+      if (!isEdit && _sendInvite) {
         await _dispatchEmailAutomation(
           email: _emailController.text.trim(),
           name: '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'.trim(),
@@ -197,13 +193,9 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              inviteSkippedOnWeb
-                  ? 'Student created. Email cannot be sent from the website; please use the mobile/desktop app.'
-                  : (isEdit ? 'Student Profile Updated!' : 'Student Profile Created!'),
+              isEdit ? 'Student Profile Updated!' : 'Student Profile Created!',
             ),
-            backgroundColor: inviteSkippedOnWeb
-                ? Colors.orange
-                : const Color(0xFF16A34A),
+            backgroundColor: const Color(0xFF16A34A),
           ),
         );
       }
@@ -222,40 +214,22 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     required String name,
     required String tempPassword,
   }) async {
-    final senderEmail = MailConfig.senderEmail;
-    final senderPassword = MailConfig.senderAppPassword;
-    if (senderEmail.isEmpty || senderPassword.isEmpty) {
-      debugPrint('SMTP credentials missing; welcome email was not sent.');
-      return;
-    }
-
-    final smtpServer = gmail(senderEmail, senderPassword);
-    final message = Message()
-      ..from = Address(senderEmail, 'ScholarBridge Admin')
-      ..recipients.add(email)
-      ..subject = 'Welcome to ScholarBridge Internship Portal'
-      ..html = """
-        <div style='font-family: sans-serif; padding: 20px; color: #0F172A;'>
-          <h2 style='color: #2563EB;'>Welcome to the Program, $name!</h2>
-          <p>Your internship tracking account has been successfully created by the administration.</p>
-          <div style='background: #F1F5F9; padding: 15px; border-radius: 8px; margin: 20px 0;'>
-            <p><strong>Portal Link:</strong> <a href='#'>Open ScholarBridge</a></p>
-            <p><strong>Username:</strong> $email</p>
-            <p><strong>One-Time Password:</strong> $tempPassword</p>
-            <p><strong>Enrollment ID:</strong> ${_idController.text.trim()}</p>
-            <p><strong>Department:</strong> $_selectedDepartment</p>
-            <p><strong>Semester:</strong> $_selectedSemester</p>
-            <p><strong>Phone:</strong> ${_phoneController.text.trim()}</p>
-          </div>
-          <p style='font-size: 12px; color: #64748B;'>Please change your password immediately upon your first login.</p>
-        </div>
-      """;
-
     try {
-      final sendReport = await send(message, smtpServer);
-      debugPrint('Student welcome email sent successfully: $sendReport');
+      await MailServerService.sendWelcomeEmail(
+        email: email,
+        name: name,
+        tempPassword: tempPassword,
+        accountType: 'student',
+        enrollmentId: _idController.text.trim(),
+        college: 'Shesadripuram College',
+        department: _selectedDepartment,
+        semester: _selectedSemester,
+        phone: _phoneController.text.trim(),
+        parentContact: _parentContactController.text.trim(),
+        parentEmail: _parentEmailController.text.trim(),
+      );
     } catch (e) {
-      debugPrint('SMTP email error: $e');
+      debugPrint('Student welcome email error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Welcome email failed in the app: $e'), backgroundColor: Colors.orange)

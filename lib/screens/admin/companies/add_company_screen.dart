@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
-import '../../../config/mail_config.dart';
 import '../../../firebase_options.dart';
+import '../../../services/mail_server_service.dart';
 import '../../../services/turso_database_service.dart';
 import 'company_detail_screen.dart';
 
@@ -328,36 +326,13 @@ class _AddCompanyScreenState extends State<AddCompanyScreen> {
     required String name,
     required String tempPassword,
   }) async {
-    final String senderEmail = MailConfig.senderEmail;
-    final String senderPassword = MailConfig.senderAppPassword;
-
-    if (senderEmail.isEmpty || senderPassword.isEmpty) {
-      debugPrint('SMTP Credentials missing, skipping company mail send.');
-      return false;
-    }
-
-    final smtpServer = gmail(senderEmail, senderPassword);
-
-    final message = Message()
-      ..from = Address(senderEmail, MailConfig.senderName)
-      ..recipients.add(email)
-      ..subject = 'Welcome to ScholarBridge - Company Access Credentials'
-      ..html = """
-        <div style='font-family: sans-serif; padding: 24px; color: #0F172A; max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 12px;'>
-          <h2 style='color: #0F172A; margin-top: 0;'>Welcome to ScholarBridge, $name!</h2>
-          <p>A partner company account has been created for your organization by the administration.</p>
-          <div style='background: #F8FAFC; padding: 18px; border-radius: 10px; border: 1px solid #E2E8F0; margin: 20px 0;'>
-            <p style='margin: 6px 0; font-size: 14px;'><strong>Portal Link:</strong> <a href='#' style='color: #2563EB;'>ScholarBridge Company Portal</a></p>
-            <p style='margin: 6px 0; font-size: 14px;'><strong>Username / HR Email:</strong> $email</p>
-            <p style='margin: 6px 0; font-size: 14px;'><strong>Temporary Password:</strong> $tempPassword</p>
-          </div>
-          <p style='font-size: 12px; color: #64748B;'>Please log in to manage your internship postings and candidate applications. We recommend updating your password after logging in.</p>
-        </div>
-      """;
-
     try {
-      final sendReport = await send(message, smtpServer);
-      debugPrint('Company welcome email sent successfully: $sendReport');
+      await MailServerService.sendWelcomeEmail(
+        email: email,
+        name: name,
+        tempPassword: tempPassword,
+        accountType: 'company',
+      );
       return true;
     } catch (e) {
       debugPrint('Company email error: $e');

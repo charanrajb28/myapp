@@ -115,13 +115,23 @@ class _MyAppState extends State<MyApp> {
         useMaterial3: true,
       ),
       home: isResetLink
-          ? ResetPasswordScreen(oobCode: uri.queryParameters['oobCode']!)
+          ? ResetPasswordScreen(actionUri: uri)
           : const AuthGate(),
       routes: {
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/login': (context) => const LoginPage(),
         '/logout': (context) => const LogoutScreen(),
         '/signup': (context) => const StudentSignUpScreen(),
+      },
+      onGenerateRoute: (settings) {
+        final routeUri = Uri.tryParse(settings.name ?? '');
+        if (routeUri != null && routeUri.path == '/auth/reset-password') {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => ResetPasswordScreen(actionUri: routeUri),
+          );
+        }
+        return null;
       },
     );
   }
