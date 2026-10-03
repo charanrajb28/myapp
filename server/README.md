@@ -17,6 +17,7 @@ Fill `.env` with:
 - The SMTP host, username, and app password.
 - A long random `SERVER_API_KEY`.
 - The deployed Flutter Web URL.
+- `CLIENT_ORIGINS` as a comma-separated list of allowed Flutter Web origins.
 
 Start it with:
 
@@ -42,3 +43,7 @@ Available endpoints:
 - `POST /api/send-welcome` with `accountType` (`student` or `company`), profile, and credentials fields
 
 Never commit `.env`, service-account JSON, SMTP passwords, or API keys. Configure those as environment variables on the deployment platform.
+
+## Vercel deployment
+
+Set the Vercel project root to this `server` folder. Vercel will use `api/index.js` and `vercel.json`. Configure all values from `.env` in the Vercel project Environment Variables, including `CLIENT_ORIGINS`, then redeploy.

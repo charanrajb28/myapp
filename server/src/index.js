@@ -10,10 +10,12 @@ const path = require('path');
 const app = express();
 const port = Number(process.env.PORT || 8082);
 
-const localOrigins = new Set([
-  'http://localhost:5000',
-  'http://127.0.0.1:5000',
-]);
+const localOrigins = new Set(
+  (process.env.CLIENT_ORIGINS || 'http://localhost:5000,http://127.0.0.1:5000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -210,6 +212,10 @@ app.post('/api/send-welcome', requireApiKey, async (req, res) => {
 });
 
 
-app.listen(port, '127.0.0.1', () => {
-  console.log(`aaroha mail server listening on port ${port}`);
-});
+if (require.main === module) {
+  app.listen(port, '127.0.0.1', () => {
+    console.log(`aaroha mail server listening on port ${port}`);
+  });
+}
+
+module.exports = app;
