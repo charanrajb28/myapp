@@ -1447,7 +1447,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
           ),
           const SizedBox(height: 24),
-          _buildInfoRow(Icons.badge_outlined, 'Enrollment ID', _valOrFallback(_studentData?['enrollment_id'], 'N/A')),
+          _buildInfoRow(Icons.badge_outlined, 'University Seat No.', _valOrFallback(_studentData?['enrollment_id'], 'N/A')),
           const SizedBox(height: 16),
           _buildInfoRow(Icons.email_outlined, 'Contact Email', _valOrFallback(_studentData?['contact_email'], 'Not Given')),
           const SizedBox(height: 16),

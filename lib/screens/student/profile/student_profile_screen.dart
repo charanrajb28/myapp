@@ -225,7 +225,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         _divider(),
         _infoTile('Semester', profile?.semester ?? 'Not set'),
         _divider(),
-        _infoTile('Enrollment ID', profile?.enrollmentId ?? 'Not set'),
+        _infoTile('University Seat No.', profile?.enrollmentId ?? 'Not set'),
         _divider(),
         _infoTile('Graduation Year', profile?.graduationYear ?? 'Not set'),
         _divider(),

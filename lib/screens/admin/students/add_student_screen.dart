@@ -323,7 +323,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildResponsiveRow(isMobile, [
-                            _buildTextField(label: 'Enrollment ID', controller: _idController, hint: 'e.g. STU-2024-001', icon: Icons.badge_outlined),
+                            _buildTextField(label: 'University Seat No.', controller: _idController, hint: 'e.g. STU-2024-001', icon: Icons.badge_outlined),
                             _buildDropdownField(
                               label: 'Department / Major',
                               value: _selectedDepartment,

@@ -211,9 +211,11 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
           // ── Toolbar ──
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isSmall = constraints.maxWidth < 600;
+
+                final searchField = TextField(
                   onChanged: (v) => setState(() => _query = v),
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
@@ -230,30 +232,47 @@ class _CompaniesListScreenState extends State<CompaniesListScreen> {
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5)),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCompanyScreen()));
-                    if (result == true) {
-                      _fetchCompanies();
-                    }
-                  },
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Add', style: TextStyle(fontWeight: FontWeight.w600)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                );
+
+                final addBtn = SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddCompanyScreen()));
+                      if (result == true) {
+                        _fetchCompanies();
+                      }
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add Company', style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
                   ),
-                ),
-              ),
-            ]),
+                );
+
+                if (isSmall) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      searchField,
+                      const SizedBox(height: 12),
+                      addBtn,
+                    ],
+                  );
+                } else {
+                  return Row(children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 12),
+                    addBtn,
+                  ]);
+                }
+              },
+            ),
           ),
 
           // ── Count ──

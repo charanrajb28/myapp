@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/turso_database_service.dart';
+import '../../utils/error_handler.dart';
 import '../../widgets/app_logo.dart';
 import '../student/student_shell.dart';
 
@@ -127,12 +128,36 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
     _confirmPasswordController.dispose();
     super.dispose();
   }
+  String _normalizeSemester(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '1st Semester';
+
+    // Exact match first
+    for (final sem in _semesters) {
+      if (sem.toLowerCase() == trimmed.toLowerCase()) {
+        return sem;
+      }
+    }
+
+    // Extract digits e.g. "3", "3rd", "Semester 3"
+    final digitMatch = RegExp(r'[1-8]').firstMatch(trimmed);
+    if (digitMatch != null) {
+      final num = int.parse(digitMatch.group(0)!);
+      final suffixes = ['st', 'nd', 'rd', 'th', 'th', 'th', 'th', 'th'];
+      final expected = '$num${suffixes[num - 1]} Semester';
+      if (_semesters.contains(expected)) {
+        return expected;
+      }
+    }
+
+    return trimmed;
+  }
 
   Future<void> _verifyUsn() async {
     final usn = _usnController.text.trim();
     if (usn.isEmpty) {
       setState(() {
-        _usnError = 'Please enter your USN / Enrollment ID.';
+        _usnError = 'Please enter your University Seat No.';
         _usnVerified = false;
       });
       return;
@@ -153,7 +178,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
 
       if (existingStudent.isNotEmpty) {
         setState(() {
-          _usnError = 'User with USN already exists.';
+          _usnError = 'User with University Seat No. already exists.';
           _usnVerified = false;
           _isVerifyingUsn = false;
         });
@@ -168,7 +193,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
 
       if (pendingList.isEmpty) {
         setState(() {
-          _usnError = 'Invalid USN. USN not found in student verification database.';
+          _usnError = 'Invalid University Seat No. University Seat No. not found in student verification database.';
           _usnVerified = false;
           _isVerifyingUsn = false;
         });
@@ -179,7 +204,8 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
       final studentData = pendingList.first;
       final name = studentData['name']?.toString() ?? '';
       final department = studentData['department']?.toString() ?? 'B.Com LSCM';
-      final semester = studentData['semester']?.toString() ?? '1st Semester';
+      final rawSemester = studentData['semester']?.toString() ?? '1st Semester';
+      final semester = _normalizeSemester(rawSemester);
 
       setState(() {
         if (name.isNotEmpty) {
@@ -191,17 +217,18 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
           _departments.add(department);
           _selectedDepartment = department;
         }
-        if (_semesters.contains(semester)) {
-          _selectedSemester = semester;
+        if (!_semesters.contains(semester)) {
+          _semesters.add(semester);
         }
+        _selectedSemester = semester;
         _usnVerified = true;
         _usnError = null;
         _isVerifyingUsn = false;
       });
     } catch (e) {
-      debugPrint('Error verifying USN: $e');
+      debugPrint('Error verifying University Seat No.: $e');
       setState(() {
-        _usnError = 'Error verifying USN: $e';
+        _usnError = 'Error verifying University Seat No.: $e';
         _usnVerified = false;
         _isVerifyingUsn = false;
       });
@@ -249,7 +276,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
     if (!_formKeys[3].currentState!.validate()) return;
 
     if (!_usnVerified) {
-      _showError('Please verify your USN in Step 1 first.');
+      _showError('Please verify your University Seat No. in Step 1 first.');
       _goToStep(0);
       return;
     }
@@ -331,7 +358,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
       );
     } catch (e) {
       if (!mounted) return;
-      _showError('Failed to complete registration: $e');
+      _showError(ErrorHandler.getErrorMessage(e, fallbackMessage: 'Failed to complete registration. Please try again.'));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -354,8 +381,8 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
     final steps = [
       const _StepMeta(
         icon: Icons.verified_user_rounded,
-        title: 'USN Verification',
-        subtitle: 'Verify your USN & basic info',
+        title: 'University Seat No. Verification',
+        subtitle: 'Verify your University Seat No. & basic info',
         color: Color(0xFF3B82F6),
       ),
       const _StepMeta(
@@ -518,7 +545,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
           children: [
             _card(
               children: [
-                _inputLabel('Enter USN / Enrollment ID *'),
+                _inputLabel('Enter University Seat No. *'),
                 Row(
                   children: [
                     Expanded(
@@ -535,8 +562,8 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
                           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _primary, width: 2)),
                         ),
                         validator: (v) {
-                          if ((v ?? '').trim().isEmpty) return 'USN is required';
-                          if (!_usnVerified) return 'Please verify your USN';
+                          if ((v ?? '').trim().isEmpty) return 'University Seat No. is required';
+                          if (!_usnVerified) return 'Please verify your University Seat No.';
                           return null;
                         },
                       ),
@@ -552,7 +579,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
                       ),
                       child: _isVerifyingUsn
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Verify USN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          : const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -596,7 +623,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'USN Verified! Student details fetched successfully.',
+                            'University Seat No. Verified! Student details fetched successfully.',
                             style: TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.bold, fontSize: 12.5),
                           ),
                         ),

@@ -90,7 +90,7 @@ class _AdminFormResponsesScreenState extends State<AdminFormResponsesScreen> {
       excel.setDefaultSheet('Responses');
       
       // Header row
-      List<String> headers = ['Date', 'Student Name', 'Enrollment ID'];
+      List<String> headers = ['Date', 'Student Name', 'University Seat No.'];
       for (var q in widget.schema) {
         headers.add(q['question'].toString());
       }

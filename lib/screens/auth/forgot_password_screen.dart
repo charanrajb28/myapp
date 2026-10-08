@@ -5,6 +5,7 @@ import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 import '../../services/mail_server_service.dart';
 import '../../services/supabase_compat.dart';
+import '../../utils/error_handler.dart';
 
 import '../../config/mail_config.dart';
 import '../../widgets/app_logo.dart';
@@ -52,7 +53,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      _showError('Unable to send password reset email: $e');
+      _showError(ErrorHandler.getErrorMessage(e, fallbackMessage: 'Unable to send password reset email. Please try again.'));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -95,7 +96,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      _showError('Unable to reset password: $e');
+      _showError(ErrorHandler.getErrorMessage(e, fallbackMessage: 'Unable to reset password. Please try again.'));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

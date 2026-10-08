@@ -172,7 +172,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
     try {
       final headers = [
         'ID',
-        'Enrollment ID',
+        'University Seat No.',
         'Name',
         'Department',
         'Semester',
@@ -791,7 +791,7 @@ class _StudentsListScreenState extends ConsumerState<StudentsListScreen> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search by name, ID, or email...',
+          hintText: 'Search by name, University Seat No., or email...',
           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
           prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
           suffixIcon: _searchController.text.isNotEmpty

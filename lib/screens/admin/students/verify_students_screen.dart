@@ -321,7 +321,7 @@ class _VerifyStudentsScreenState extends State<VerifyStudentsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: usnCtrl, decoration: const InputDecoration(labelText: 'USN'), enabled: !isEdit),
+              TextField(controller: usnCtrl, decoration: const InputDecoration(labelText: 'University Seat No.'), enabled: !isEdit),
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
               TextField(controller: deptCtrl, decoration: const InputDecoration(labelText: 'Department')),
               TextField(controller: semCtrl, decoration: const InputDecoration(labelText: 'Semester')),
@@ -385,31 +385,58 @@ class _VerifyStudentsScreenState extends State<VerifyStudentsScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Search by USN or Name',
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onChanged: (val) => setState(() => _searchQuery = val),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isSmall = constraints.maxWidth < 650;
+
+                    final searchField = TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search by University Seat No. or Name',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                    );
+
+                    final uploadBtn = ElevatedButton.icon(
                       onPressed: _uploadExcel,
                       icon: const Icon(Icons.upload_file),
                       label: const Text('Upload'),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
+                    );
+
+                    final addBtn = ElevatedButton.icon(
                       onPressed: () => _showEditStudentDialog(null),
                       icon: const Icon(Icons.add),
                       label: const Text('Add'),
-                    ),
-                  ],
+                    );
+
+                    if (isSmall) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          searchField,
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: uploadBtn),
+                              const SizedBox(width: 10),
+                              Expanded(child: addBtn),
+                            ],
+                          ),
+                        ],
+                      );
+                    } else {
+                      return Row(
+                        children: [
+                          Expanded(child: searchField),
+                          const SizedBox(width: 10),
+                          uploadBtn,
+                          const SizedBox(width: 10),
+                          addBtn,
+                        ],
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 20),
                 Expanded(
@@ -434,7 +461,7 @@ class _VerifyStudentsScreenState extends State<VerifyStudentsScreen> {
                                   ),
                                   child: const Row(
                                     children: [
-                                      Expanded(flex: 2, child: Text('USN', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87))),
+                                      Expanded(flex: 2, child: Text('University Seat No.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87))),
                                       Expanded(flex: 3, child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87))),
                                       SizedBox(width: 48), // Space for action menu icon
                                     ],

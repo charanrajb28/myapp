@@ -112,7 +112,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
       if (type == 'students') {
         fileName = 'student_records_${DateTime.now().millisecondsSinceEpoch}.csv';
         final data = await client.from('students').select('*');
-        sb.writeln('Enrollment ID,Name,College,Department,Semester,Email,Phone,Parent Contact,Parent Email,GPA,Graduation Year,Blacklisted');
+        sb.writeln('University Seat No.,Name,College,Department,Semester,Email,Phone,Parent Contact,Parent Email,GPA,Graduation Year,Blacklisted');
         for (final row in data) {
           final email = row['contact_email']?.toString() ?? '';
           sb.writeln('"${row['enrollment_id'] ?? ''}","${row['name'] ?? ''}","${row['college'] ?? ''}","${row['department'] ?? ''}","${row['semester'] ?? ''}","$email","${row['phone_number'] ?? ''}","${row['parent_contact'] ?? ''}","${row['parent_email'] ?? ''}","${row['gpa'] ?? ''}","${row['graduation_year'] ?? ''}","${row['is_blacklisted'] == true ? 'Yes' : 'No'}"');
@@ -128,7 +128,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
       } else if (type == 'internships') {
         fileName = 'internship_reports_${DateTime.now().millisecondsSinceEpoch}.csv';
         final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, start_date, end_date, companies(name))');
-        sb.writeln('Student Name,Enrollment ID,Company,Role,Status,Progress %,Start Date,End Date,Mentor Name');
+        sb.writeln('Student Name,University Seat No.,Company,Role,Status,Progress %,Start Date,End Date,Mentor Name');
         for (final row in data) {
           final student = row['students'] as Map? ?? {};
           final internship = row['internships'] as Map? ?? {};
@@ -139,7 +139,7 @@ class _MoreOptionsScreenState extends State<MoreOptionsScreen> {
       } else if (type == 'alerts') {
         fileName = 'alert_logs_${DateTime.now().millisecondsSinceEpoch}.csv';
         final data = await client.from('applications').select('*, students(name, enrollment_id), internships(role, end_date, companies(name))').inFilter('status', ['Removed', 'Completed']).order('progress', ascending: true);
-        sb.writeln('Alert Reason,Student Name,Enrollment ID,Company,Role,Status,Progress %,End Date');
+        sb.writeln('Alert Reason,Student Name,University Seat No.,Company,Role,Status,Progress %,End Date');
         for (final row in data) {
           final student = row['students'] as Map? ?? {};
           final internship = row['internships'] as Map? ?? {};

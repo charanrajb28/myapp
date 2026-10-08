@@ -17,6 +17,7 @@ import 'screens/admin/admin_shell.dart';
 import 'screens/admin/dashboard/admin_dashboard_screen.dart';
 import 'screens/student/student_shell.dart';
 import 'utils/device_session_helper.dart';
+import 'utils/error_handler.dart';
 import 'services/fcm_service.dart';
 import 'widgets/app_logo.dart';
 
@@ -567,7 +568,7 @@ class _LoginPageState extends State<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'College Email / ID',
+                          'College Email',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -578,7 +579,7 @@ class _LoginPageState extends State<LoginPage> {
                         TextField(
                           controller: _emailController,
                           decoration: InputDecoration(
-                            hintText: 'Enter your official credentials',
+                            hintText: 'Enter your official email',
                             hintStyle: TextStyle(
                               color: textSecondary.withValues(alpha: 0.7),
                               fontSize: 14,
@@ -825,7 +826,7 @@ class _LoginPageState extends State<LoginPage> {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(e.toString()),
+                                      content: Text(ErrorHandler.getErrorMessage(e)),
                                       backgroundColor: Colors.red,
                                     )
                                   );

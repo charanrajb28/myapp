@@ -10,6 +10,7 @@ import '../../../services/turso_database_service.dart';
 import '../../../config/mail_config.dart';
 import '../../../services/supabase_compat.dart';
 import '../../../utils/device_session_helper.dart';
+import '../../../utils/error_handler.dart';
 
 enum VerificationMode { password, otp }
 
@@ -132,14 +133,13 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
         _isVerifying = false;
       });
       _showMessage('Identity verified successfully.');
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() => _isVerifying = false);
-      _showMessage(e.message ?? 'Authentication failed', isError: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isVerifying = false);
-      _showMessage('Unable to verify password: $e', isError: true);
+      _showMessage(
+        ErrorHandler.getErrorMessage(e, fallbackMessage: 'Unable to verify password. Please try again.'),
+        isError: true,
+      );
     }
   }
 
@@ -200,14 +200,13 @@ class _SecurityPasswordScreenState extends State<SecurityPasswordScreen> {
       setState(() => _isUpdating = false);
       _showMessage('Password updated successfully.');
       Navigator.pop(context);
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() => _isUpdating = false);
-      _showMessage(e.message, isError: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isUpdating = false);
-      _showMessage('Unable to update password: $e', isError: true);
+      _showMessage(
+        ErrorHandler.getErrorMessage(e, fallbackMessage: 'Unable to update password. Please try again.'),
+        isError: true,
+      );
     }
   }
 
