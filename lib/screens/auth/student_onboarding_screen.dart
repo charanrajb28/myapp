@@ -841,7 +841,7 @@ class _StudentOnboardingScreenState extends State<StudentOnboardingScreen> with 
           children: [
             _card(
               children: [
-                _inputLabel('College Email Address *'),
+                _inputLabel('Email ID *'),
                 _textField(
                   controller: _emailController,
                   hint: 'student@example.com',

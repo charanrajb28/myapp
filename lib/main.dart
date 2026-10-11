@@ -568,7 +568,7 @@ class _LoginPageState extends State<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'College Email',
+                          'Email ID',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
