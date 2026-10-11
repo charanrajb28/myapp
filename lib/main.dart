@@ -726,103 +726,151 @@ class _LoginPageState extends State<LoginPage> {
                           height: 52,
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : () async {
+                              final email = _emailController.text.trim();
+                              final password = _passwordController.text;
+
+                              if (email.isEmpty || password.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please enter both email and password.'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+
                               setState(() => _isLoading = true);
                               try {
                                 final cred = await AuthService.instance.signInWithEmailAndPassword(
-                                  email: _emailController.text.trim(),
-                                  password: _passwordController.text,
+                                  email: email,
+                                  password: password,
                                 );
                                 
                                 final user = cred.user;
                                 if (user != null) {
-                                  final deviceToken = await getOrCreateDeviceToken();
-                                  final deviceInfo = getDeviceInfo();
-                                  
-                                  // Check for active session(s)
-                                  final activeSessions = await TursoDatabaseService.instance.query(
-                                    '''
-                                    SELECT device_token, device_info FROM user_device_sessions
-                                    WHERE user_id = ? AND is_active = 1
-                                    ''',
+                                  // 1. Verify user profile and role in database first
+                                  final userData = await TursoDatabaseService.instance.querySingle(
+                                    'SELECT id, role FROM users WHERE id = ?',
                                     [user.uid],
                                   );
-                                      
-                                  bool proceed = true;
-                                  if (activeSessions.isNotEmpty) {
-                                    final currentActiveToken = activeSessions.first['device_token'];
-                                    final currentActiveInfo = activeSessions.first['device_info'];
-                                    
-                                    if (currentActiveToken != deviceToken) {
-                                      if (!context.mounted) {
-                                        await AuthService.instance.signOut();
-                                        return;
-                                      }
-                                      final shouldLogoutOther = await _showConflictDialog(context, currentActiveInfo ?? 'Other device');
-                                      if (shouldLogoutOther == true) {
-                                        await TursoDatabaseService.instance.execute(
-                                          '''
-                                          UPDATE user_device_sessions
-                                          SET is_active = 0, logged_out_at = CURRENT_TIMESTAMP
-                                          WHERE user_id = ? AND is_active = 1
-                                          ''',
-                                          [user.uid],
-                                        );
-                                            
-                                        await TursoDatabaseService.instance.execute(
-                                          '''
-                                          INSERT INTO user_device_sessions (id, user_id, device_token, device_info, is_active)
-                                          VALUES (?, ?, ?, ?, 1)
-                                          ''',
-                                          ['session_${DateTime.now().millisecondsSinceEpoch}', user.uid, deviceToken, deviceInfo],
-                                        );
-                                      } else {
-                                        proceed = false;
-                                        await AuthService.instance.signOut();
-                                      }
-                                    }
-                                  } else {
-                                    await TursoDatabaseService.instance.execute(
-                                      '''
-                                      INSERT INTO user_device_sessions (id, user_id, device_token, device_info, is_active)
-                                      VALUES (?, ?, ?, ?, 1)
-                                      ''',
-                                      ['session_${DateTime.now().millisecondsSinceEpoch}', user.uid, deviceToken, deviceInfo],
+
+                                  String? role = userData?['role']?.toString();
+
+                                  // If user exists in Firebase Auth but ID differed in Turso DB, sync UID
+                                  if (role == null && user.email != null) {
+                                    final userByEmail = await TursoDatabaseService.instance.querySingle(
+                                      'SELECT id, role FROM users WHERE LOWER(email) = LOWER(?)',
+                                      [user.email],
                                     );
+                                    if (userByEmail != null) {
+                                      final oldId = userByEmail['id'];
+                                      await TursoDatabaseService.instance.execute(
+                                        'UPDATE users SET id = ? WHERE id = ?',
+                                        [user.uid, oldId],
+                                      );
+                                      await TursoDatabaseService.instance.execute(
+                                        'UPDATE students SET user_id = ? WHERE user_id = ?',
+                                        [user.uid, oldId],
+                                      );
+                                      await TursoDatabaseService.instance.execute(
+                                        'UPDATE companies SET user_id = ? WHERE user_id = ?',
+                                        [user.uid, oldId],
+                                      );
+                                      role = userByEmail['role']?.toString();
+                                    }
                                   }
 
-                                  if (proceed) {
-                                    final userData = await TursoDatabaseService.instance.querySingle(
-                                      'SELECT role FROM users WHERE id = ?',
-                                      [user.uid],
-                                    );
-                                        
-                                    final role = userData?['role'];
-                                    
-                                    if (!context.mounted) return;
-                                    
-                                    if (role == 'admin' || role == 'sub_admin') {
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
-                                      );
-                                    } else if (role == 'student') {
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(builder: (context) => const StudentShell()),
-                                      );
-                                    } else if (role == 'company') {
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute(builder: (context) => const CompanyShell()),
-                                      );
-                                    } else {
+                                  if (role == null) {
+                                    await AuthService.instance.signOut();
+                                    if (context.mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
-                                          content: Text('User role not found or not assigned.'),
+                                          content: Text('No assigned user role found for this account. Please contact the administrator.'),
                                           backgroundColor: Colors.orange,
                                         ),
                                       );
                                     }
+                                    return;
+                                  }
+
+                                  // 2. Manage device session safely
+                                  try {
+                                    final deviceToken = await getOrCreateDeviceToken();
+                                    final deviceInfo = getDeviceInfo();
+                                    
+                                    final activeSessions = await TursoDatabaseService.instance.query(
+                                      '''
+                                      SELECT device_token, device_info FROM user_device_sessions
+                                      WHERE user_id = ? AND is_active = 1
+                                      ''',
+                                      [user.uid],
+                                    );
+                                        
+                                    if (activeSessions.isNotEmpty) {
+                                      final currentActiveToken = activeSessions.first['device_token'];
+                                      final currentActiveInfo = activeSessions.first['device_info'];
+                                      
+                                      if (currentActiveToken != deviceToken) {
+                                        if (!context.mounted) {
+                                          await AuthService.instance.signOut();
+                                          return;
+                                        }
+                                        final shouldLogoutOther = await _showConflictDialog(context, currentActiveInfo ?? 'Other device');
+                                        if (shouldLogoutOther == true) {
+                                          await TursoDatabaseService.instance.execute(
+                                            '''
+                                            UPDATE user_device_sessions
+                                            SET is_active = 0, logged_out_at = CURRENT_TIMESTAMP
+                                            WHERE user_id = ? AND is_active = 1
+                                            ''',
+                                            [user.uid],
+                                          );
+                                              
+                                          await TursoDatabaseService.instance.execute(
+                                            '''
+                                            INSERT INTO user_device_sessions (id, user_id, device_token, device_info, is_active)
+                                            VALUES (?, ?, ?, ?, 1)
+                                            ''',
+                                            ['session_${DateTime.now().millisecondsSinceEpoch}', user.uid, deviceToken, deviceInfo],
+                                          );
+                                        } else {
+                                          await AuthService.instance.signOut();
+                                          return;
+                                        }
+                                      }
+                                    } else {
+                                      await TursoDatabaseService.instance.execute(
+                                        '''
+                                        INSERT INTO user_device_sessions (id, user_id, device_token, device_info, is_active)
+                                        VALUES (?, ?, ?, ?, 1)
+                                        ''',
+                                        ['session_${DateTime.now().millisecondsSinceEpoch}', user.uid, deviceToken, deviceInfo],
+                                      );
+                                    }
+                                  } catch (sessionErr) {
+                                    debugPrint('Device session tracking non-fatal warning: $sessionErr');
+                                  }
+
+                                  // 3. Navigate to appropriate role shell
+                                  if (!context.mounted) return;
+                                  
+                                  if (role == 'admin' || role == 'sub_admin') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const AdminShell(child: AdminDashboardScreen())),
+                                    );
+                                  } else if (role == 'student') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const StudentShell()),
+                                    );
+                                  } else if (role == 'company') {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => const CompanyShell()),
+                                    );
                                   }
                                 }
-                              } catch (e) {
+                              } catch (e, stack) {
+                                debugPrint('❌ Sign in error: $e');
+                                debugPrint('Stack: $stack');
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
